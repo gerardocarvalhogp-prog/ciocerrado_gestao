@@ -315,4 +315,7 @@ begin
 end $$;
 
 revoke execute on function meu_participante(text) from anon;
-revoke execute on function recalc_fatura_participante(uuid) from anon;
+
+-- O calculo da fatura vive em _recalcular_fatura_participante, que
+-- nasce depois (funcoes_financeiro). A revogacao dele fica naquele
+-- arquivo: revogar aqui referenciaria uma funcao que ainda nao existe.

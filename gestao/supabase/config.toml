@@ -44,7 +44,10 @@ sql_paths = ["./seed.sql"]
 enabled = true
 port = 54323
 
-[inbucket]
+# Captura os e-mails localmente (magic link, avisos da fila de
+# notificacoes) em vez de enviar de verdade. Era [inbucket] ate o CLI
+# 2.x renomear.
+[local_smtp]
 enabled = true
 port = 54324
 
