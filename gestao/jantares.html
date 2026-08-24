@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jantares · CIO Cerrado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
+  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
+  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--papel);color:var(--texto);
+  font-family:'Public Sans',system-ui,sans-serif;font-size:14.5px;line-height:1.5;}
+button{font-family:inherit;cursor:pointer;}
+:focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
+
+.topo{background:var(--verde);color:#fff;padding:13px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;}
+.marca span{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
+.topo-dir{display:flex;align-items:center;gap:11px;}
+.quem{font-family:'IBM Plex Mono',monospace;font-size:11.5px;opacity:.85;}
+.sair{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
+  border-radius:var(--raio);padding:4px 10px;font-size:12px;}
+
+.wrap{max-width:1080px;margin:0 auto;padding:22px 20px 80px;}
+.abas{display:flex;gap:2px;border-bottom:1px solid var(--linha);
+  margin-bottom:22px;overflow-x:auto;}
+.aba{background:none;border:none;border-bottom:2px solid transparent;
+  padding:9px 13px;font-size:13.5px;color:var(--suave);white-space:nowrap;}
+.aba[aria-selected="true"]{color:var(--verde);border-bottom-color:var(--verde);font-weight:600;}
+
+h1{font-family:'Archivo',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing:-.015em;}
+h2{font-family:'Archivo',sans-serif;font-size:16px;margin:0 0 8px;}
+.sub{color:var(--suave);font-size:13px;margin:0 0 18px;}
+
+.cartao{background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:15px;margin-bottom:12px;}
+.cartao-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.barra{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;}
+.barra > div{min-width:150px;}
+
+label{display:block;font-size:11.5px;color:var(--suave);margin-bottom:3px;}
+input[type=text],input[type=email],input[type=date],input[type=file],select{
+  width:100%;padding:7px 9px;border:1px solid var(--linha);border-radius:var(--raio);
+  font-family:inherit;font-size:13.5px;background:var(--superficie);color:var(--texto);}
+.check{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--texto);}
+.check input{width:auto;margin:0;}
+
+.btn{background:var(--verde);color:#fff;border:none;border-radius:var(--raio);
+  padding:8px 14px;font-size:13.5px;font-weight:500;}
+.btn:hover{background:#0E241F;}
+.btn:disabled{background:#A9B5B0;cursor:not-allowed;}
+.btn.sec{background:transparent;color:var(--verde);border:1px solid var(--linha);}
+.btn.sec:hover{background:#F1F3EE;}
+.btn.mini{padding:4px 9px;font-size:12px;}
+.btn.perigo{background:transparent;color:var(--erro);border:1px solid #E4CFCB;}
+.btn.ok{background:var(--verde-med);}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--suave);
+  border-bottom:1px solid var(--linha);padding:7px 6px;}
+td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
+.rolagem{max-height:480px;overflow:auto;}
+
+.selo{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;
+  border-radius:20px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.selo.ok{background:#E4F0EA;color:var(--verde-med);}
+.selo.pend{background:#EFEFEA;color:var(--suave);}
+.selo.alerta{background:#F7EFD9;color:var(--ouro);}
+.selo.erro{background:#FBF0EE;color:var(--erro);}
+
+.aviso{border-radius:var(--raio);padding:10px 12px;font-size:13px;margin-bottom:12px;
+  border:1px solid var(--linha);background:var(--superficie);}
+.aviso.erro{background:#FBF0EE;border-color:#E4CFCB;color:var(--erro);}
+.aviso.ok{background:#E8F2EC;border-color:#C9E0D4;color:var(--verde-med);}
+.vazio{border:1px dashed var(--linha);border-radius:var(--raio);padding:22px;
+  text-align:center;color:var(--suave);font-size:13.5px;}
+.carregando{color:var(--suave);font-size:13px;padding:18px 0;}
+.oculto{display:none !important;}
+.meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--suave);}
+.login{max-width:380px;margin:12vh auto;padding:0 20px;}
+.login h1{font-size:20px;}
+.voltar{background:none;border:none;color:var(--verde);text-decoration:underline;
+  font-size:13px;padding:0;margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<div id="tela-login" class="login">
+  <div class="cartao">
+    <h1>Jantares CIO Cerrado</h1>
+    <p class="sub">Acesso restrito à equipe. Entre com seu e-mail.</p>
+    <div id="login-aviso"></div>
+    <label for="email">E-mail</label>
+    <input type="email" id="email" autocomplete="email">
+    <div style="margin-top:11px;">
+      <button class="btn" id="btn-entrar" style="width:100%;">Enviar link de acesso</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="oculto">
+  <header class="topo">
+    <div class="marca">CIO Cerrado<span>Jantares</span></div>
+    <div class="topo-dir">
+      <span class="quem" id="quem"></span>
+      <button class="sair" id="btn-sair">Sair</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="abas" role="tablist">
+      <button class="aba" role="tab" data-aba="agenda" aria-selected="true">Agenda</button>
+      <button class="aba" role="tab" data-aba="estatisticas" aria-selected="false">Estatísticas</button>
+    </div>
+    <div id="aviso-global"></div>
+    <div id="conteudo"><p class="carregando">Carregando…</p></div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURACAO
+// =====================================================================
+const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { db: { schema: "gestao" } });
+
+const $  = (s,r=document) => r.querySelector(s);
+const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function aviso(alvo, texto, tipo="erro"){
+  const el = typeof alvo === "string" ? $(alvo) : alvo;
+  if(!el) return;
+  el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
+}
+function explicar(e){
+  const m = e?.message || String(e);
+  if(m.includes("Acesso restrito a administradores"))
+    return "Esta ação exige perfil de administrador.";
+  if(m.includes("Acesso restrito")) return "Seu e-mail não está cadastrado na equipe.";
+  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
+  return m;
+}
+async function rpc(nome, params){
+  const { data, error } = await sb.rpc(nome, params);
+  if(error) throw error;
+  return data;
+}
+async function ia(prompt, { buscarWeb=false, json=false, maxTokens=2000 } = {}){
+  const { data, error } = await sb.functions.invoke("ia", {
+    body: { prompt, buscar_web: buscarWeb, json, max_tokens: maxTokens } });
+  if(error) throw new Error(error.message || "Falha ao chamar a IA.");
+  if(data?.erro) throw new Error(data.erro);
+  return json ? data.dados : data.texto;
+}
+const dataBR = d => d ? String(d).split("T")[0].split("-").reverse().join("/") : "—";
+
+function exportar(linhas, colunas, nomeArquivo, nomeAba="Dados"){
+  if(!linhas || linhas.length === 0){ aviso("#aviso-global","Não há dados para exportar."); return; }
+  const dados = linhas.map(l => { const o={}; colunas.forEach(([c,t])=>o[t]=l[c]??""); return o; });
+  const ws = XLSX.utils.json_to_sheet(dados);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+  XLSX.writeFile(wb, nomeArquivo);
+}
+
+// =====================================================================
+// LOGIN / BOOT
+// =====================================================================
+$("#btn-entrar").addEventListener("click", async () => {
+  const email = $("#email").value.trim();
+  if(!email){ aviso("#login-aviso","Informe seu e-mail."); return; }
+  const b = $("#btn-entrar");
+  b.disabled = true; b.textContent = "Enviando…";
+  try{
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href }});
+    if(error) throw error;
+    aviso("#login-aviso","Link enviado. Abra seu e-mail para entrar.","ok");
+  }catch(e){ aviso("#login-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Enviar link de acesso"; }
+});
+$("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
+$("#btn-sair").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+let iniciado = false;
+sb.auth.onAuthStateChange(ev => {
+  if(ev === "SIGNED_OUT"){ location.reload(); return; }
+  if(!iniciado) iniciar();
+});
+(async () => { const { data } = await sb.auth.getSession(); if(data?.session) iniciar(); })();
+
+async function iniciar(){
+  if(iniciado) return; iniciado = true;
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user) return;
+  $("#tela-login").classList.add("oculto");
+  $("#app").classList.remove("oculto");
+  $("#quem").textContent = user.email;
+
+  $$(".aba").forEach(b => b.addEventListener("click", () => {
+    $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
+    ABAS[b.dataset.aba]();
+  }));
+  ABAS.agenda();
+}
+
+const ABAS = {};
+
+// =====================================================================
+// ABA: AGENDA
+// =====================================================================
+ABAS.agenda = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const l = await rpc("jantar_listar", {});
+
+    c.innerHTML = `
+      <h1>Agenda de jantares</h1>
+      <p class="sub">${l.length} jantar(es) cadastrado(s).</p>
+
+      <div class="cartao">
+        <h2>Novo jantar</h2>
+        <div class="barra">
+          <div><label>Patrocinador</label><input type="text" id="j-patro"></div>
+          <div><label>Site</label><input type="text" id="j-site"></div>
+          <div style="max-width:150px;"><label>Data</label><input type="date" id="j-data"></div>
+          <div style="max-width:100px;"><label>Horário</label><input type="text" id="j-hora" placeholder="20:00"></div>
+        </div>
+        <div class="barra">
+          <div><label>Local</label><input type="text" id="j-local"></div>
+          <div style="max-width:110px;"><label>Capacidade</label><input type="text" id="j-cap" placeholder="8"></div>
+          <div><label>Perfil de convidado desejado</label>
+            <input type="text" id="j-perfil" placeholder="Ex.: indústrias com faturamento acima de 1 Bi"></div>
+        </div>
+        <div class="barra">
+          <div style="min-width:100%;"><label>Observações</label><input type="text" id="j-obs"></div>
+        </div>
+        <div id="j-aviso"></div>
+        <button class="btn" id="j-salvar">Criar jantar</button>
+      </div>
+
+      <div class="cartao">
+        <div class="rolagem"><table>
+          <tr><th>Data</th><th>Patrocinador</th><th>Local</th><th>Convidados</th><th>Status</th><th></th></tr>
+          ${l.map(j => `<tr>
+            <td class="meta">${dataBR(j.data)}${j.horario ? " "+String(j.horario).slice(0,5) : ""}</td>
+            <td><strong>${esc(j.patrocinador)}</strong></td>
+            <td class="meta">${esc(j.local||"—")}</td>
+            <td><span class="selo ${Number(j.confirmados)>=j.capacidade?"ok":"pend"}">${j.confirmados}/${j.capacidade}</span>
+                ${j.compareceram ? `<br><span class="meta">${j.compareceram} compareceu</span>` : ""}</td>
+            <td><span class="selo ${j.status==="realizado"?"ok":j.status==="cancelado"?"erro":"alerta"}">${esc(j.status)}</span></td>
+            <td><button class="btn sec mini abrir" data-id="${esc(j.id)}">Abrir</button></td>
+          </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nenhum jantar ainda.</td></tr>`}
+        </table></div>
+      </div>`;
+
+    $("#j-salvar").addEventListener("click", async () => {
+      const nome = $("#j-patro").value.trim();
+      if(!nome){ aviso("#j-aviso","Informe o patrocinador."); return; }
+      const b = $("#j-salvar");
+      b.disabled = true; b.textContent = "Criando…";
+      try{
+        const r = await rpc("jantar_salvar", {
+          p_patrocinador_nome: nome,
+          p_data: $("#j-data").value || null,
+          p_horario: $("#j-hora").value || null,
+          p_local: $("#j-local").value.trim() || null,
+          p_patrocinador_site: $("#j-site").value.trim() || null,
+          p_perfil_convidado: $("#j-perfil").value.trim() || null,
+          p_observacoes: $("#j-obs").value.trim() || null,
+          p_capacidade: parseInt($("#j-cap").value,10) || 8
+        });
+        abrirJantar(r.id);
+      }catch(e){ aviso("#j-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Criar jantar"; }
+    });
+
+    $$(".abrir").forEach(b => b.addEventListener("click", () => abrirJantar(b.dataset.id)));
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+// =====================================================================
+// DETALHE DO JANTAR
+// =====================================================================
+let J = null;
+let PROSP = [];
+
+async function abrirJantar(id){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando jantar…</p>`;
+  try{
+    const [j] = await rpc("jantar_obter", { p_id: id });
+    J = j;
+    desenharJantar();
+  }catch(e){ aviso(c, explicar(e)); }
+}
+
+async function desenharJantar(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <button class="voltar" id="voltar">← Voltar para a agenda</button>
+    <h1>${esc(J.patrocinador_nome)}</h1>
+    <p class="sub">${dataBR(J.data)}${J.horario?" · "+String(J.horario).slice(0,5):""} · ${esc(J.local||"local a definir")} · ${J.capacidade} vaga(s)</p>
+
+    <div class="cartao">
+      <div class="cartao-cab">
+        <h2 style="margin:0;">Dados do jantar</h2>
+        <select id="jd-status" style="max-width:160px;">
+          <option value="planejado"  ${J.status==="planejado" ?"selected":""}>Planejado</option>
+          <option value="confirmado" ${J.status==="confirmado"?"selected":""}>Confirmado</option>
+          <option value="realizado"  ${J.status==="realizado" ?"selected":""}>Realizado</option>
+          <option value="cancelado"  ${J.status==="cancelado" ?"selected":""}>Cancelado</option>
+        </select>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>Patrocinador</label><input type="text" id="jd-patro" value="${esc(J.patrocinador_nome)}"></div>
+        <div><label>Site</label><input type="text" id="jd-site" value="${esc(J.patrocinador_site||"")}"></div>
+        <div style="max-width:150px;"><label>Data</label><input type="date" id="jd-data" value="${esc(J.data||"")}"></div>
+        <div style="max-width:100px;"><label>Horário</label><input type="text" id="jd-hora" value="${esc(J.horario||"")}"></div>
+      </div>
+      <div class="barra">
+        <div><label>Local</label><input type="text" id="jd-local" value="${esc(J.local||"")}"></div>
+        <div style="max-width:110px;"><label>Capacidade</label><input type="text" id="jd-cap" value="${J.capacidade}"></div>
+        <div><label>Perfil de convidado desejado</label><input type="text" id="jd-perfil" value="${esc(J.perfil_convidado||"")}"></div>
+      </div>
+      <div id="jd-aviso"></div>
+      <button class="btn sec" id="jd-salvar">Salvar</button>
+      <button class="btn perigo" id="jd-remover" style="margin-left:6px;">Remover jantar</button>
+    </div>
+
+    <div class="cartao">
+      <h2>Buscar convidados</h2>
+      <div class="barra">
+        <div style="min-width:280px;"><label>Abrangência geográfica</label>
+          <input type="text" id="pr-abr" value="Grande Brasília (DF + entorno)"></div>
+        <div style="max-width:170px;"><label>Faturamento mínimo</label>
+          <input type="text" id="pr-fatmin" placeholder="Ex.: 500 milhões"></div>
+        <div style="max-width:200px;"><label>Executivos por empresa</label>
+          <select id="pr-execs">
+            <option value="1">Só o 1º executivo</option>
+            <option value="2">1º e 2º executivo</option>
+          </select></div>
+      </div>
+      <div class="barra">
+        <div><label class="check"><input type="checkbox" id="pr-priv" checked> Só empresas privadas</label></div>
+        <div><label class="check"><input type="checkbox" id="pr-hib" checked> Incluir híbridas</label></div>
+        <div><label class="check"><input type="checkbox" id="pr-forn" checked> Excluir fornecedores</label></div>
+        <div><label class="check"><input type="checkbox" id="pr-hist" checked> Excluir quem já foi convidado antes</label></div>
+      </div>
+      <div class="barra">
+        <div style="min-width:100%;"><label>Observações do organizador (opcional)</label>
+          <input type="text" id="pr-obs"></div>
+      </div>
+      <button class="btn" id="pr-rodar">Analisar</button>
+      <span class="meta" style="margin-left:8px;">Pesquisa o patrocinador na web e pontua cada empresa.</span>
+      <div id="pr-aviso"></div>
+      <div id="pr-status"></div>
+      <div id="pr-resultado"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Adicionar quem não passou pela análise</h2>
+      <p class="sub" style="margin-bottom:10px;">Staff, equipe do patrocinador ou troca de última hora. Entra já confirmado.</p>
+      <div class="barra">
+        <div><label>Nome</label><input type="text" id="av-nome"></div>
+        <div><label>Empresa</label><input type="text" id="av-empresa"></div>
+        <div><label>E-mail</label><input type="email" id="av-email"></div>
+        <div style="max-width:140px;"><label>Telefone</label><input type="text" id="av-tel"></div>
+      </div>
+      <div class="barra">
+        <div><label>Cargo</label><input type="text" id="av-cargo"></div>
+        <div style="max-width:190px;"><label>Identificação</label>
+          <select id="av-rotulo">
+            <option value="CIO CERRADO">Equipe CIO Cerrado</option>
+            <option value="PATROCINADOR">Patrocinador</option>
+            <option value="CONVIDADO">Convidado</option>
+          </select></div>
+        <div style="min-width:auto;"><button class="btn" id="av-salvar">Adicionar</button></div>
+      </div>
+      <div id="av-aviso"></div>
+    </div>
+
+    <div class="cartao">
+      <div class="cartao-cab" style="margin-bottom:8px;">
+        <h2 style="margin:0;">Convidados</h2>
+        <button class="btn sec mini" id="cv-exportar">Exportar mailing</button>
+      </div>
+      <div id="cv-lista"><p class="carregando">Carregando…</p></div>
+    </div>`;
+
+  $("#voltar").addEventListener("click", ABAS.agenda);
+  $("#jd-salvar").addEventListener("click", salvarDadosJantar);
+  $("#jd-remover").addEventListener("click", removerJantar);
+  $("#pr-rodar").addEventListener("click", rodarProspeccaoJantar);
+  $("#av-salvar").addEventListener("click", salvarAvulso);
+  $("#cv-exportar").addEventListener("click", exportarMailing);
+
+  const sincHib = () => { $("#pr-hib").disabled = !$("#pr-priv").checked; };
+  $("#pr-priv").addEventListener("change", sincHib);
+  sincHib();
+
+  carregarConvidados();
+}
+
+async function salvarDadosJantar(){
+  const b = $("#jd-salvar");
+  b.disabled = true; b.textContent = "Salvando…";
+  try{
+    await rpc("jantar_salvar", {
+      p_id: J.id,
+      p_patrocinador_nome: $("#jd-patro").value.trim(),
+      p_data: $("#jd-data").value || null,
+      p_horario: $("#jd-hora").value || null,
+      p_local: $("#jd-local").value.trim() || null,
+      p_patrocinador_site: $("#jd-site").value.trim() || null,
+      p_perfil_convidado: $("#jd-perfil").value.trim() || null,
+      p_capacidade: parseInt($("#jd-cap").value,10) || 8,
+      p_status: $("#jd-status").value
+    });
+    aviso("#jd-aviso","Salvo.","ok");
+    await abrirJantar(J.id);
+  }catch(e){ aviso("#jd-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Salvar"; }
+}
+
+async function removerJantar(){
+  if(!confirm(`Remover o jantar de ${J.patrocinador_nome}?`)) return;
+  try{
+    await rpc("jantar_remover", { p_id: J.id });
+    ABAS.agenda();
+  }catch(e){ aviso("#jd-aviso", explicar(e)); }
+}
+
+async function rodarProspeccaoJantar(){
+  const btn = $("#pr-rodar");
+  btn.disabled = true;
+  const status = t => $("#pr-status").innerHTML = `<p class="carregando">${esc(t)}</p>`;
+
+  try{
+    status("Buscando empresas na base…");
+    let base = await rpc("jantar_base", {
+      p_jantar_id: J.id,
+      p_excluir_fornecedores: $("#pr-forn").checked,
+      p_excluir_convidados: $("#pr-hist").checked,
+      p_limite: 500
+    });
+
+    if(base.length === 0){
+      $("#pr-status").innerHTML = "";
+      aviso("#pr-aviso","Nenhuma empresa nova com esses filtros.");
+      btn.disabled = false; return;
+    }
+
+    const abr = $("#pr-abr").value.trim();
+    if(abr){
+      status(`Interpretando a abrangência "${abr}"…`);
+      const pares = [...new Set(base.map(e => `${(e.cidade||"").trim()}|${(e.estado||"").trim()}`))]
+        .filter(p => p !== "|");
+      if(pares.length){
+        try{
+          const idx = await ia(
+            `Abrangência geográfica desejada (texto do organizador do evento): "${abr}"\\n\\n` +
+            `Lista de localidades (indice: cidade|UF):\\n` +
+            pares.map((p,i) => `${i}: ${p}`).join("\\n") +
+            `\\n\\nQuais índices pertencem a essa abrangência? Interprete com bom senso: ` +
+            `"e região"/"entorno" inclui a região metropolitana e municípios vizinhos; ` +
+            `siglas como BSB = Brasília; "todo o Brasil" = todos. ` +
+            `Responda APENAS um array JSON de índices, sem markdown. Ex.: [0,3,7]`,
+            { json: true, maxTokens: 1500 });
+          const ok = new Set((Array.isArray(idx)?idx:[]).map(Number)
+            .map(i => pares[i]).filter(Boolean).map(p => p.toUpperCase()));
+          if(ok.size) base = base.filter(e =>
+            ok.has(`${(e.cidade||"").trim()}|${(e.estado||"").trim()}`.toUpperCase()));
+        }catch(e){
+          const a = abr.toUpperCase();
+          base = base.filter(e => {
+            const cid=(e.cidade||"").trim().toUpperCase(), est=(e.estado||"").trim().toUpperCase();
+            return (cid && a.includes(cid)) || (est && a.includes(est));
+          });
+        }
+      }
+    }
+
+    if(base.length === 0){
+      $("#pr-status").innerHTML = "";
+      aviso("#pr-aviso",`Nenhuma empresa dentro de "${abr}".`);
+      btn.disabled = false; return;
+    }
+
+    status(`Pesquisando o perfil de ${J.patrocinador_nome}…`);
+    let perfil = J.patrocinador_nome + (J.patrocinador_site ? " — "+J.patrocinador_site : "");
+    try{
+      perfil = await ia(
+        `Pesquise a empresa "${J.patrocinador_nome}"${J.patrocinador_site ? ` (site: ${J.patrocinador_site})` : ""} ` +
+        `e responda em no máximo 120 palavras: o que ela vende, principais serviços/produtos, ` +
+        `e que perfil de cliente empresarial ela busca. Responda só o texto, sem preâmbulo.`,
+        { buscarWeb:true, maxTokens:600 });
+    }catch(e){ status(`Não consegui pesquisar na web. Seguindo com o cadastro.`); }
+
+    const soPriv = $("#pr-priv").checked, incHib = $("#pr-hib").checked;
+    const regraIncluir = soPriv
+      ? (incHib ? '- incluir=true para privadas e híbridas; incluir=false para públicas.'
+                : '- incluir=true somente para privadas; false para híbridas e públicas.')
+      : '- incluir=true para todas.';
+
+    const LOTE=12, nLotes=Math.ceil(base.length/LOTE), saida=[];
+    for(let i=0;i<nLotes;i++){
+      status(`Analisando aderência — lote ${i+1} de ${nLotes} (${base.length} empresas)…`);
+      const chunk = base.slice(i*LOTE,(i+1)*LOTE);
+      const lista = chunk.map((e,j)=>`${j}|${e.empresa}|seg:${e.segmento||"?"}|fat:${e.faturamento||"?"}|func:${e.funcionarios||"?"}`).join("\\n");
+      const prompt = `Você é analista de prospecção B2B.
+
+PATROCINADOR (quem vai oferecer o jantar): ${J.patrocinador_nome}
+Perfil: ${perfil}
+${J.perfil_convidado ? "Perfil de convidado desejado: "+J.perfil_convidado : ""}
+${$("#pr-fatmin").value.trim() ? "Faturamento mínimo desejado: "+$("#pr-fatmin").value.trim() : ""}
+${$("#pr-obs").value.trim() ? "Observações do organizador: "+$("#pr-obs").value.trim() : ""}
+
+REGRAS DE CLASSIFICAÇÃO:
+- natureza "privada": empresa privada comum.
+- natureza "hibrida": Sistema S (SENAI/SESI/SESC/SEBRAE/SEST SENAT), serviços sociais autônomos, fundações/associações privadas ligadas a estatais, fundos de pensão, capital misto.
+- natureza "publica": órgãos de governo, autarquias, tribunais, ministérios, forças armadas, estatais puras, organismos internacionais.
+${regraIncluir}
+- score 0-100 = aderência comercial entre a empresa e o que o patrocinador vende.
+
+EMPRESAS (indice|nome|dados):
+${lista}
+
+Responda APENAS um array JSON, sem markdown, um objeto por empresa:
+[{"i":0,"natureza":"privada","incluir":true,"score":85,"just":"máx 15 palavras"}]`;
+
+      let arr=[];
+      try{ arr = await ia(prompt,{json:true,maxTokens:2000}) || []; }catch(e){ arr=[]; }
+      chunk.forEach((e,j) => {
+        const m = (Array.isArray(arr)?arr:[]).find(x=>x.i===j) || {};
+        saida.push({...e, natureza:m.natureza||"privada", incluir:m.incluir!==false,
+          score:Math.max(0,Math.min(100,Number(m.score)||50)), just:m.just||"",
+          manter:m.incluir!==false, sem_analise:!m.natureza});
+      });
+    }
+    saida.sort((a,b)=>b.score-a.score);
+
+    // vagas restantes = capacidade menos quem ja esta confirmado/compareceu
+    const jaOcupados = (await rpc("jantar_convidados_listar",{p_jantar_id:J.id}))
+      .filter(c => c.status==="confirmado" || c.status==="compareceu").length;
+    const restantes = Math.max(J.capacidade - jaOcupados, 0);
+    const execs = $("#pr-execs").value;
+    let vagas=0;
+    for(const r of saida){
+      if(!r.incluir){ r.manter=false; continue; }
+      const assentos = execs==="2" ? (r.exec2_nome?2:1) : 1;
+      if(vagas+assentos <= restantes){ r.manter=true; vagas+=assentos; }
+      else r.manter=false;
+    }
+
+    PROSP = saida;
+    $("#pr-status").innerHTML="";
+    if(restantes === 0) aviso("#pr-aviso","O jantar já está com todas as vagas ocupadas — nada foi marcado para manter.","erro");
+    desenharProspeccaoJantar();
+  }catch(e){
+    $("#pr-status").innerHTML="";
+    aviso("#pr-aviso", explicar(e));
+  }finally{ btn.disabled=false; }
+}
+
+function desenharProspeccaoJantar(){
+  const box = $("#pr-resultado");
+  const execs = $("#pr-execs").value;
+  const assentosDe = r => execs==="2" ? (r.exec2_nome?2:1) : 1;
+  const dentro = PROSP.filter(r=>r.manter && r.incluir);
+  const nConv = dentro.reduce((n,r)=>n+assentosDe(r),0);
+
+  box.innerHTML = `
+    <div style="margin-top:10px;">
+      <p class="meta" style="margin-bottom:8px;">${dentro.length} empresa(s) · ${nConv} convidado(s) selecionado(s)</p>
+      <div class="rolagem"><table>
+        <tr><th></th><th>Empresa</th><th>Executivos</th><th>Natureza</th><th>Aderência</th><th>Por quê</th></tr>
+        ${PROSP.map((r,i) => `<tr ${r.incluir?"":'style="opacity:.5"'}>
+          <td><input type="checkbox" class="pr-pick" data-i="${i}" ${r.manter?"checked":""}></td>
+          <td><strong>${esc(r.empresa)}</strong>
+              ${r.ja_convidado_em?`<br><span class="selo alerta">já em ${esc(r.ja_convidado_em)}</span>`:""}</td>
+          <td>${esc(r.exec1_nome||"—")}<br><span class="meta">${esc(r.exec1_cargo||"")}</span></td>
+          <td><span class="selo ${r.natureza==="publica"?"erro":r.natureza==="hibrida"?"alerta":"pend"}">${esc(r.natureza)}</span></td>
+          <td><span class="selo ${r.score>=70?"ok":r.score>=50?"alerta":"pend"}">${r.score}%</span></td>
+          <td class="meta">${esc(r.just||"—")}</td>
+        </tr>`).join("")}
+      </table></div>
+      <button class="btn" id="pr-salvar" style="margin-top:10px;">Salvar selecionados como convidados</button>
+    </div>`;
+
+  $$(".pr-pick").forEach(c => c.addEventListener("change", e => {
+    PROSP[e.target.dataset.i].manter = e.target.checked;
+  }));
+
+  $("#pr-salvar").addEventListener("click", async () => {
+    const b = $("#pr-salvar");
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      const r = await rpc("jantar_salvar_selecao", {
+        p_jantar_id: J.id,
+        p_itens: PROSP.map(x => ({
+          gestor_id: x.exec1_id, empresa: x.empresa, score: x.score,
+          natureza: x.natureza, justificativa: x.just, manter: x.manter && x.incluir
+        }))
+      });
+      aviso("#pr-aviso", `${r.salvos} convidado(s) adicionados.`, "ok");
+      carregarConvidados();
+    }catch(e){ aviso("#pr-aviso", explicar(e)); }
+    finally{ b.disabled = false; b.textContent = "Salvar selecionados como convidados"; }
+  });
+}
+
+async function salvarAvulso(){
+  const nome = $("#av-nome").value.trim();
+  if(!nome){ aviso("#av-aviso","Informe o nome."); return; }
+  const b = $("#av-salvar");
+  b.disabled = true; b.textContent = "Adicionando…";
+  try{
+    const r = await rpc("jantar_avulso", {
+      p_jantar_id: J.id, p_nome: nome,
+      p_empresa: $("#av-empresa").value.trim() || null,
+      p_email:   $("#av-email").value.trim()   || null,
+      p_telefone: $("#av-tel").value.trim()    || null,
+      p_cargo:   $("#av-cargo").value.trim()   || null,
+      p_rotulo:  $("#av-rotulo").value
+    });
+    aviso("#av-aviso", r.gestor_reaproveitado
+      ? `${nome} já estava na base — adicionado.` : `${nome} adicionado.`, "ok");
+    ["#av-nome","#av-empresa","#av-email","#av-tel","#av-cargo"].forEach(s => $(s).value="");
+    carregarConvidados();
+  }catch(e){ aviso("#av-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Adicionar"; }
+}
+
+const ROTULO_ST = { sugerido:"Sugerido", convidado:"Convidado",
+  confirmado:"Confirmado", recusado:"Recusou", compareceu:"Compareceu" };
+
+async function carregarConvidados(){
+  const box = $("#cv-lista");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
+    box.innerHTML = l.length === 0
+      ? `<div class="vazio">Nenhum convidado ainda.</div>`
+      : `<div class="rolagem"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Identificação</th><th>Status</th><th></th></tr>
+          ${l.map(c => `<tr data-id="${esc(c.id)}">
+            <td>${esc(c.nome)}<br><span class="meta">${esc(c.email||"")}</span></td>
+            <td>${esc(c.empresa||"—")}</td>
+            <td>${c.rotulo ? `<span class="selo alerta">${esc(c.rotulo)}</span>` :
+                 c.score!=null ? `<span class="selo ${c.score>=70?"ok":"pend"}">${c.score}%</span>` : "—"}</td>
+            <td><span class="selo ${c.status==="compareceu"||c.status==="confirmado"?"ok":c.status==="recusado"?"erro":"pend"}">
+                  ${esc(ROTULO_ST[c.status]||c.status)}</span></td>
+            <td style="white-space:nowrap;">
+              ${c.status !== "confirmado" ? `<button class="btn sec mini st" data-st="confirmado">Confirmar</button>` : ""}
+              ${c.status !== "compareceu" ? `<button class="btn ok mini st" data-st="compareceu">Compareceu</button>` : ""}
+              ${c.status !== "recusado" ? `<button class="btn sec mini st" data-st="recusado">Recusou</button>` : ""}
+              <button class="btn perigo mini remover">Remover</button>
+            </td></tr>`).join("")}
+        </table></div>`;
+
+    $$(".st", box).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true;
+      try{
+        await rpc("jantar_marcar_convidado", { p_id: tr.dataset.id, p_status: b.dataset.st });
+        carregarConvidados();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+    $$(".remover", box).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!confirm("Remover este convidado?")) return;
+      try{ await rpc("jantar_remover_convidado", { p_id: tr.dataset.id }); carregarConvidados(); }
+      catch(e){ aviso("#aviso-global", explicar(e)); }
+    }));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+async function exportarMailing(){
+  try{
+    const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
+    exportar(l.filter(c => c.status==="confirmado" || c.status==="compareceu"),
+      [["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],["email","E-mail"],
+       ["telefone","Telefone"],["rotulo","Identificação"]],
+      `Mailing_${J.patrocinador_nome.replace(/\\W+/g,"_")}.xlsx`, "Mailing");
+  }catch(e){ aviso("#aviso-global", explicar(e)); }
+}
+
+// =====================================================================
+// ABA: ESTATISTICAS
+// =====================================================================
+ABAS.estatisticas = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const [freq, semConvite] = await Promise.all([
+      rpc("jantar_estatisticas_gestores", { p_limite: 200 }),
+      rpc("jantar_empresas_sem_convite", { p_limite: 200 })
+    ]);
+
+    c.innerHTML = `
+      <h1>Estatísticas</h1>
+      <p class="sub">Frequência de convite, para não repetir sempre os mesmos nomes.</p>
+
+      <div class="cartao">
+        <div class="cartao-cab"><h2 style="margin:0;">Quem mais foi convidado</h2>
+          <button class="btn sec mini" id="ex-freq">Exportar</button></div>
+        <div class="rolagem"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Vezes</th><th>Última vez</th></tr>
+          ${freq.map(f => `<tr><td>${esc(f.nome)}</td><td>${esc(f.empresa||"—")}</td>
+            <td><span class="selo ${f.vezes>=3?"alerta":"pend"}">${f.vezes}</span></td>
+            <td class="meta">${dataBR(f.ultima_vez)}</td></tr>`).join("") ||
+            `<tr><td colspan="4" style="color:var(--suave)">Sem histórico ainda.</td></tr>`}
+        </table></div>
+      </div>
+
+      <div class="cartao">
+        <div class="cartao-cab"><h2 style="margin:0;">Empresas que nunca foram convidadas</h2>
+          <button class="btn sec mini" id="ex-nunca">Exportar</button></div>
+        <p class="sub">Candidatas para as próximas rodadas de prospecção.</p>
+        <div class="rolagem"><table>
+          <tr><th>Empresa</th><th>Segmento</th><th>Contatos na base</th></tr>
+          ${semConvite.map(e => `<tr><td>${esc(e.empresa)}</td>
+            <td class="meta">${esc(e.segmento||"—")}</td><td>${e.contatos}</td></tr>`).join("") ||
+            `<tr><td colspan="3" style="color:var(--suave)">Nenhuma — todas já foram convidadas.</td></tr>`}
+        </table></div>
+      </div>`;
+
+    $("#ex-freq").addEventListener("click", () => exportar(freq,
+      [["nome","Nome"],["empresa","Empresa"],["vezes","Vezes convidado"],["ultima_vez","Última vez"]],
+      "frequencia-convites.xlsx", "Frequência"));
+    $("#ex-nunca").addEventListener("click", () => exportar(semConvite,
+      [["empresa","Empresa"],["segmento","Segmento"],["contatos","Contatos na base"]],
+      "empresas-sem-convite.xlsx", "Sem convite"));
+  }catch(e){ aviso(c, explicar(e)); }
+};
+</script>
+</body>
+</html>

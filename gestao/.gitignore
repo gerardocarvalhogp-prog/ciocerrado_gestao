@@ -1,0 +1,17 @@
+# Supabase CLI — estado local da maquina, nao do projeto
+supabase/.temp/
+.branches/
+
+# Segredos: a service_role NUNCA entra aqui.
+# A anon key nos .html e publica por design e fica versionada.
+.env
+.env.*
+*.key
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Backup da reconciliacao (historico local, ja coberto pelos commits)
+_backup-meus/

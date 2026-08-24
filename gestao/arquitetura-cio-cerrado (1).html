@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitetura do Sistema — CIO Cerrado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F7F8FA;
+    --card:#FFFFFF;
+    --ink:#1E3A5F;
+    --ink-soft:#4A6580;
+    --accent:#2D9CDB;
+    --warn:#C97A2B;
+    --ok:#2E8B57;
+    --muted:#8B95A1;
+    --line:#C7D1DC;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.55;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 96px;}
+
+  header.hero{
+    border-bottom:2px dashed var(--line);
+    padding-bottom:32px;
+    margin-bottom:48px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:10px;
+  }
+  h1{
+    font-size:clamp(28px,5vw,42px);
+    margin:0 0 12px;
+    letter-spacing:-0.01em;
+  }
+  .hero p{color:var(--ink-soft);max-width:640px;margin:0;font-size:16px;}
+
+  section{margin-bottom:64px;}
+  .fig-tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  h2{
+    font-size:22px;
+    margin:0 0 6px;
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  h2 .num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    color:var(--accent);
+    border:1px solid var(--accent);
+    border-radius:3px;
+    padding:1px 7px;
+  }
+  .section-intro{color:var(--ink-soft);max-width:680px;margin:0 0 28px;font-size:15px;}
+
+  /* Atores */
+  .actors{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .actor{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:16px;
+  }
+  .actor .tag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;}
+  .actor h3{font-size:15px;margin:6px 0 4px;}
+  .actor p{font-size:13px;color:var(--muted);margin:0;}
+  @media(max-width:760px){.actors{grid-template-columns:repeat(2,1fr);}}
+
+  /* Fluxos */
+  .flow{display:flex;flex-wrap:wrap;gap:0;align-items:stretch;}
+  .step{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:14px 16px;
+    width:190px;
+    position:relative;
+  }
+  .step .n{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--accent);
+    margin-bottom:6px;
+    display:block;
+  }
+  .step h4{font-size:14px;margin:0 0 4px;}
+  .step p{font-size:12.5px;color:var(--muted);margin:0;}
+  .arrow{
+    display:flex;align-items:center;justify-content:center;
+    width:34px;color:var(--accent);font-size:18px;font-family:'IBM Plex Mono',monospace;
+  }
+  .step.gate{border-style:dashed;border-color:var(--warn);}
+  .step.gate .n{color:var(--warn);}
+  @media(max-width:820px){
+    .flow{flex-direction:column;}
+    .arrow{width:auto;height:24px;transform:rotate(90deg);}
+    .step{width:100%;}
+  }
+
+  /* Integrações */
+  .integ{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .integ-box{
+    background:var(--card);border:1px solid var(--line);border-radius:8px;
+    padding:16px;text-align:center;
+  }
+  .integ-box.core{border:2px solid var(--ink);}
+  .integ-box .tag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+  .integ-box h4{margin:6px 0 4px;font-size:14px;}
+  .integ-box p{font-size:12px;color:var(--muted);margin:0;}
+  @media(max-width:700px){.integ{grid-template-columns:1fr;}}
+
+  /* Wireframes */
+  .screens{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media(max-width:760px){.screens{grid-template-columns:1fr;}}
+  .device{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow:0 1px 2px rgba(30,58,95,.04);
+  }
+  .device .bar{
+    background:var(--ink);
+    color:#fff;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    padding:8px 12px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .device .bar .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+  .device .body{padding:16px;}
+  .wf-title{font-size:15px;font-weight:600;margin:0 0 3px;}
+  .wf-caption{font-size:12px;color:var(--muted);margin:0 0 14px;}
+  .field{
+    border:1px solid var(--line);
+    border-radius:5px;
+    padding:8px 10px;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:8px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .btn{
+    display:inline-block;
+    border-radius:5px;
+    padding:8px 14px;
+    font-size:12px;
+    font-family:'IBM Plex Mono',monospace;
+    margin-top:4px;
+    text-decoration:none;
+    cursor:default;
+  }
+  .btn.primary{background:var(--ink);color:#fff;}
+  .btn.ghost{border:1px solid var(--line);color:var(--ink-soft);margin-left:6px;}
+  .row{display:flex;gap:8px;}
+  .row .field{flex:1;}
+  .pill{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+    padding:2px 8px;border-radius:20px;margin-right:6px;margin-bottom:8px;
+  }
+  .pill.ok{background:#E7F3EC;color:var(--ok);}
+  .pill.warn{background:#FBF0E2;color:var(--warn);}
+  .pill.pend{background:#EDEFF2;color:var(--muted);}
+  .card-row{
+    border:1px dashed var(--line);
+    border-radius:6px;
+    padding:10px;
+    margin-bottom:8px;
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;
+  }
+  .card-row .left b{display:block;font-size:12.5px;color:var(--ink);}
+  .card-row .left span{color:var(--muted);font-size:11px;}
+  table.wf{width:100%;border-collapse:collapse;font-size:11.5px;}
+  table.wf th{
+    text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:500;
+    color:var(--muted);border-bottom:1px solid var(--line);padding:6px 4px;
+  }
+  table.wf td{padding:6px 4px;border-bottom:1px solid #EEF1F4;color:var(--ink-soft);}
+
+  footer{
+    border-top:2px dashed var(--line);
+    padding-top:24px;
+    color:var(--muted);
+    font-size:13px;
+  }
+  footer b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">Documento de arquitetura · CIO Cerrado Experience</div>
+    <h1>Do cadastro do CIO ao check-in do quarto</h1>
+    <p>Como o Sympla, o Autentique, a rooming list e o portal do patrocinador conversam entre si — e como cada tela desse fluxo se parece.</p>
+  </header>
+
+  <!-- ATORES -->
+  <section>
+    <div class="fig-tag">FIG. 01</div>
+    <h2><span class="num">A</span>Quem usa o sistema</h2>
+    <p class="section-intro">Quatro perfis diferentes, com telas diferentes. Ninguém vê mais do que precisa.</p>
+    <div class="actors">
+      <div class="actor"><div class="tag">Convidado</div><h3>Participante (CIO)</h3><p>Se inscreve no Sympla, assina o contrato, completa o rooming.</p></div>
+      <div class="actor"><div class="tag">Dependente</div><h3>Acompanhante / filho</h3><p>Entra depois, só nos dados de rooming — não passa pelo Sympla.</p></div>
+      <div class="actor"><div class="tag">Empresa</div><h3>Patrocinador</h3><p>Vários usuários por empresa, gerenciando a cota de quartos.</p></div>
+      <div class="actor"><div class="tag">Interno</div><h3>Admin / staff</h3><p>Visão geral de tudo, sem precisar tratar nada por WhatsApp.</p></div>
+    </div>
+  </section>
+
+  <!-- FLUXO PARTICIPANTE -->
+  <section>
+    <div class="fig-tag">FIG. 02</div>
+    <h2><span class="num">B</span>Fluxo do participante</h2>
+    <p class="section-intro">Cada etapa só libera a próxima. O contrato assinado é o portão de entrada para o rooming.</p>
+    <div class="flow">
+      <div class="step"><span class="n">01</span><h4>Inscrição no Sympla</h4><p>Dados básicos do CIO, sincronizados pro sistema.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">02</span><h4>Contrato no Autentique</h4><p>Disparado automaticamente com os dados da inscrição.</p></div>
+      <div class="arrow">→</div>
+      <div class="step gate"><span class="n">GATE</span><h4>Assinatura confirmada</h4><p>Webhook libera a etapa seguinte. Sem assinatura, sem rooming.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">03</span><h4>Rooming list</h4><p>Acompanhante, filho, transfer. Fatura adicional calculada na hora.</p></div>
+    </div>
+    <p class="wf-caption" style="margin-top:14px;">Também é possível o CIO se cadastrar direto no sistema, sem esperar convite — cai numa fila de aprovação e, aprovado, segue o mesmo caminho a partir do contrato.</p>
+  </section>
+
+  <!-- FLUXO PATROCINADOR -->
+  <section>
+    <div class="fig-tag">FIG. 03</div>
+    <h2><span class="num">C</span>Fluxo do patrocinador</h2>
+    <p class="section-intro">A cota já vem pronta (quantidade e tipo de quarto). O patrocinador só preenche quem ocupa cada um.</p>
+    <div class="flow">
+      <div class="step"><span class="n">01</span><h4>Cota cadastrada</h4><p>Admin define nº de quartos e tipo por nível (Esmeralda, Diamante...).</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">02</span><h4>Usuários da empresa</h4><p>Qualquer um dos logins da empresa acessa o mesmo painel.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">03</span><h4>Preenche cada quarto</h4><p>Ocupantes, transfer e brinde, quarto a quarto.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">04</span><h4>Quarto extra (opcional)</h4><p>Vê disponibilidade real do hotel e reserva direto.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">05</span><h4>Indicações</h4><p>Sugere CIOs pro evento e, se a cota permitir, escolhe convidados da mesa redonda / reunião exclusiva.</p></div>
+    </div>
+  </section>
+
+  <!-- INTEGRAÇÕES -->
+  <section>
+    <div class="fig-tag">FIG. 04</div>
+    <h2><span class="num">D</span>Integrações e onde tudo mora</h2>
+    <p class="section-intro">Reaproveitando a mesma base do sistema de massagem: Supabase como centro de dados, Netlify servindo as telas.</p>
+    <div class="integ">
+      <div class="integ-box"><div class="tag">EXTERNO</div><h4>Sympla</h4><p>Fonte da inscrição inicial.</p></div>
+      <div class="integ-box core"><div class="tag">CENTRO</div><h4>Supabase (Postgres)</h4><p>Dados, autenticação por magic-link, regras de acesso.</p></div>
+      <div class="integ-box"><div class="tag">EXTERNO</div><h4>Autentique</h4><p>Envio e status do contrato.</p></div>
+      <div class="integ-box"><div class="tag">FRONT</div><h4>Netlify</h4><p>Telas do participante, patrocinador e admin.</p></div>
+      <div class="integ-box"><div class="tag">COMUNICAÇÃO</div><h4>Resend</h4><p>E-mail a cada marco do fluxo.</p></div>
+      <div class="integ-box"><div class="tag">JOBS</div><h4>Scripts Python</h4><p>Sincroniza Sympla/Autentique e dispara lembretes.</p></div>
+    </div>
+  </section>
+
+  <!-- INDICAÇÕES -->
+  <section>
+    <div class="fig-tag">FIG. 05</div>
+    <h2><span class="num">E</span>Indicações do patrocinador</h2>
+    <p class="section-intro">Duas indicações diferentes: uma pra trazer CIOs pro evento, outra pra escolher quem senta na mesa redonda ou entra nas reuniões exclusivas — essa segunda só aparece pra quem tem o benefício na cota.</p>
+
+    <div class="actors">
+      <div class="actor"><div class="tag">Aberto a todos</div><h3>Indicar CIO para o evento</h3><p>Sugere nome, empresa e contato. Vira lead na fila de convite do time CIO Cerrado.</p></div>
+      <div class="actor"><div class="tag">Depende da cota</div><h3>Mesa redonda / reunião exclusiva</h3><p>Escolhe, entre os convidados já confirmados, quem senta na mesa ou participa da reunião — se a cota tiver esse benefício.</p></div>
+    </div>
+
+    <p class="section-intro" style="margin-top:22px;"><b style="color:var(--ink)">Ordem de escolha na mesa redonda / reunião exclusiva:</b> as cotas mais altas escolhem primeiro. Dentro da mesma cota, quem fechou (contrato + rooming completos) primeiro escolhe antes dos demais do mesmo nível.</p>
+    <div class="flow">
+      <div class="step"><span class="n">1º</span><h4>Esmeralda</h4><p>Sempre escolhe primeiro.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">2º</span><h4>Diamante</h4><p>Escolhe depois da Esmeralda.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">3º</span><h4>Platina</h4><p>Escolhe depois da Diamante.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">4º</span><h4>Ouro / Prata</h4><p>Últimas a escolher.</p></div>
+    </div>
+    <p class="wf-caption" style="margin-top:10px;">Dentro de cada cota, a ordem entre os patrocinadores do mesmo nível segue quem completou contrato + rooming primeiro.</p>
+  </section>
+
+  <!-- OPERAÇÃO DO ADMIN -->
+  <section>
+    <div class="fig-tag">FIG. 06</div>
+    <h2><span class="num">F</span>Operação do admin</h2>
+    <p class="section-intro">Quatro rotinas que hoje ainda dependem de planilha avulsa ou script rodado à mão, reunidas dentro do sistema.</p>
+
+    <div class="actors">
+      <div class="actor"><div class="tag">Base de dados</div><h3>Cadastro em massa</h3><p>Sobe uma planilha, ou deixa a IA comparar a base sozinha e apontar o que mudou.</p></div>
+      <div class="actor"><div class="tag">Impressão</div><h3>Emissão de etiquetas</h3><p>Gera as etiquetas (nome, empresa, quarto, categoria) direto da base.</p></div>
+      <div class="actor"><div class="tag">Alocação</div><h3>Separar quartos</h3><p>Tela simples pra decidir quem fica em qual quarto.</p></div>
+      <div class="actor"><div class="tag">Match</div><h3>Jantares por aderência</h3><p>Sugere CIOs pro jantar de cada patrocinador, com o mesmo motor de match já usado hoje.</p></div>
+      <div class="actor"><div class="tag">Exportação</div><h3>Central de relatórios</h3><p>Mailing, pesquisa de perfil e check-ins por patrocinador — tudo na tela, exportável em Excel.</p></div>
+    </div>
+
+    <p class="section-intro" style="margin-top:22px;"><b style="color:var(--ink)">Jantares — como o match funciona:</b></p>
+    <div class="flow">
+      <div class="step"><span class="n">01</span><h4>Escolhe o patrocinador</h4><p>Admin seleciona quem vai oferecer o jantar.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">02</span><h4>Cruza perfis</h4><p>Aderência comercial entre o que o patrocinador vende e a base de CIOs.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">03</span><h4>Lista sugerida</h4><p>Ranking por % de aderência, pronto pra revisão.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">04</span><h4>Aprova e convida</h4><p>Lista aprovada segue direto pro convite no Sympla.</p></div>
+    </div>
+
+    <p class="section-intro" style="margin-top:22px;"><b style="color:var(--ink)">Cadastro em massa — o que a IA aponta:</b></p>
+    <div class="flow">
+      <div class="step"><span class="n">01</span><h4>Varre a base</h4><p>Compara a empresa/cargo declarados hoje com o que já está cadastrado.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">02</span><h4>Detecta mudanças</h4><p>CIO trocou de empresa, ou empresa trocou de gestor.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">03</span><h4>Sugere novidades</h4><p>Empresas e gestores que ainda não estão na base.</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="n">04</span><h4>Admin revisa</h4><p>Aprova ou ignora cada sugestão antes de aplicar na base.</p></div>
+    </div>
+  </section>
+
+  <!-- MOCKUPS -->
+  <section>
+    <div class="fig-tag">FIG. 07</div>
+    <h2><span class="num">G</span>Mockup das telas</h2>
+    <p class="section-intro">Baixa fidelidade de propósito — o objetivo aqui é fechar os campos e a informação de cada tela, não o visual final.</p>
+
+    <div class="screens">
+
+      <!-- Tela 1: Rooming do participante -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> rooming.html — participante</div>
+        <div class="body">
+          <p class="wf-title">Complete seus dados de hospedagem</p>
+          <p class="wf-caption">Liberado após assinatura do contrato</p>
+          <span class="pill ok">Contrato assinado</span>
+          <div class="field">+ Adicionar acompanhante / filho</div>
+          <div class="row"><div class="field">Nome</div><div class="field">Data de nascimento</div></div>
+          <div class="field">Vai usar transfer? ( ) Sim ( ) Não</div>
+          <div class="card-row"><div class="left"><b>Fatura estimada</b><span>1 acompanhante + transfer</span></div><b>R$ —</b></div>
+          <a class="btn primary">Confirmar dados</a>
+        </div>
+      </div>
+
+      <!-- Tela 2: Portal patrocinador dashboard -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> portal.html — patrocinador</div>
+        <div class="body">
+          <p class="wf-title">Cota Diamante · 4 quartos</p>
+          <p class="wf-caption">Logado como qualquer usuário da empresa</p>
+          <div class="card-row"><div class="left"><b>Quarto 1 · Duplo</b><span>2 ocupantes preenchidos</span></div><span class="pill ok">Completo</span></div>
+          <div class="card-row"><div class="left"><b>Quarto 2 · Duplo</b><span>0 ocupantes</span></div><span class="pill pend">Pendente</span></div>
+          <div class="card-row"><div class="left"><b>Quarto 3 · Single</b><span>1 ocupante</span></div><span class="pill ok">Completo</span></div>
+          <a class="btn primary">+ Comprar quarto extra</a>
+          <a class="btn ghost">Ver manual do patrocinador</a>
+        </div>
+      </div>
+
+      <!-- Tela 3: Detalhe do quarto -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> portal.html — quarto 2</div>
+        <div class="body">
+          <p class="wf-title">Quarto 2 · Duplo</p>
+          <p class="wf-caption">Preencha os ocupantes deste quarto</p>
+          <div class="row"><div class="field">Ocupante 1 — nome</div><div class="field">CPF</div></div>
+          <div class="row"><div class="field">Ocupante 2 — nome</div><div class="field">CPF</div></div>
+          <div class="field">Transfer? ( ) Sim ( ) Não</div>
+          <div class="field">Brinde para o hotel? ( ) Sim ( ) Não</div>
+          <div class="field">Qual brinde? [caixa de texto]</div>
+          <a class="btn primary">Salvar quarto</a>
+        </div>
+      </div>
+
+      <!-- Tela 4: Comprar quarto extra -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> portal.html — disponibilidade</div>
+        <div class="body">
+          <p class="wf-title">Quartos disponíveis no hotel</p>
+          <p class="wf-caption">Atualizado em tempo real</p>
+          <table class="wf">
+            <tr><th>Tipo</th><th>Livres</th><th></th></tr>
+            <tr><td>Single</td><td>6</td><td><a class="btn ghost">Reservar</a></td></tr>
+            <tr><td>Duplo</td><td>2</td><td><a class="btn ghost">Reservar</a></td></tr>
+            <tr><td>Triplo</td><td>0</td><td><span class="pill warn">Esgotado</span></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tela 5: Admin dashboard -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> admin.html — visão geral</div>
+        <div class="body">
+          <p class="wf-title">Painel do evento</p>
+          <p class="wf-caption">Filtros: status contrato · status rooming · empresa</p>
+          <table class="wf">
+            <tr><th>Empresa</th><th>Contrato</th><th>Rooming</th></tr>
+            <tr><td>Lanlink</td><td><span class="pill ok">Assinado</span></td><td><span class="pill ok">Completo</span></td></tr>
+            <tr><td>TecHub</td><td><span class="pill warn">Pendente</span></td><td><span class="pill pend">—</span></td></tr>
+            <tr><td>Add Value</td><td><span class="pill ok">Assinado</span></td><td><span class="pill pend">Parcial</span></td></tr>
+          </table>
+          <a class="btn ghost">Exportar Excel</a>
+        </div>
+      </div>
+
+      <!-- Tela 6: Manual do patrocinador -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> manual.html — patrocinador</div>
+        <div class="body">
+          <p class="wf-title">Manual do patrocinador</p>
+          <p class="wf-caption">Mesmo conteúdo de sempre, agora dentro do portal</p>
+          <div class="card-row"><div class="left"><b>Prazo de assinatura</b><span>Contrato Autentique</span></div><b>—/—</b></div>
+          <div class="card-row"><div class="left"><b>Prazo de rooming</b><span>Sem multa até essa data</span></div><b>—/—</b></div>
+          <div class="card-row"><div class="left"><b>Check-in / check-out</b><span>Datas do resort</span></div><b>—/—</b></div>
+        </div>
+      </div>
+
+      <!-- Tela 7: Indicar CIO para o evento -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> portal.html — indicar CIO</div>
+        <div class="body">
+          <p class="wf-title">Indicar um CIO para o evento</p>
+          <p class="wf-caption">Disponível para todas as cotas</p>
+          <div class="row"><div class="field">Nome do CIO</div><div class="field">Empresa</div></div>
+          <div class="row"><div class="field">E-mail</div><div class="field">Telefone</div></div>
+          <a class="btn primary">Enviar indicação</a>
+          <div class="card-row" style="margin-top:14px;"><div class="left"><b>Maria Santos</b><span>Grupo Vale Verde</span></div><span class="pill pend">Aguardando convite</span></div>
+          <div class="card-row"><div class="left"><b>João Prado</b><span>Rede Fortim</span></div><span class="pill ok">Inscrito</span></div>
+        </div>
+      </div>
+
+      <!-- Tela 8: Escolher mesa redonda -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> portal.html — mesa redonda</div>
+        <div class="body">
+          <p class="wf-title">Escolher convidados · Mesa redonda</p>
+          <p class="wf-caption">Cota Diamante · benefício ativo</p>
+          <span class="pill ok">Sua vez de escolher</span>
+          <span class="pill pend">2 de 4 vagas escolhidas</span>
+          <div class="card-row"><div class="left"><b>☑ Ana Ribeiro</b><span>Comércio Rubi</span></div></div>
+          <div class="card-row"><div class="left"><b>☐ Carlos Nery</b><span>Grupo Atlas</span></div></div>
+          <div class="card-row"><div class="left"><b>☐ Fábio Lins</b><span>Rede Bravo</span></div></div>
+          <a class="btn primary">Confirmar escolhas</a>
+          <p class="wf-caption" style="margin-top:10px;">Cotas Esmeralda já escolheram. Aguardando: nenhuma Diamante à sua frente.</p>
+        </div>
+      </div>
+
+      <!-- Tela 9: CIO auto-cadastro -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> cadastro.html — CIO</div>
+        <div class="body">
+          <p class="wf-title">Quero participar do evento</p>
+          <p class="wf-caption">Cadastro direto, sem convite prévio</p>
+          <div class="row"><div class="field">Nome</div><div class="field">Cargo</div></div>
+          <div class="row"><div class="field">Empresa</div><div class="field">E-mail</div></div>
+          <a class="btn primary">Enviar cadastro</a>
+          <p class="wf-caption" style="margin-top:10px;"><span class="pill pend">Aguardando aprovação</span> Segue pro contrato assim que aprovado.</p>
+        </div>
+      </div>
+
+      <!-- Tela 10: Cadastro em massa -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> admin.html — importar Gestores/CIOs</div>
+        <div class="body">
+          <p class="wf-title">Atualizar cadastro em massa</p>
+          <p class="wf-caption">Sobe uma planilha para criar ou atualizar em lote</p>
+          <div class="field">📎 planilha-gestores.xlsx</div>
+          <table class="wf">
+            <tr><th>Nome</th><th>Empresa</th><th>Status</th></tr>
+            <tr><td>Rita Nunes</td><td>Grupo Alfa</td><td><span class="pill ok">Atualizado</span></td></tr>
+            <tr><td>Diego Farias</td><td>Rede Bem</td><td><span class="pill pend">Novo registro</span></td></tr>
+            <tr><td>Sem e-mail</td><td>—</td><td><span class="pill warn">Erro na linha</span></td></tr>
+          </table>
+          <a class="btn primary">Confirmar importação</a>
+
+          <p class="wf-caption" style="margin-top:16px;"><b style="color:var(--ink)">Sugestões da IA</b></p>
+          <div class="card-row"><div class="left"><b>Carlos Nery</b><span>Grupo Atlas → Rede Íris</span></div><span class="pill warn">Trocou de empresa</span></div>
+          <div class="card-row"><div class="left"><b>Rede Bravo</b><span>sugestão: Julia Prado</span></div><span class="pill pend">Novo gestor</span></div>
+          <div class="card-row"><div class="left"><b>TechNova Distribuidora</b><span>empresa ainda não cadastrada</span></div><span class="pill pend">Empresa nova</span></div>
+          <a class="btn ghost">Aprovar</a>
+          <a class="btn ghost">Ignorar</a>
+        </div>
+      </div>
+
+      <!-- Tela 11: Emissão de etiquetas -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> admin.html — etiquetas</div>
+        <div class="body">
+          <p class="wf-title">Gerar etiquetas</p>
+          <p class="wf-caption">Nome, empresa, quarto e categoria de crachá</p>
+          <div class="field">Filtro: todos / por quarto / por categoria</div>
+          <div class="card-row"><div class="left"><b>APTO 214</b><span>Maria Silva · Grupo Vale Verde · PROTAGONISTA</span></div></div>
+          <div class="card-row"><div class="left"><b>312 etiquetas prontas</b><span>Ordenadas por quarto</span></div><b></b></div>
+          <a class="btn primary">Gerar PDF</a>
+        </div>
+      </div>
+
+      <!-- Tela 12: Separar quartos -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> admin.html — separar quartos</div>
+        <div class="body">
+          <p class="wf-title">Distribuir pessoas nos quartos</p>
+          <p class="wf-caption">Seleciona o quarto de cada pessoa, um a um</p>
+          <table class="wf">
+            <tr><th>Nome</th><th>Empresa</th><th>Quarto</th></tr>
+            <tr><td>Paulo Mendes</td><td>Comércio Rubi</td><td><span class="pill ok">214</span></td></tr>
+            <tr><td>Bianca Costa</td><td>Comércio Rubi</td><td><span class="pill ok">214</span></td></tr>
+            <tr><td>Tiago Reis</td><td>Grupo Atlas</td><td><span class="pill pend">— selecionar —</span></td></tr>
+          </table>
+          <a class="btn primary">Salvar alocação</a>
+        </div>
+      </div>
+
+      <!-- Tela 13: Jantares por match -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> admin.html — jantar · match</div>
+        <div class="body">
+          <p class="wf-title">Jantar · Grupo Vale Verde</p>
+          <p class="wf-caption">Sugestão automática por aderência comercial</p>
+          <table class="wf">
+            <tr><th>CIO</th><th>Empresa</th><th>Aderência</th></tr>
+            <tr><td>Ana Ribeiro</td><td>Comércio Rubi</td><td><span class="pill ok">92%</span></td></tr>
+            <tr><td>Carlos Nery</td><td>Grupo Atlas</td><td><span class="pill ok">81%</span></td></tr>
+            <tr><td>Fábio Lins</td><td>Rede Bravo</td><td><span class="pill warn">64%</span></td></tr>
+          </table>
+          <a class="btn primary">Aprovar lista</a>
+          <a class="btn ghost">Colar no Sympla</a>
+        </div>
+      </div>
+
+      <!-- Tela 14: Central de relatórios -->
+      <div class="device">
+        <div class="bar"><span class="dot"></span> admin.html — relatórios</div>
+        <div class="body">
+          <p class="wf-title">Central de relatórios</p>
+          <p class="wf-caption">Mesmos relatórios que hoje saem por script, agora direto na tela</p>
+
+          <p class="wf-caption" style="margin-top:4px;"><b style="color:var(--ink)">Mailing List</b></p>
+          <table class="wf">
+            <tr><th>Nome</th><th>Empresa</th><th>Perfil</th></tr>
+            <tr><td>Abel Silva</td><td>EBM Construtora</td><td>Cliente</td></tr>
+            <tr><td>Júlio Pereira</td><td>FazendaoAgro</td><td>CIO</td></tr>
+          </table>
+          <p class="wf-caption">157 confirmados · CNPJ e segmento inclusos</p>
+          <a class="btn ghost">Exportar Excel</a>
+
+          <p class="wf-caption" style="margin-top:16px;"><b style="color:var(--ink)">Pesquisa de perfil</b></p>
+          <table class="wf">
+            <tr><th>Empresa</th><th>Segmento</th><th>Faturamento</th></tr>
+            <tr><td>Rede Fortim</td><td>Agro</td><td>3,1 a 5 Bi</td></tr>
+            <tr><td>Grupo Atlas</td><td>Varejo</td><td>1,1 a 3 Bi</td></tr>
+          </table>
+          <p class="wf-caption">Inclui orçamento de TI e áreas de investimento por categoria</p>
+          <a class="btn ghost">Exportar Excel</a>
+
+          <p class="wf-caption" style="margin-top:16px;"><b style="color:var(--ink)">Check-ins</b></p>
+          <table class="wf">
+            <tr><th>Empresa</th><th>Check-ins</th></tr>
+            <tr><td>3DB</td><td>128</td></tr>
+            <tr><td>Abaco</td><td>132</td></tr>
+          </table>
+          <p class="wf-caption">Resumo geral + detalhe por patrocinador (61 empresas)</p>
+          <a class="btn ghost">Exportar Excel</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    Próximo passo natural: transformar isso em <b>schema.sql</b> (tabelas + RLS + funções), no mesmo padrão do sistema de agendamento de massagem.
+  </footer>
+
+</div>
+</body>
+</html>

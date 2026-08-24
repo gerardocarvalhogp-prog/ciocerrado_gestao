@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check-in · CIO Cerrado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
+  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
+  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--papel);color:var(--texto);
+  font-family:'Public Sans',system-ui,sans-serif;font-size:15px;line-height:1.5;}
+button{font-family:inherit;cursor:pointer;}
+:focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
+
+.topo{background:var(--verde);color:#fff;padding:12px 16px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  position:sticky;top:0;z-index:10;}
+.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;}
+.marca span{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
+.sair{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
+  border-radius:var(--raio);padding:4px 10px;font-size:12px;}
+
+.wrap{max-width:640px;margin:0 auto;padding:16px 16px 80px;}
+
+/* placar: a informação que a equipe olha o tempo todo */
+.placar{display:flex;gap:8px;margin-bottom:14px;}
+.placar div{flex:1;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:11px 10px;text-align:center;}
+.placar .n{font-family:'Archivo',sans-serif;font-size:22px;line-height:1.1;}
+.placar .r{font-family:'IBM Plex Mono',monospace;font-size:9.5px;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--suave);margin-top:3px;}
+.placar .feitos .n{color:var(--verde-med);}
+.placar .pend .n{color:var(--ouro);}
+
+/* busca grande: uso no balcão, muitas vezes no celular */
+.busca{position:sticky;top:56px;background:var(--papel);padding:10px 0;z-index:9;}
+#termo{width:100%;padding:13px 14px;border:2px solid var(--linha);
+  border-radius:var(--raio);font-family:inherit;font-size:17px;
+  background:var(--superficie);color:var(--texto);}
+#termo:focus{border-color:var(--verde);}
+.filtros{display:flex;gap:8px;margin-top:8px;}
+.chip{background:var(--superficie);border:1px solid var(--linha);
+  border-radius:20px;padding:5px 13px;font-size:12.5px;color:var(--suave);}
+.chip[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:#fff;}
+
+.pessoa{background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:12px 13px;margin-bottom:8px;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.pessoa.feito{background:#F2F7F4;border-color:#C9E0D4;}
+.pessoa .info strong{display:block;font-family:'Archivo',sans-serif;font-size:15px;}
+.pessoa .info .meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--suave);}
+.btn{background:var(--verde);color:#fff;border:none;border-radius:var(--raio);
+  padding:10px 16px;font-size:14px;font-weight:500;white-space:nowrap;}
+.btn:disabled{background:#A9B5B0;cursor:not-allowed;}
+.btn.sec{background:transparent;color:var(--suave);border:1px solid var(--linha);
+  padding:6px 11px;font-size:12.5px;}
+.selo{font-family:'IBM Plex Mono',monospace;font-size:9.5px;padding:2px 7px;
+  border-radius:20px;background:#EFEFEA;color:var(--suave);
+  text-transform:uppercase;letter-spacing:.04em;}
+
+.aviso{border-radius:var(--raio);padding:11px 13px;font-size:13.5px;margin-bottom:12px;
+  border:1px solid var(--linha);background:var(--superficie);}
+.aviso.erro{background:#FBF0EE;border-color:#E4CFCB;color:var(--erro);}
+.aviso.ok{background:#E8F2EC;border-color:#C9E0D4;color:var(--verde-med);}
+.vazio{border:1px dashed var(--linha);border-radius:var(--raio);padding:26px;
+  text-align:center;color:var(--suave);font-size:14px;}
+.carregando{color:var(--suave);font-size:13.5px;padding:18px 0;text-align:center;}
+.oculto{display:none !important;}
+.login{max-width:380px;margin:12vh auto;padding:0 20px;}
+.login .cartao{background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:24px;}
+.login h1{font-family:'Archivo',sans-serif;font-size:20px;margin:0 0 4px;}
+.login p{color:var(--suave);font-size:13.5px;margin:0 0 16px;}
+label{display:block;font-size:12px;color:var(--suave);margin-bottom:3px;}
+input[type=email],input[type=text]{width:100%;padding:9px 10px;
+  border:1px solid var(--linha);border-radius:var(--raio);
+  font-family:inherit;font-size:14px;background:var(--superficie);color:var(--texto);}
+select{width:100%;padding:9px 10px;border:1px solid var(--linha);
+  border-radius:var(--raio);font-family:inherit;font-size:14px;
+  background:var(--superficie);color:var(--texto);}
+#form-novo label{margin-bottom:3px;}
+</style>
+</head>
+<body>
+
+<div id="tela-login" class="login">
+  <div class="cartao">
+    <h1>Check-in</h1>
+    <p>Acesso da equipe. Entre com seu e-mail.</p>
+    <div id="login-aviso"></div>
+    <label for="email">E-mail</label>
+    <input type="email" id="email" autocomplete="email">
+    <div style="margin-top:12px;">
+      <button class="btn" id="btn-entrar" style="width:100%;">Enviar link de acesso</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="oculto">
+  <header class="topo">
+    <div class="marca">CIO Cerrado<span>Check-in</span></div>
+    <button class="sair" id="btn-sair">Sair</button>
+  </header>
+
+  <div class="wrap">
+    <div class="placar" id="placar"></div>
+
+    <div class="busca">
+      <input type="search" id="termo" placeholder="Buscar por nome, empresa ou e-mail" autocomplete="off">
+      <div class="filtros">
+        <button class="chip" id="f-todos" aria-pressed="true">Todos</button>
+        <button class="chip" id="f-pend"  aria-pressed="false">Só pendentes</button>
+      </div>
+    </div>
+
+    <div id="aviso"></div>
+
+    <div id="form-novo" class="oculto">
+      <div class="pessoa" style="display:block;">
+        <strong style="font-family:'Archivo';font-size:15px;display:block;margin-bottom:10px;">
+          Cadastrar quem chegou</strong>
+        <div style="margin-bottom:8px;">
+          <label>Nome completo</label><input type="text" id="n-nome"></div>
+        <div style="margin-bottom:8px;">
+          <label>Empresa</label><input type="text" id="n-empresa"></div>
+        <div style="margin-bottom:8px;">
+          <label>E-mail</label><input type="email" id="n-email"></div>
+        <div style="margin-bottom:8px;">
+          <label>Telefone</label><input type="text" id="n-telefone"></div>
+        <div style="margin-bottom:8px;">
+          <label>Cargo</label><input type="text" id="n-cargo"></div>
+        <div style="margin-bottom:12px;">
+          <label>Categoria do crachá</label>
+          <select id="n-cat">
+            <option value="PROTAGONISTA">Protagonista (CIO)</option>
+            <option value="ACOMPANHANTE">Acompanhante</option>
+            <option value="PATROCINADOR">Patrocinador</option>
+            <option value="CIO CERRADO">Equipe CIO Cerrado</option>
+          </select></div>
+        <div id="n-aviso"></div>
+        <button class="btn" id="n-salvar" style="width:100%;">Cadastrar e dar check-in</button>
+        <button class="btn sec" id="n-cancelar" style="width:100%;margin-top:8px;">Cancelar</button>
+      </div>
+    </div>
+
+    <div id="lista"><p class="carregando">Carregando…</p></div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURACAO
+// =====================================================================
+const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
+const EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+const LOCAL  = new URLSearchParams(location.search).get("local")  || null;
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  db: { schema: "gestao" }
+});
+
+const $  = (s,r=document) => r.querySelector(s);
+const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function aviso(texto, tipo="erro"){
+  $("#aviso").innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
+  if(texto && tipo === "ok") setTimeout(() => $("#aviso").innerHTML = "", 2500);
+}
+
+function explicar(e){
+  const m = e?.message || String(e);
+  if(m.includes("Acesso restrito")) return "Seu e-mail não está cadastrado na equipe.";
+  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
+  return m;
+}
+
+const hora = d => d ? new Date(d).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "";
+
+async function rpc(nome, params){
+  const { data, error } = await sb.rpc(nome, params);
+  if(error) throw error;
+  return data;
+}
+
+// =====================================================================
+// LOGIN
+// =====================================================================
+$("#btn-entrar").addEventListener("click", async () => {
+  const email = $("#email").value.trim();
+  if(!email){ $("#login-aviso").innerHTML = `<div class="aviso erro">Informe seu e-mail.</div>`; return; }
+  const b = $("#btn-entrar");
+  b.disabled = true; b.textContent = "Enviando…";
+  try{
+    const { error } = await sb.auth.signInWithOtp({
+      email, options:{ emailRedirectTo: location.href }});
+    if(error) throw error;
+    $("#login-aviso").innerHTML = `<div class="aviso ok">Link enviado. Abra seu e-mail.</div>`;
+  }catch(e){
+    $("#login-aviso").innerHTML = `<div class="aviso erro">${esc(explicar(e))}</div>`;
+  }finally{ b.disabled = false; b.textContent = "Enviar link de acesso"; }
+});
+$("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
+$("#btn-sair").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+// =====================================================================
+// BOOT
+// =====================================================================
+let iniciado = false, soPendentes = false, timer;
+
+sb.auth.onAuthStateChange(ev => {
+  if(ev === "SIGNED_OUT"){ location.reload(); return; }
+  if(!iniciado) iniciar();
+});
+(async function(){
+  const { data } = await sb.auth.getSession();
+  if(data?.session) iniciar();
+})();
+
+async function iniciar(){
+  if(iniciado) return;
+  iniciado = true;
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user) return;
+
+  $("#tela-login").classList.add("oculto");
+  $("#app").classList.remove("oculto");
+
+  $("#termo").addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(carregar, 250);
+  });
+  $("#f-todos").addEventListener("click", () => trocarFiltro(false));
+  $("#f-pend").addEventListener("click",  () => trocarFiltro(true));
+
+  await Promise.all([carregar(), placar()]);
+}
+
+function trocarFiltro(pend){
+  soPendentes = pend;
+  $("#f-todos").setAttribute("aria-pressed", !pend);
+  $("#f-pend").setAttribute("aria-pressed",  pend);
+  carregar();
+}
+
+async function placar(){
+  try{
+    const r = await rpc("checkin_resumo", { p_evento_slug: EVENTO });
+    $("#placar").innerHTML = `
+      <div><div class="n">${r.esperados}</div><div class="r">Esperados</div></div>
+      <div class="feitos"><div class="n">${r.feitos}</div><div class="r">Feitos</div></div>
+      <div class="pend"><div class="n">${r.pendentes}</div><div class="r">Pendentes</div></div>`;
+  }catch(e){ /* placar e acessorio: nao bloqueia o check-in */ }
+}
+
+async function carregar(){
+  const termo = $("#termo").value.trim();
+  try{
+    const l = await rpc("checkin_listar", {
+      p_evento_slug: EVENTO,
+      p_termo: termo || null,
+      p_so_pendentes: soPendentes,
+      p_limite: 300
+    });
+
+    if(l.length === 0){
+      // buscar e não achar é exatamente quando a recepção precisa
+      // cadastrar na hora — o botão aparece aqui, com o nome já digitado
+      $("#lista").innerHTML = `<div class="vazio">
+        ${termo ? `Ninguém encontrado para "${esc(termo)}".`
+                : soPendentes ? "Todos já fizeram check-in." : "Nenhuma pessoa esperada ainda."}
+        ${termo ? `<div style="margin-top:14px;">
+          <button class="btn" id="abrir-novo">Cadastrar "${esc(termo)}"</button></div>` : ""}
+      </div>`;
+      const b = $("#abrir-novo");
+      if(b) b.addEventListener("click", () => abrirCadastro(termo));
+      return;
+    }
+
+    $("#lista").innerHTML = l.map(p => `
+      <div class="pessoa ${p.checkin_id ? "feito" : ""}" data-k="${esc(p.pessoa_key)}" data-c="${esc(p.checkin_id||"")}">
+        <div class="info">
+          <strong>${esc(p.nome)}</strong>
+          <span class="meta">${esc(p.empresa||"—")}${p.quarto ? " · apto "+esc(p.quarto) : ""}</span>
+          <span class="selo">${esc(p.categoria)}</span>
+        </div>
+        ${p.checkin_id
+          ? `<div style="text-align:right;">
+               <div class="meta" style="margin-bottom:4px;">✓ ${hora(p.registrado_em)}</div>
+               <button class="btn sec desfazer">Desfazer</button>
+             </div>`
+          : `<button class="btn marcar">Check-in</button>`}
+      </div>`).join("");
+
+    $("#lista").insertAdjacentHTML("beforeend",
+      `<div style="margin-top:14px;text-align:center;">
+         <button class="btn sec" id="abrir-novo2">Não está na lista? Cadastrar</button>
+       </div>`);
+    $("#abrir-novo2").addEventListener("click", () => abrirCadastro(termo));
+
+    $$(".marcar").forEach(b => b.addEventListener("click", () => marcar(b)));
+    $$(".desfazer").forEach(b => b.addEventListener("click", () => desfazer(b)));
+  }catch(e){ aviso(explicar(e)); }
+}
+
+async function marcar(btn){
+  const card = btn.closest(".pessoa");
+  btn.disabled = true; btn.textContent = "…";
+  try{
+    const r = await rpc("checkin_registrar", {
+      p_evento_slug: EVENTO, p_pessoa_key: card.dataset.k, p_local: LOCAL });
+
+    // segunda leitura do mesmo crachá não é erro: avisa e segue
+    aviso(r.ja_estava
+      ? `${r.nome} já tinha feito check-in às ${hora(r.registrado_em)}.`
+      : `${r.nome} · check-in registrado.`, "ok");
+
+    await Promise.all([carregar(), placar()]);
+  }catch(e){
+    aviso(explicar(e));
+    btn.disabled = false; btn.textContent = "Check-in";
+  }
+}
+
+function abrirCadastro(termo){
+  $("#form-novo").classList.remove("oculto");
+  $("#n-nome").value = termo || "";
+  ["#n-empresa","#n-email","#n-telefone","#n-cargo"].forEach(s => $(s).value = "");
+  $("#n-aviso").innerHTML = "";
+  $("#n-nome").focus();
+  $("#form-novo").scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+
+$("#n-cancelar").addEventListener("click", () => {
+  $("#form-novo").classList.add("oculto");
+});
+
+$("#n-salvar").addEventListener("click", async () => {
+  const nome = $("#n-nome").value.trim();
+  if(!nome){
+    $("#n-aviso").innerHTML = `<div class="aviso erro">Informe o nome.</div>`;
+    return;
+  }
+
+  const b = $("#n-salvar");
+  b.disabled = true; b.textContent = "Cadastrando…";
+  try{
+    const r = await rpc("checkin_cadastrar", {
+      p_evento_slug: EVENTO,
+      p_nome: nome,
+      p_empresa:  $("#n-empresa").value.trim()  || null,
+      p_email:    $("#n-email").value.trim()    || null,
+      p_telefone: $("#n-telefone").value.trim() || null,
+      p_cargo:    $("#n-cargo").value.trim()    || null,
+      p_categoria: $("#n-cat").value,
+      p_local: LOCAL
+    });
+
+    // reaproveitou cadastro existente: vale avisar, senão a recepção
+    // acha que criou duplicata
+    aviso(r.gestor_reaproveitado
+      ? `${r.nome} já estava na base — check-in registrado.`
+      : `${nome} cadastrado e com check-in registrado.`, "ok");
+
+    $("#form-novo").classList.add("oculto");
+    $("#termo").value = "";
+    await Promise.all([carregar(), placar()]);
+  }catch(e){
+    $("#n-aviso").innerHTML = `<div class="aviso erro">${esc(explicar(e))}</div>`;
+  }finally{
+    b.disabled = false; b.textContent = "Cadastrar e dar check-in";
+  }
+});
+
+async function desfazer(btn){
+  const card = btn.closest(".pessoa");
+  btn.disabled = true; btn.textContent = "…";
+  try{
+    await rpc("checkin_desfazer", { p_checkin_id: card.dataset.c });
+    await Promise.all([carregar(), placar()]);
+  }catch(e){
+    aviso(explicar(e));
+    btn.disabled = false; btn.textContent = "Desfazer";
+  }
+}
+</script>
+</body>
+</html>

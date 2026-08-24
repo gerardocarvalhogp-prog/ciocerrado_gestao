@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sua hospedagem · CIO Cerrado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
+  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
+  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--papel);color:var(--texto);
+  font-family:'Public Sans',system-ui,sans-serif;font-size:15px;line-height:1.55;
+}
+button{font-family:inherit;cursor:pointer;}
+:focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
+}
+
+.topo{
+  background:var(--verde);color:#fff;padding:14px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:16px;letter-spacing:-.01em;}
+.marca span{
+  display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;opacity:.7;
+}
+.topo-dir{display:flex;align-items:center;gap:12px;}
+.quem{font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.85;}
+.sair{
+  background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
+  border-radius:var(--raio);padding:5px 11px;font-size:12px;
+}
+.sair:hover{background:rgba(255,255,255,.1);}
+
+.wrap{max-width:780px;margin:0 auto;padding:26px 20px 80px;}
+h1{font-family:'Archivo',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
+h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
+.sub{color:var(--suave);font-size:13.5px;margin:0 0 22px;}
+
+.cartao{
+  background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:18px;margin-bottom:14px;
+}
+
+/* ---------- trilha de etapas (signature) ---------- */
+.trilha{margin:0 0 26px;}
+.etapa{
+  display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--linha);
+}
+.etapa:last-child{border-bottom:none;}
+.etapa .marcador{
+  flex:0 0 22px;height:22px;border-radius:50%;margin-top:2px;
+  border:2px solid var(--linha);background:var(--superficie);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--suave);
+}
+.etapa.feita .marcador{background:var(--verde-med);border-color:var(--verde-med);color:#fff;}
+.etapa.agora .marcador{border-color:var(--ouro);color:var(--ouro);font-weight:600;}
+.etapa .txt h3{font-family:'Archivo',sans-serif;font-size:14.5px;margin:0 0 1px;}
+.etapa .txt p{margin:0;font-size:13px;color:var(--suave);}
+.etapa.bloqueada .txt h3{color:var(--suave);}
+.etapa.agora .txt h3{color:var(--verde);}
+
+label{display:block;font-size:12px;color:var(--suave);margin-bottom:3px;}
+input[type=text],input[type=email],input[type=date],select,textarea{
+  width:100%;padding:8px 10px;border:1px solid var(--linha);border-radius:var(--raio);
+  font-family:inherit;font-size:14px;background:var(--superficie);color:var(--texto);
+}
+.linha{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.linha > div{flex:1;min-width:130px;}
+.check{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--texto);}
+.check input{width:auto;margin:0;}
+
+.btn{
+  background:var(--verde);color:#fff;border:none;border-radius:var(--raio);
+  padding:9px 16px;font-size:14px;font-weight:500;
+}
+.btn:hover{background:#0E241F;}
+.btn:disabled{background:#A9B5B0;cursor:not-allowed;}
+.btn.sec{background:transparent;color:var(--verde);border:1px solid var(--linha);}
+.btn.sec:hover{background:#F1F3EE;}
+.btn.mini{padding:5px 11px;font-size:12.5px;}
+.btn.perigo{background:transparent;color:var(--erro);border:1px solid #E4CFCB;}
+
+.pessoa{
+  border:1px solid var(--linha);border-radius:var(--raio);
+  padding:13px;margin-bottom:10px;background:var(--papel);
+}
+.pessoa-cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.pessoa-cab strong{font-family:'Archivo',sans-serif;font-size:13.5px;}
+
+/* ---------- fatura ---------- */
+.fatura{
+  border:1px solid var(--linha);border-radius:var(--raio);
+  background:var(--superficie);padding:16px;margin:18px 0;
+}
+.fatura-topo{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:1px solid var(--linha);padding-bottom:9px;margin-bottom:10px;
+}
+.fatura-topo h3{font-family:'Archivo',sans-serif;font-size:15px;margin:0;}
+.fatura-total{font-family:'Archivo',sans-serif;font-size:22px;color:var(--verde);}
+.fatura-item{display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;}
+.fatura-item span:last-child{font-family:'IBM Plex Mono',monospace;}
+.fatura-nota{font-size:12.5px;color:var(--suave);margin:9px 0 0;}
+
+.selo{
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:3px 9px;
+  border-radius:20px;text-transform:uppercase;letter-spacing:.04em;
+}
+.selo.ok{background:#E4F0EA;color:var(--verde-med);}
+.selo.pend{background:#EFEFEA;color:var(--suave);}
+
+.aviso{
+  border-radius:var(--raio);padding:11px 13px;font-size:13.5px;margin-bottom:14px;
+  border:1px solid var(--linha);background:var(--superficie);
+}
+.aviso.erro{background:#FBF0EE;border-color:#E4CFCB;color:var(--erro);}
+.aviso.ok{background:#E8F2EC;border-color:#C9E0D4;color:var(--verde-med);}
+.vazio{
+  border:1px dashed var(--linha);border-radius:var(--raio);
+  padding:24px;text-align:center;color:var(--suave);font-size:14px;
+}
+.carregando{color:var(--suave);font-size:13.5px;padding:20px 0;}
+.oculto{display:none !important;}
+.login{max-width:400px;margin:11vh auto;padding:0 20px;}
+.login h1{font-size:21px;}
+.alternar{
+  background:none;border:none;color:var(--verde);text-decoration:underline;
+  font-size:13px;padding:0;margin-top:12px;
+}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN / AUTO-CADASTRO ================= -->
+<div id="tela-login" class="login">
+  <div class="cartao">
+    <div id="modo-entrar">
+      <h1>Sua hospedagem</h1>
+      <p class="sub">Entre com o e-mail da sua inscrição. Enviamos um link de acesso — sem senha.</p>
+      <div id="login-aviso"></div>
+      <label for="email">E-mail</label>
+      <input type="email" id="email" placeholder="voce@empresa.com.br" autocomplete="email">
+      <div style="margin-top:12px;">
+        <button class="btn" id="btn-entrar" style="width:100%;">Enviar link de acesso</button>
+      </div>
+      <button class="alternar" id="ir-cadastro">Ainda não tenho inscrição</button>
+    </div>
+
+    <div id="modo-cadastro" class="oculto">
+      <h1>Quero participar</h1>
+      <p class="sub">Preencha seus dados. A organização avalia e responde por e-mail.</p>
+      <div id="cad-aviso"></div>
+      <div class="linha">
+        <div><label>Nome completo</label><input type="text" id="c-nome"></div>
+      </div>
+      <div class="linha">
+        <div><label>E-mail corporativo</label><input type="email" id="c-email"></div>
+      </div>
+      <div class="linha">
+        <div><label>Empresa</label><input type="text" id="c-empresa"></div>
+        <div><label>Cargo</label><input type="text" id="c-cargo"></div>
+      </div>
+      <div class="linha">
+        <div><label>Telefone</label><input type="text" id="c-telefone"></div>
+        <div><label>CNPJ da empresa</label><input type="text" id="c-cnpj"></div>
+      </div>
+      <button class="btn" id="btn-cadastrar" style="width:100%;">Enviar cadastro</button>
+      <button class="alternar" id="ir-entrar">Já tenho inscrição</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app" class="oculto">
+  <header class="topo">
+    <div class="marca">CIO Cerrado<span>Sua hospedagem</span></div>
+    <div class="topo-dir">
+      <span class="quem" id="quem"></span>
+      <button class="sair" id="btn-sair">Sair</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div id="conteudo"><p class="carregando">Carregando sua inscrição…</p></div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURACAO — preencher antes de publicar
+// =====================================================================
+const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
+
+const EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+
+// Schema "gestao": separado do sistema de agendamento de massagem.
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  db: { schema: "gestao" }
+});
+
+let STATUS = null;
+
+// =====================================================================
+// UTILITARIOS
+// =====================================================================
+const $  = (s,r=document) => r.querySelector(s);
+const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function aviso(alvo, texto, tipo="erro"){
+  const el = typeof alvo === "string" ? $(alvo) : alvo;
+  if(!el) return;
+  el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
+}
+
+function explicar(e){
+  const m = e?.message || String(e);
+  if(m.includes("Rooming liberado"))  return "O rooming abre depois que seu contrato for assinado.";
+  if(m.includes("Prazo de rooming"))  return m + " Fale com a organização para ajustar.";
+  if(m.includes("data de nascimento das criancas"))
+    return "Informe a data de nascimento das crianças — ela define a cobrança e o crachá.";
+  if(m.includes("nascimento no futuro")) return "Confira a data de nascimento: está no futuro.";
+  if(m.includes("acompanhante precisa de nome")) return "Todo acompanhante precisa de nome.";
+  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
+  return m;
+}
+
+const moeda = v => Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const dataBR = d => d ? String(d).split("-").reverse().join("/") : "—";
+
+async function rpc(nome, params){
+  const { data, error } = await sb.rpc(nome, params);
+  if(error) throw error;
+  return data;
+}
+
+// =====================================================================
+// LOGIN E AUTO-CADASTRO
+// =====================================================================
+$("#ir-cadastro").addEventListener("click", () => {
+  $("#modo-entrar").classList.add("oculto");
+  $("#modo-cadastro").classList.remove("oculto");
+});
+$("#ir-entrar").addEventListener("click", () => {
+  $("#modo-cadastro").classList.add("oculto");
+  $("#modo-entrar").classList.remove("oculto");
+});
+
+$("#btn-entrar").addEventListener("click", async () => {
+  const email = $("#email").value.trim();
+  if(!email){ aviso("#login-aviso","Informe seu e-mail."); return; }
+
+  const btn = $("#btn-entrar");
+  btn.disabled = true; btn.textContent = "Enviando…";
+  try{
+    const { error } = await sb.auth.signInWithOtp({
+      email, options:{ emailRedirectTo: location.href }
+    });
+    if(error) throw error;
+    aviso("#login-aviso","Link enviado. Abra seu e-mail para entrar.","ok");
+  }catch(e){
+    aviso("#login-aviso", explicar(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Enviar link de acesso";
+  }
+});
+
+$("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
+
+$("#btn-cadastrar").addEventListener("click", async () => {
+  const nome  = $("#c-nome").value.trim();
+  const email = $("#c-email").value.trim();
+  if(!nome || !email){ aviso("#cad-aviso","Nome e e-mail são obrigatórios."); return; }
+
+  const btn = $("#btn-cadastrar");
+  btn.disabled = true; btn.textContent = "Enviando…";
+  try{
+    const r = await rpc("part_autocadastro", {
+      p_evento_slug: EVENTO,
+      p_nome: nome, p_email: email,
+      p_empresa:  $("#c-empresa").value.trim()  || null,
+      p_cargo:    $("#c-cargo").value.trim()    || null,
+      p_telefone: $("#c-telefone").value.trim() || null,
+      p_cnpj:     $("#c-cnpj").value.trim()     || null
+    });
+
+    if(!r.ok && r.motivo === "evento_fechado"){
+      aviso("#cad-aviso","As inscrições para este evento estão fechadas.");
+    }else if(r.ja_inscrito){
+      aviso("#cad-aviso","Você já tem cadastro neste evento. Volte e entre com seu e-mail.","ok");
+    }else{
+      aviso("#cad-aviso","Cadastro enviado. A organização avalia e responde por e-mail.","ok");
+    }
+  }catch(e){
+    aviso("#cad-aviso", explicar(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Enviar cadastro";
+  }
+});
+
+$("#btn-sair").addEventListener("click", async () => {
+  await sb.auth.signOut(); location.reload();
+});
+
+// =====================================================================
+// BOOT
+// =====================================================================
+let iniciado = false;
+
+sb.auth.onAuthStateChange(ev => {
+  if(ev === "SIGNED_OUT"){ location.reload(); return; }
+  if(!iniciado) iniciar();
+});
+
+(async function(){
+  const { data } = await sb.auth.getSession();
+  if(data?.session) iniciar();
+})();
+
+async function iniciar(){
+  if(iniciado) return;
+  iniciado = true;
+
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user) return;
+
+  $("#tela-login").classList.add("oculto");
+  $("#app").classList.remove("oculto");
+  $("#quem").textContent = user.email;
+
+  await carregar();
+}
+
+async function carregar(){
+  try{
+    STATUS = await rpc("part_meu_status", { p_evento_slug: EVENTO });
+    desenhar();
+  }catch(e){
+    aviso("#conteudo", explicar(e));
+  }
+}
+
+// =====================================================================
+// TELA PRINCIPAL
+// =====================================================================
+function desenhar(){
+  const c = $("#conteudo");
+
+  if(!STATUS.inscrito){
+    c.innerHTML = `<div class="vazio">
+      Não encontramos inscrição para este e-mail.<br>
+      Se você se cadastrou com outro endereço, saia e entre com ele.
+    </div>`;
+    return;
+  }
+
+  c.innerHTML = `
+    <h1>Olá, ${esc(String(STATUS.nome||"").split(" ")[0])}</h1>
+    <p class="sub">${esc(STATUS.empresa || "")}</p>
+    <div class="trilha">${trilha()}</div>
+    <div id="aviso-global"></div>
+    <div id="area"></div>`;
+
+  if(STATUS.rooming_liberado) areaRooming();
+  else areaBloqueada();
+}
+
+// A trilha diz exatamente onde a pessoa está e o que falta.
+function trilha(){
+  const inscricaoOk = STATUS.status_inscricao === "aprovado";
+  const contratoOk  = STATUS.status_contrato  === "assinado";
+  const roomingOk   = STATUS.status_rooming   === "completo";
+
+  const etapas = [
+    {
+      ok: inscricaoOk,
+      titulo: "Inscrição",
+      nota: inscricaoOk ? "Aprovada."
+          : STATUS.status_inscricao === "pendente" ? "Em análise pela organização."
+          : "Não aprovada."
+    },
+    {
+      ok: contratoOk,
+      titulo: "Contrato",
+      nota: contratoOk ? "Assinado."
+          : STATUS.status_contrato === "enviado"
+            ? `Enviado para seu e-mail. Prazo: ${dataBR(STATUS.prazo_contrato)}.`
+            : "Você recebe por e-mail assim que a inscrição for aprovada."
+    },
+    {
+      ok: roomingOk,
+      titulo: "Dados de hospedagem",
+      nota: roomingOk ? "Confirmados."
+          : STATUS.rooming_liberado
+            ? `Preencha abaixo. Prazo: ${dataBR(STATUS.prazo_rooming)}.`
+            : "Abre depois da assinatura do contrato."
+    }
+  ];
+
+  // "agora" e a primeira etapa nao concluida
+  const iAgora = etapas.findIndex(e => !e.ok);
+
+  return etapas.map((e,i) => {
+    const cls = e.ok ? "feita" : (i === iAgora ? "agora" : "bloqueada");
+    return `<div class="etapa ${cls}">
+      <div class="marcador">${e.ok ? "✓" : i+1}</div>
+      <div class="txt"><h3>${e.titulo}</h3><p>${esc(e.nota)}</p></div>
+    </div>`;
+  }).join("");
+}
+
+function areaBloqueada(){
+  const contratoUrl = STATUS.contrato_url;
+  $("#area").innerHTML = contratoUrl
+    ? `<div class="cartao">
+         <h2>Assine seu contrato</h2>
+         <p class="sub" style="margin-bottom:14px;">
+           Depois da assinatura, esta página libera o preenchimento dos dados de hospedagem.
+         </p>
+         <a class="btn" href="${esc(contratoUrl)}" target="_blank" rel="noopener"
+            style="display:inline-block;text-decoration:none;">Abrir contrato</a>
+       </div>`
+    : `<div class="vazio">
+         Nada a fazer por enquanto. Avisamos por e-mail quando for a sua vez.
+       </div>`;
+}
+
+// =====================================================================
+// ROOMING
+// =====================================================================
+let ACOMPANHANTES = [];
+
+async function areaRooming(){
+  $("#area").innerHTML = `<p class="carregando">Carregando seus dados…</p>`;
+
+  let lista = [];
+  try{
+    lista = await rpc("part_listar_rooming", { p_evento_slug: EVENTO });
+  }catch(e){
+    aviso("#area", explicar(e)); return;
+  }
+
+  const titular = lista.find(o => o.tipo === "titular");
+  ACOMPANHANTES = lista.filter(o => o.tipo !== "titular").map(o => ({
+    nome: o.nome || "", cpf: o.cpf || "",
+    data_nascimento: o.data_nascimento || "",
+    tipo: o.tipo || "adulto",
+    usa_transfer: !!o.usa_transfer
+  }));
+
+  $("#area").innerHTML = `
+    <div class="cartao">
+      <h2>Quem vai com você</h2>
+      <p class="sub" style="margin-bottom:16px;">
+        Você já está incluído. Adicione acompanhantes e filhos — cada um gera custo adicional,
+        que aparece no resumo abaixo enquanto você preenche.
+      </p>
+
+      <div class="pessoa" style="background:#EDF2EF;">
+        <div class="pessoa-cab">
+          <strong>${esc(STATUS.nome)}</strong>
+          <span class="selo ok">Você</span>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="titular-transfer" ${titular?.usa_transfer ? "checked" : ""}>
+          Vou usar o transfer
+        </label>
+      </div>
+
+      <div id="lista-pessoas"></div>
+
+      <button class="btn sec mini" id="add-pessoa">+ Adicionar acompanhante</button>
+
+      <div class="linha" style="margin-top:16px;">
+        <div style="max-width:280px;">
+          <label>De onde sai o transfer</label>
+          <select id="transfer-origem">
+            <option value="">Não vamos usar transfer</option>
+            <option value="GYN">Goiânia</option>
+            <option value="BSB">Brasília</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fatura" id="fatura"></div>
+      <div id="aviso-rooming"></div>
+      <button class="btn" id="salvar-rooming">Confirmar dados</button>
+    </div>`;
+
+  $("#add-pessoa").addEventListener("click", () => {
+    ACOMPANHANTES.push({ nome:"", cpf:"", data_nascimento:"", tipo:"adulto", usa_transfer:false });
+    desenharPessoas();
+  });
+  $("#salvar-rooming").addEventListener("click", salvarRooming);
+  $("#titular-transfer").addEventListener("change", atualizarFatura);
+  $("#transfer-origem").addEventListener("change", atualizarFatura);
+
+  desenharPessoas();
+}
+
+function desenharPessoas(){
+  const box = $("#lista-pessoas");
+  box.innerHTML = "";
+
+  ACOMPANHANTES.forEach((p,i) => {
+    const el = document.createElement("div");
+    el.className = "pessoa";
+    el.innerHTML = `
+      <div class="pessoa-cab">
+        <strong>Acompanhante ${i+1}</strong>
+        <button class="btn perigo mini remover">Remover</button>
+      </div>
+      <div class="linha">
+        <div><label>Nome completo</label>
+          <input type="text" class="f-nome" value="${esc(p.nome)}"></div>
+        <div style="max-width:150px;"><label>Tipo</label>
+          <select class="f-tipo">
+            <option value="adulto"  ${p.tipo==="adulto"  ? "selected":""}>Adulto</option>
+            <option value="crianca" ${p.tipo==="crianca" ? "selected":""}>Criança</option>
+          </select></div>
+      </div>
+      <div class="linha">
+        <div><label>CPF</label>
+          <input type="text" class="f-cpf" value="${esc(p.cpf)}"></div>
+        <div><label>Data de nascimento</label>
+          <input type="date" class="f-nasc" value="${esc(p.data_nascimento)}"
+                 title="Define a faixa de cobrança e o crachá"></div>
+        <div style="max-width:150px;">
+          <label>Transfer</label>
+          <label class="check" style="padding-top:8px;">
+            <input type="checkbox" class="f-transfer" ${p.usa_transfer ? "checked":""}> Usa
+          </label>
+        </div>
+      </div>`;
+
+    // grava no estado a cada digitada para a fatura acompanhar.
+    // O nome tambem recalcula: a previa so conta quem ja tem nome, entao
+    // sem isso a pessoa digita o acompanhante e o valor nao mexe.
+    el.querySelector(".f-nome").addEventListener("input", e => { p.nome = e.target.value; atualizarFatura(); });
+    el.querySelector(".f-cpf").addEventListener("input",  e => { p.cpf  = e.target.value; });
+    el.querySelector(".f-nasc").addEventListener("change",e => { p.data_nascimento = e.target.value; atualizarFatura(); });
+    el.querySelector(".f-tipo").addEventListener("change",e => { p.tipo = e.target.value; atualizarFatura(); });
+    el.querySelector(".f-transfer").addEventListener("change", e => { p.usa_transfer = e.target.checked; atualizarFatura(); });
+    el.querySelector(".remover").addEventListener("click", () => {
+      ACOMPANHANTES.splice(i,1); desenharPessoas(); atualizarFatura();
+    });
+
+    box.appendChild(el);
+  });
+
+  atualizarFatura();
+}
+
+// Prévia calculada no banco, com os mesmos preços do save — assim o
+// valor da tela nunca diverge do valor cobrado.
+let timerFatura;
+function atualizarFatura(){
+  clearTimeout(timerFatura);
+  timerFatura = setTimeout(async () => {
+    const box = $("#fatura");
+    if(!box) return;
+
+    try{
+      const r = await rpc("part_previa_fatura", {
+        p_evento_slug: EVENTO,
+        p_acompanhantes: ACOMPANHANTES.filter(p => p.nome.trim() !== ""),
+        p_usa_transfer: $("#titular-transfer")?.checked || false
+      });
+
+      // A prévia já vem detalhada do banco, com a idade em cada linha:
+      // duas crianças de idades diferentes podem ter valores diferentes,
+      // e sem mostrar a idade o total parece errado.
+      const itens = r.itens || [];
+
+      box.innerHTML = `
+        <div class="fatura-topo">
+          <h3>Custo adicional</h3>
+          <div class="fatura-total">${moeda(r.total)}</div>
+        </div>
+        ${itens.length
+          ? itens.map(i => `<div class="fatura-item">
+              <span>${esc(i.descricao)}</span>
+              <span>${i.valor === null || i.valor === undefined ? "" : moeda(i.valor)}</span>
+            </div>`).join("")
+          : `<p class="fatura-nota" style="margin-top:0;">Sem custo adicional — só você na hospedagem.</p>`}
+        <p class="fatura-nota">
+          Valores por faixa de idade, considerando a idade no início do evento.
+          Estimativa — a organização confirma o valor final e a forma de pagamento.
+        </p>`;
+    }catch(e){
+      box.innerHTML = `<p class="fatura-nota">${esc(explicar(e))}</p>`;
+    }
+  }, 350);
+}
+
+async function salvarRooming(){
+  const btn = $("#salvar-rooming");
+  const lista = ACOMPANHANTES.filter(p => p.nome.trim() !== "");
+
+  // valida antes de mandar: erro que a pessoa consegue corrigir sozinha
+  for(const p of lista){
+    if(p.tipo === "crianca" && !p.data_nascimento){
+      aviso("#aviso-rooming","Informe a data de nascimento das crianças — ela define a cobrança e o crachá.");
+      return;
+    }
+  }
+
+  // Aviso, não bloqueio: sem a data o valor sai pela faixa padrão, e a
+  // pessoa pode legitimamente não saber a data do acompanhante agora.
+  const semData = lista.filter(p => !p.data_nascimento).length;
+  if(semData && !confirm(
+      `${semData} acompanhante(s) sem data de nascimento. ` +
+      `O valor será calculado pela faixa padrão e pode mudar depois. Continuar?`)) return;
+
+  const origem = $("#transfer-origem").value;
+  const titularTransfer = $("#titular-transfer").checked;
+
+  if(titularTransfer && !origem){
+    aviso("#aviso-rooming","Escolha de onde sai o transfer.");
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try{
+    await rpc("part_salvar_rooming", {
+      p_evento_slug: EVENTO,
+      p_acompanhantes: lista,
+      p_usa_transfer: titularTransfer,
+      p_transfer_origem: origem || null
+    });
+    aviso("#aviso-global","Dados de hospedagem confirmados.","ok");
+    await carregar();
+    window.scrollTo({ top:0, behavior:"smooth" });
+  }catch(e){
+    aviso("#aviso-rooming", explicar(e));
+    btn.disabled = false; btn.textContent = "Confirmar dados";
+  }
+}
+</script>
+</body>
+</html>

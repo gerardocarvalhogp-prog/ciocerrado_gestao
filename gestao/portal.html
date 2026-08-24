@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal do Patrocinador · CIO Cerrado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --verde:#14312B;        /* tinta principal */
+  --verde-med:#1D6F5C;    /* confirmado */
+  --ouro:#A8842C;         /* SINAL: reservado para "sua vez" */
+  --papel:#FBFAF7;
+  --superficie:#FFFFFF;
+  --linha:#DDE0D8;
+  --texto:#243B35;
+  --suave:#6B7C76;
+  --erro:#9B3226;
+  --raio:6px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--papel);
+  color:var(--texto);
+  font-family:'Public Sans',system-ui,sans-serif;
+  font-size:15px;
+  line-height:1.55;
+}
+button{font-family:inherit;cursor:pointer;}
+:focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
+}
+
+/* ---------- estrutura ---------- */
+.topo{
+  background:var(--verde);color:#fff;
+  padding:14px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  flex-wrap:wrap;
+}
+.marca{font-family:'Archivo',sans-serif;font-weight:700;letter-spacing:-.01em;font-size:16px;}
+.marca span{
+  display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
+  font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;
+}
+.topo-dir{display:flex;align-items:center;gap:12px;font-size:13px;}
+.topo-dir .quem{font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.85;}
+.sair{
+  background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
+  border-radius:var(--raio);padding:5px 11px;font-size:12px;
+}
+.sair:hover{background:rgba(255,255,255,.1);}
+
+.wrap{max-width:940px;margin:0 auto;padding:26px 20px 80px;}
+
+.abas{
+  display:flex;gap:2px;border-bottom:1px solid var(--linha);
+  margin-bottom:26px;overflow-x:auto;
+}
+.aba{
+  background:none;border:none;border-bottom:2px solid transparent;
+  padding:10px 14px;font-size:14px;color:var(--suave);white-space:nowrap;
+}
+.aba[aria-selected="true"]{color:var(--verde);border-bottom-color:var(--verde);font-weight:600;}
+
+h1{font-family:'Archivo',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
+h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
+.sub{color:var(--suave);font-size:13.5px;margin:0 0 22px;}
+
+.cartao{
+  background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:16px;margin-bottom:12px;
+}
+.cartao-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.cartao h3{font-family:'Archivo',sans-serif;font-size:15px;margin:0 0 2px;}
+.meta{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--suave);}
+
+.selo{
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+  padding:3px 9px;border-radius:20px;white-space:nowrap;
+  text-transform:uppercase;letter-spacing:.04em;
+}
+.selo.ok{background:#E4F0EA;color:var(--verde-med);}
+.selo.pend{background:#EFEFEA;color:var(--suave);}
+.selo.vez{background:#F7EFD9;color:var(--ouro);font-weight:600;}
+
+/* ---------- formulários ---------- */
+label{display:block;font-size:12px;color:var(--suave);margin-bottom:3px;}
+input[type=text],input[type=email],input[type=date],select,textarea{
+  width:100%;padding:8px 10px;border:1px solid var(--linha);
+  border-radius:var(--raio);font-family:inherit;font-size:14px;
+  background:var(--superficie);color:var(--texto);
+}
+textarea{min-height:64px;resize:vertical;}
+.linha{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.linha > div{flex:1;min-width:130px;}
+.check{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--texto);}
+.check input{width:auto;margin:0;}
+
+.btn{
+  background:var(--verde);color:#fff;border:none;
+  border-radius:var(--raio);padding:9px 16px;font-size:14px;font-weight:500;
+}
+.btn:hover{background:#0E241F;}
+.btn:disabled{background:#A9B5B0;cursor:not-allowed;}
+.btn.sec{background:transparent;color:var(--verde);border:1px solid var(--linha);}
+.btn.sec:hover{background:#F1F3EE;}
+.btn.mini{padding:5px 11px;font-size:12.5px;}
+.btn.perigo{background:transparent;color:var(--erro);border:1px solid #E4CFCB;}
+
+/* ---------- fila de escolha (signature) ---------- */
+.fila{
+  background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:16px;margin-bottom:14px;
+}
+.fila-trilho{
+  display:flex;align-items:stretch;gap:0;margin:14px 0 6px;
+  overflow-x:auto;padding-bottom:4px;
+}
+.fila-passo{
+  flex:1;min-width:92px;padding:9px 10px;
+  border-top:3px solid var(--linha);
+}
+.fila-passo .n{
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--suave);
+}
+.fila-passo .q{font-family:'Archivo',sans-serif;font-size:13.5px;margin-top:2px;}
+.fila-passo.passou{border-top-color:var(--verde-med);}
+.fila-passo.passou .q{color:var(--suave);}
+.fila-passo.aqui{border-top-color:var(--ouro);}
+.fila-passo.aqui .n{color:var(--ouro);font-weight:600;}
+.fila-passo.aqui .q{font-weight:700;color:var(--verde);}
+.fila-nota{font-size:13px;color:var(--suave);margin:0;}
+.sel-empresa{
+  margin-top:8px;padding:6px 10px;border:1px solid var(--linha);
+  border-radius:var(--raio);font-family:inherit;font-size:13.5px;
+  background:var(--superficie);color:var(--texto);}
+
+/* ---------- avisos ---------- */
+.aviso{
+  border-radius:var(--raio);padding:11px 13px;font-size:13.5px;margin-bottom:14px;
+  border:1px solid var(--linha);background:var(--superficie);
+}
+.aviso.erro{background:#FBF0EE;border-color:#E4CFCB;color:var(--erro);}
+.aviso.ok{background:#E8F2EC;border-color:#C9E0D4;color:var(--verde-med);}
+.vazio{
+  border:1px dashed var(--linha);border-radius:var(--raio);
+  padding:24px;text-align:center;color:var(--suave);font-size:14px;
+}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{
+  text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:500;
+  font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--suave);border-bottom:1px solid var(--linha);padding:7px 6px;
+}
+td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
+
+.oculto{display:none !important;}
+.carregando{color:var(--suave);font-size:13.5px;padding:20px 0;}
+
+/* ---------- login ---------- */
+.login{max-width:380px;margin:12vh auto;padding:0 20px;}
+.login .cartao{padding:26px;}
+.login h1{font-size:21px;}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="tela-login" class="login">
+  <div class="cartao">
+    <h1>Portal do Patrocinador</h1>
+    <p class="sub">Entre com o e-mail cadastrado pela sua empresa. Enviamos um link de acesso — sem senha.</p>
+    <div id="login-aviso"></div>
+    <label for="email">E-mail</label>
+    <input type="email" id="email" placeholder="voce@empresa.com.br" autocomplete="email">
+    <div style="margin-top:12px;">
+      <button class="btn" id="btn-entrar" style="width:100%;">Enviar link de acesso</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app" class="oculto">
+  <header class="topo">
+    <div class="marca">CIO Cerrado<span>Portal do patrocinador</span></div>
+    <div class="topo-dir">
+      <span class="quem" id="quem"></span>
+      <button class="sair" id="btn-sair">Sair</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="cabecalho"></div>
+
+    <div class="abas" role="tablist">
+      <button class="aba" role="tab" data-aba="quartos" aria-selected="true">Quartos</button>
+      <button class="aba" role="tab" data-aba="mesa" aria-selected="false">Mesa redonda</button>
+      <button class="aba" role="tab" data-aba="indicacoes" aria-selected="false">Indicar CIO</button>
+      <button class="aba" role="tab" data-aba="manual" aria-selected="false">Manual</button>
+    </div>
+
+    <div id="aviso-global"></div>
+
+    <section id="painel-quartos"></section>
+    <section id="painel-mesa" class="oculto"></section>
+    <section id="painel-indicacoes" class="oculto"></section>
+    <section id="painel-manual" class="oculto"></section>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURACAO — preencher antes de publicar
+// =====================================================================
+const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
+
+// O evento vem da URL (?evento=slug). Multievento desde o inicio.
+const EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+
+// IMPORTANTE: todas as tabelas e funcoes vivem no schema "gestao",
+// separado do sistema de agendamento de massagem que ocupa "public".
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  db: { schema: "gestao" }
+});
+
+// =====================================================================
+// ESTADO
+// =====================================================================
+let PATRO = null;      // patrocinador ativo
+let QUARTOS = [];
+let SESSOES = [];
+
+// =====================================================================
+// UTILITARIOS
+// =====================================================================
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+function esc(v){
+  return String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+function aviso(alvo, texto, tipo="erro"){
+  const el = typeof alvo === "string" ? $(alvo) : alvo;
+  if(!el) return;
+  el.innerHTML = texto
+    ? `<div class="aviso ${tipo}">${esc(texto)}</div>`
+    : "";
+}
+
+// Mensagem de erro que diz o que aconteceu, nao "algo deu errado".
+function explicar(erro){
+  const m = erro?.message || String(erro);
+  if(m.includes("Sem acesso"))          return "Seu e-mail não está vinculado a esta empresa. Fale com a organização.";
+  if(m.includes("nao e a sua vez") ||
+     m.includes("não é a sua vez"))     return m;
+  if(m.includes("Cota de"))             return m;
+  if(m.includes("comporta"))            return m;
+  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
+  return m;
+}
+
+function moeda(v){
+  return Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+}
+function dataBR(d){
+  if(!d) return "—";
+  const [a,m,dia] = String(d).split("-");
+  return `${dia}/${m}/${a}`;
+}
+
+async function rpc(nome, params){
+  const { data, error } = await sb.rpc(nome, params);
+  if(error) throw error;
+  return data;
+}
+
+// =====================================================================
+// LOGIN
+// =====================================================================
+$("#btn-entrar").addEventListener("click", async () => {
+  const email = $("#email").value.trim();
+  if(!email){ aviso("#login-aviso","Informe seu e-mail."); return; }
+
+  const btn = $("#btn-entrar");
+  btn.disabled = true; btn.textContent = "Enviando…";
+
+  try{
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: location.href }
+    });
+    if(error) throw error;
+    aviso("#login-aviso", "Link enviado. Abra seu e-mail para entrar.", "ok");
+  }catch(e){
+    aviso("#login-aviso", explicar(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Enviar link de acesso";
+  }
+});
+
+$("#email").addEventListener("keydown", e => {
+  if(e.key === "Enter") $("#btn-entrar").click();
+});
+
+$("#btn-sair").addEventListener("click", async () => {
+  await sb.auth.signOut();
+  location.reload();
+});
+
+// =====================================================================
+// BOOT
+// =====================================================================
+let iniciado = false;
+
+sb.auth.onAuthStateChange((evento) => {
+  // so reage ao primeiro login e ao logout; sem isso a aba perde o
+  // estado toda vez que o usuario volta para ela
+  if(evento === "SIGNED_OUT"){ location.reload(); return; }
+  if(!iniciado) iniciar();
+});
+
+(async function(){
+  const { data } = await sb.auth.getSession();
+  if(data?.session) iniciar();
+})();
+
+async function iniciar(){
+  if(iniciado) return;
+  iniciado = true;
+
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user) return;
+
+  $("#tela-login").classList.add("oculto");
+  $("#app").classList.remove("oculto");
+  $("#quem").textContent = user.email;
+
+  try{
+    const painel = await rpc("patro_meu_painel", { p_evento_slug: EVENTO });
+
+    if(!painel || painel.length === 0){
+      $("#cabecalho").innerHTML = `
+        <div class="vazio">
+          Este e-mail não está vinculado a nenhum patrocinador deste evento.<br>
+          Fale com a organização para liberar seu acesso.
+        </div>`;
+      $$(".abas, #painel-quartos").forEach(el => el.classList.add("oculto"));
+      return;
+    }
+
+    PATRO = painel[0];
+
+    // Antes o portal pegava a primeira empresa em silencio. Quem responde
+    // por duas patrocinadoras precisa escolher, senao edita a errada sem
+    // perceber.
+    if(painel.length > 1){
+      const sel = document.createElement("select");
+      sel.className = "sel-empresa";
+      sel.innerHTML = painel.map((p,i) =>
+        `<option value="${i}">${esc(p.empresa)}</option>`).join("");
+      sel.addEventListener("change", () => {
+        PATRO = painel[sel.value];
+        desenharCabecalho();
+        $("#cabecalho").appendChild(sel);
+        carregarQuartos();
+      });
+      desenharCabecalho();
+      $("#cabecalho").appendChild(sel);
+    }else{
+      desenharCabecalho();
+    }
+    ligarAbas();
+    carregarQuartos();
+  }catch(e){
+    aviso("#aviso-global", explicar(e));
+  }
+}
+
+function desenharCabecalho(){
+  $("#cabecalho").innerHTML = `
+    <h1>${esc(PATRO.empresa)}</h1>
+    <p class="sub">
+      Cota ${esc(PATRO.cota)} · ${PATRO.quartos_total} quarto(s)
+      · ${PATRO.quartos_preenchidos} preenchido(s)
+      ${PATRO.vagas_mesa_redonda > 0
+        ? ` · ${PATRO.vagas_mesa_redonda} vaga(s) na mesa redonda` : ""}
+    </p>`;
+}
+
+function ligarAbas(){
+  $$(".aba").forEach(b => b.addEventListener("click", () => {
+    $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
+    ["quartos","mesa","indicacoes","manual"].forEach(a =>
+      $("#painel-"+a).classList.toggle("oculto", a !== b.dataset.aba));
+
+    if(b.dataset.aba === "mesa")       carregarMesa();
+    if(b.dataset.aba === "indicacoes") carregarIndicacoes();
+    if(b.dataset.aba === "manual")     carregarManual();
+  }));
+}
+
+// =====================================================================
+// ABA: QUARTOS
+// =====================================================================
+async function recarregarPainel(){
+  try{
+    const painel = await rpc("patro_meu_painel", { p_evento_slug: EVENTO });
+    const atual = painel.find(p => p.patrocinador_id === PATRO.patrocinador_id);
+    if(atual){ PATRO = atual; desenharCabecalho(); }
+  }catch(e){ /* contador e acessorio: nao bloqueia a acao */ }
+}
+
+async function carregarQuartos(){
+  const alvo = $("#painel-quartos");
+  alvo.innerHTML = `<p class="carregando">Carregando seus quartos…</p>`;
+
+  try{
+    QUARTOS = await rpc("patro_listar_quartos", { p_patrocinador_id: PATRO.patrocinador_id });
+    const disp = await rpc("patro_disponibilidade", { p_evento_slug: EVENTO });
+
+    if(QUARTOS.length === 0){
+      alvo.innerHTML = `<div class="vazio">
+        Sua cota ainda não tem quartos liberados. Fale com a organização.
+      </div>`;
+      return;
+    }
+
+    alvo.innerHTML = `
+      <h2>Seus quartos</h2>
+      <p class="sub">Preencha quem ocupa cada quarto, o transfer e o brinde.</p>
+      <div id="lista-quartos"></div>
+      ${blocoDisponibilidade(disp)}`;
+
+    QUARTOS.forEach(q => $("#lista-quartos").appendChild(cartaoQuarto(q)));
+    ligarCompra();
+  }catch(e){
+    aviso(alvo, explicar(e));
+  }
+}
+
+function blocoDisponibilidade(disp){
+  const linhas = (disp||[]).map(d => `
+    <tr>
+      <td style="text-transform:capitalize">${esc(d.tipo)}</td>
+      <td>${d.livres}</td>
+      <td style="text-align:right">
+        ${d.livres > 0
+          ? `<button class="btn sec mini comprar" data-tipo="${esc(d.tipo)}">Reservar</button>`
+          : `<span class="selo pend">Esgotado</span>`}
+      </td>
+    </tr>`).join("");
+
+  return `
+    <h2 style="margin-top:28px;">Quartos disponíveis</h2>
+    <p class="sub">Reserve um quarto além da sua cota. A disponibilidade é do hotel, em tempo real.</p>
+    <div class="cartao">
+      <table>
+        <tr><th>Tipo</th><th>Livres</th><th></th></tr>
+        ${linhas || `<tr><td colspan="3" style="color:var(--suave)">Sem quartos livres no momento.</td></tr>`}
+      </table>
+    </div>`;
+}
+
+function ligarCompra(){
+  $$(".comprar").forEach(b => b.addEventListener("click", async () => {
+    b.disabled = true; b.textContent = "Reservando…";
+    try{
+      const r = await rpc("patro_comprar_quarto", {
+        p_patrocinador_id: PATRO.patrocinador_id,
+        p_tipo: b.dataset.tipo
+      });
+      if(!r.ok){
+        // outro patrocinador levou o ultimo entre a tela carregar e o clique
+        aviso("#aviso-global","O último quarto desse tipo acabou de ser reservado por outra empresa.");
+        carregarQuartos();
+        return;
+      }
+      aviso("#aviso-global", `${r.rotulo} reservado. Preencha os ocupantes abaixo.`, "ok");
+      await recarregarPainel();
+      carregarQuartos();
+    }catch(e){
+      aviso("#aviso-global", explicar(e));
+    }
+  }));
+}
+
+function cartaoQuarto(q){
+  const cap = q.capacidade;
+  const el = document.createElement("div");
+  el.className = "cartao";
+  el.innerHTML = `
+    <div class="cartao-cab">
+      <div>
+        <h3>${esc(q.rotulo)} · <span style="text-transform:capitalize">${esc(q.tipo)}</span></h3>
+        <p class="meta">
+          ${q.ocupantes} de ${cap} ocupante(s)
+          ${q.quarto_numero ? ` · apto ${esc(q.quarto_numero)}` : ""}
+          ${q.origem === "extra" ? " · extra" : ""}
+        </p>
+      </div>
+      <span class="selo ${q.status === "completo" ? "ok" : "pend"}">
+        ${q.status === "completo" ? "Preenchido" : "Pendente"}
+      </span>
+    </div>
+    <div style="margin-top:14px;">
+      <button class="btn sec mini abrir">${q.status === "completo" ? "Editar" : "Preencher"}</button>
+      ${q.origem === "extra"
+        ? `<button class="btn perigo mini cancelar" style="margin-left:6px;">Cancelar quarto</button>`
+        : ""}
+    </div>
+    <div class="editor oculto" style="margin-top:16px;"></div>`;
+
+  el.querySelector(".abrir").addEventListener("click", () => {
+    const ed = el.querySelector(".editor");
+    if(!ed.classList.contains("oculto")){ ed.classList.add("oculto"); return; }
+    ed.classList.remove("oculto");
+    abrirEditor(ed, q);
+  });
+
+  const btnCancel = el.querySelector(".cancelar");
+  if(btnCancel) btnCancel.addEventListener("click", async () => {
+    if(!confirm(`Cancelar ${q.rotulo}? O quarto volta para a disponibilidade do hotel.`)) return;
+    try{
+      await rpc("patro_cancelar_quarto_extra", { p_reserva_id: q.reserva_id });
+      aviso("#aviso-global", `${q.rotulo} cancelado.`, "ok");
+      // recarrega o painel junto: o contador do cabecalho vinha dele e
+      // ficava desatualizado ate a pessoa recarregar a pagina na mao
+      await recarregarPainel();
+      carregarQuartos();
+    }catch(e){ aviso("#aviso-global", explicar(e)); }
+  });
+
+  return el;
+}
+
+async function abrirEditor(ed, q){
+  ed.innerHTML = `<p class="carregando">Carregando ocupantes…</p>`;
+
+  let ocupantes = [];
+  try{
+    ocupantes = await rpc("patro_listar_ocupantes", { p_reserva_id: q.reserva_id });
+  }catch(e){
+    aviso(ed, explicar(e)); return;
+  }
+
+  // completa ate a capacidade para o usuario ter os campos prontos
+  while(ocupantes.length < q.capacidade) ocupantes.push({ nome:"", cpf:"" });
+
+  ed.innerHTML = `
+    <div class="caixa-ocupantes"></div>
+    <div class="linha" style="margin-top:6px;">
+      <div>
+        <label>Transfer</label>
+        <select class="f-transfer">
+          <option value="">Não vamos usar</option>
+          <option value="GYN">Sim — saindo de Goiânia</option>
+          <option value="BSB">Sim — saindo de Brasília</option>
+        </select>
+      </div>
+    </div>
+    <div class="linha">
+      <div>
+        <label class="check">
+          <input type="checkbox" class="f-brinde-tem"> Vamos enviar brinde para o quarto
+        </label>
+      </div>
+    </div>
+    <div class="linha f-brinde-box oculto">
+      <div>
+        <label>Qual brinde</label>
+        <input type="text" class="f-brinde-desc" placeholder="Ex.: kit café + caneca">
+      </div>
+    </div>
+    <div class="aviso-quarto"></div>
+    <button class="btn salvar">Salvar quarto</button>`;
+
+  // Seleciona por classe, nao por id montado com o UUID: UUID que
+  // comeca com digito ("3f2b...") gera um seletor CSS invalido e
+  // querySelector lanca excecao.
+  const box = $(".caixa-ocupantes", ed);
+  ocupantes.forEach((o,i) => box.appendChild(campoOcupante(o,i)));
+
+  const tr = ed.querySelector(".f-transfer");
+  if(q.usa_transfer && q.transfer_origem) tr.value = q.transfer_origem;
+
+  const chk = ed.querySelector(".f-brinde-tem");
+  const cx  = ed.querySelector(".f-brinde-box");
+  chk.checked = !!q.brinde_vai_enviar;
+  cx.classList.toggle("oculto", !chk.checked);
+  ed.querySelector(".f-brinde-desc").value = q.brinde_descricao || "";
+  chk.addEventListener("change", () => cx.classList.toggle("oculto", !chk.checked));
+
+  ed.querySelector(".salvar").addEventListener("click", () => salvarQuarto(ed, q));
+}
+
+function campoOcupante(o, i){
+  const d = document.createElement("div");
+  d.className = "linha ocupante";
+  d.innerHTML = `
+    <div>
+      <label>Ocupante ${i+1} — nome</label>
+      <input type="text" class="f-nome" value="${esc(o.nome)}" placeholder="Nome completo">
+    </div>
+    <div>
+      <label>CPF</label>
+      <input type="text" class="f-cpf" value="${esc(o.cpf)}" placeholder="000.000.000-00">
+    </div>
+    <div style="max-width:150px;">
+      <label>Transfer</label>
+      <label class="check" style="padding-top:8px;">
+        <input type="checkbox" class="f-ocup-transfer" ${o.usa_transfer ? "checked" : ""}> Usa
+      </label>
+    </div>`;
+  return d;
+}
+
+async function salvarQuarto(ed, q){
+  const btn = ed.querySelector(".salvar");
+  const alvoAviso = ed.querySelector(".aviso-quarto");
+
+  // linha em branco nao vira ocupante: o usuario nao precisa apagar
+  // os campos que sobraram
+  const lista = $$(".ocupante", ed).map(r => ({
+    nome: r.querySelector(".f-nome").value.trim(),
+    cpf:  r.querySelector(".f-cpf").value.trim(),
+    tipo: "adulto",
+    usa_transfer: r.querySelector(".f-ocup-transfer").checked
+  })).filter(o => o.nome !== "");
+
+  if(lista.length === 0){
+    aviso(alvoAviso, "Informe pelo menos um ocupante para salvar o quarto.");
+    return;
+  }
+
+  const origem = ed.querySelector(".f-transfer").value;
+
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try{
+    await rpc("patro_salvar_quarto", {
+      p_reserva_id: q.reserva_id,
+      p_ocupantes: lista,
+      p_usa_transfer: origem !== "",
+      p_transfer_origem: origem || null,
+      p_brinde_enviar: ed.querySelector(".f-brinde-tem").checked,
+      p_brinde_descricao: ed.querySelector(".f-brinde-desc").value.trim() || null
+    });
+    aviso("#aviso-global", `${q.rotulo} salvo.`, "ok");
+    carregarQuartos();
+  }catch(e){
+    aviso(alvoAviso, explicar(e));
+    btn.disabled = false; btn.textContent = "Salvar quarto";
+  }
+}
+
+// =====================================================================
+// ABA: MESA REDONDA  (signature = a fila de escolha)
+// =====================================================================
+async function carregarMesa(){
+  const alvo = $("#painel-mesa");
+  alvo.innerHTML = `<p class="carregando">Carregando suas sessões…</p>`;
+
+  try{
+    if(ORDEM_COTAS.length === 0) await carregarCotas();
+    SESSOES = await rpc("patro_minhas_sessoes", { p_patrocinador_id: PATRO.patrocinador_id });
+
+    if(SESSOES.length === 0){
+      alvo.innerHTML = `<div class="vazio">
+        Sua cota não inclui mesa redonda nem reunião exclusiva.<br>
+        Você ainda pode indicar CIOs para o evento na aba ao lado.
+      </div>`;
+      return;
+    }
+
+    alvo.innerHTML = `
+      <h2>Mesa redonda e reuniões</h2>
+      <p class="sub">As cotas mais altas escolhem primeiro. Dentro da mesma cota, quem fechou contrato e rooming antes escolhe antes.</p>
+      <div id="lista-sessoes"></div>`;
+
+    for(const s of SESSOES){
+      const card = document.createElement("div");
+      card.className = "fila";
+      $("#lista-sessoes").appendChild(card);
+      await desenharSessao(card, s);
+    }
+  }catch(e){
+    aviso(alvo, explicar(e));
+  }
+}
+
+const NOME_TIPO = {
+  mesa_redonda:"Mesa redonda",
+  reuniao_exclusiva:"Reunião exclusiva",
+  jantar:"Jantar"
+};
+
+async function desenharSessao(card, s){
+  let vez;
+  try{
+    vez = await rpc("patro_minha_vez", { p_sessao_id: s.sessao_id });
+  }catch(e){
+    aviso(card, explicar(e)); return;
+  }
+
+  const minhaVez  = vez.minha_vez && !s.encerrada;
+  const restantes = s.vagas - Number(s.escolhidos);
+
+  card.innerHTML = `
+    <div class="cartao-cab">
+      <div>
+        <h3>${NOME_TIPO[s.tipo] || esc(s.tipo)}${s.data ? " · " + dataBR(s.data) : ""}</h3>
+        <p class="meta">${s.escolhidos} de ${s.vagas} vaga(s) escolhida(s)${s.local ? " · " + esc(s.local) : ""}</p>
+      </div>
+      <span class="selo ${s.encerrada ? "ok" : (minhaVez ? "vez" : "pend")}">
+        ${s.encerrada ? "Encerrada" : (minhaVez ? "Sua vez" : "Aguardando")}
+      </span>
+    </div>
+
+    ${trilhoFila(vez, PATRO.cota)}
+
+    <div class="corpo-sessao"></div>`;
+
+  const corpo = card.querySelector(".corpo-sessao");
+
+  if(s.encerrada){
+    corpo.innerHTML = `<p class="fila-nota">${
+      s.passou
+        ? "Você passou a vez. As vagas restantes foram liberadas para as próximas empresas da fila."
+        : "Suas escolhas estão confirmadas."
+    }</p>`;
+    return;
+  }
+
+  if(!minhaVez){
+    corpo.innerHTML = `<p class="fila-nota">
+      ${vez.na_frente} empresa(s) ainda estão escolhendo antes de você.
+      Avisamos por e-mail assim que chegar a sua vez.
+    </p>`;
+    return;
+  }
+
+  corpo.innerHTML = `
+    <p class="fila-nota" style="margin-bottom:10px;">
+      Escolha até ${restantes} convidado(s). Quem você marcar sai da lista das outras empresas.
+    </p>
+    <div class="lista-convidados carregando">Carregando convidados disponíveis…</div>
+    <div class="aviso-sessao"></div>
+    <div style="margin-top:12px;">
+      <button class="btn confirmar" disabled>Confirmar escolhas</button>
+      <button class="btn sec passar" style="margin-left:6px;">Passar a vez</button>
+    </div>`;
+
+  let disponiveis = [];
+  try{
+    disponiveis = await rpc("patro_convidados_disponiveis", { p_sessao_id: s.sessao_id });
+  }catch(e){
+    aviso(corpo.querySelector(".aviso-sessao"), explicar(e)); return;
+  }
+
+  const lista = corpo.querySelector(".lista-convidados");
+  lista.classList.remove("carregando");
+
+  if(disponiveis.length === 0){
+    lista.innerHTML = `<div class="vazio">Não há mais convidados disponíveis para esta sessão.</div>`;
+  }else{
+    lista.innerHTML = `<table><tbody>${disponiveis.map(c => `
+      <tr>
+        <td style="width:26px;">
+          <input type="checkbox" class="pick" value="${esc(c.participante_id)}">
+        </td>
+        <td><strong>${esc(c.nome)}</strong><br>
+            <span class="meta">${esc(c.empresa || "")}${c.cargo ? " · " + esc(c.cargo) : ""}</span></td>
+      </tr>`).join("")}</tbody></table>`;
+  }
+
+  const btn = corpo.querySelector(".confirmar");
+
+  // trava a selecao no limite de vagas em vez de deixar o banco recusar
+  function sincronizar(){
+    const marcados = $$(".pick:checked", corpo);
+    btn.disabled = marcados.length === 0;
+    btn.textContent = marcados.length
+      ? `Confirmar ${marcados.length} escolha(s)`
+      : "Confirmar escolhas";
+    $$(".pick", corpo).forEach(c => {
+      c.disabled = !c.checked && marcados.length >= restantes;
+    });
+  }
+  $$(".pick", corpo).forEach(c => c.addEventListener("change", sincronizar));
+
+  btn.addEventListener("click", async () => {
+    const ids = $$(".pick:checked", corpo).map(c => c.value);
+    btn.disabled = true; btn.textContent = "Confirmando…";
+    try{
+      const r = await rpc("patro_escolher_convidados", {
+        p_sessao_id: s.sessao_id,
+        p_participantes: ids
+      });
+      aviso("#aviso-global", `${r.inseridos} convidado(s) confirmado(s).`, "ok");
+      carregarMesa();
+    }catch(e){
+      aviso(corpo.querySelector(".aviso-sessao"), explicar(e));
+      btn.disabled = false; btn.textContent = "Confirmar escolhas";
+    }
+  });
+
+  corpo.querySelector(".passar").addEventListener("click", async () => {
+    if(!confirm("Passar a vez libera as vagas restantes para as próximas empresas da fila. Confirma?")) return;
+    try{
+      await rpc("patro_passar_a_vez", { p_sessao_id: s.sessao_id });
+      carregarMesa();
+    }catch(e){ aviso("#aviso-global", explicar(e)); }
+  });
+}
+
+// A fila: mostra onde a empresa está na ordem de escolha.
+// A ordem vem do banco (cotas.ordem_prioridade). Deixá-la fixa aqui
+// significaria que criar uma cota nova no painel exigiria mexer neste
+// arquivo também — e ninguém lembraria.
+let ORDEM_COTAS = [];
+
+async function carregarCotas(){
+  try{
+    const l = await rpc("listar_cotas", { p_evento_slug: EVENTO });
+    ORDEM_COTAS = l.map(c => c.nome);
+  }catch(e){
+    ORDEM_COTAS = [];   // sem a lista, o trilho some e sobra a nota
+  }
+}
+
+function trilhoFila(vez, minhaCota){
+  if(ORDEM_COTAS.length === 0){
+    return `<p class="fila-nota">${esc(vez.minha_vez
+      ? `Você é o próximo da fila — posição ${vez.posicao}.`
+      : `${vez.na_frente} empresa(s) na sua frente · posição ${vez.posicao}.`)}</p>`;
+  }
+
+  const idx = ORDEM_COTAS.findIndex(c =>
+    c.toLowerCase() === String(minhaCota||"").toLowerCase());
+
+  const passos = ORDEM_COTAS.map((c,i) => {
+    const aqui   = i === idx;
+    const passou = idx >= 0 && i < idx;
+    return `<div class="fila-passo ${aqui ? "aqui" : (passou ? "passou" : "")}">
+      <div class="n">${passou ? "antes de você" : (aqui ? "você" : "depois de você")}</div>
+      <div class="q">${c}</div>
+    </div>`;
+  }).join("");
+
+  const nota = vez.minha_vez
+    ? `Você é o próximo da fila — posição ${vez.posicao}.`
+    : `${vez.na_frente} empresa(s) na sua frente · sua posição na ordem geral: ${vez.posicao}.`;
+
+  return `<div class="fila-trilho">${passos}</div>
+          <p class="fila-nota">${esc(nota)}</p>`;
+}
+
+// =====================================================================
+// ABA: INDICAR CIO
+// =====================================================================
+async function carregarIndicacoes(){
+  const alvo = $("#painel-indicacoes");
+
+  alvo.innerHTML = `
+    <h2>Indicar um CIO</h2>
+    <p class="sub">Sugira executivos para o evento. A organização faz o convite e você acompanha o status por aqui.</p>
+
+    <div class="cartao">
+      <div class="linha">
+        <div><label>Nome</label><input type="text" id="i-nome" placeholder="Nome completo"></div>
+        <div><label>Empresa</label><input type="text" id="i-empresa"></div>
+      </div>
+      <div class="linha">
+        <div><label>Cargo</label><input type="text" id="i-cargo" placeholder="CIO, Diretor de TI…"></div>
+        <div><label>E-mail</label><input type="email" id="i-email"></div>
+        <div><label>Telefone</label><input type="text" id="i-telefone"></div>
+      </div>
+      <div class="linha">
+        <div><label>Observação</label><textarea id="i-obs" placeholder="Contexto que ajude a organização"></textarea></div>
+      </div>
+      <div id="i-aviso"></div>
+      <button class="btn" id="i-enviar">Enviar indicação</button>
+    </div>
+
+    <h2 style="margin-top:26px;">Suas indicações</h2>
+    <div id="i-lista"><p class="carregando">Carregando…</p></div>`;
+
+  $("#i-enviar").addEventListener("click", enviarIndicacao);
+  listarIndicacoes();
+}
+
+async function enviarIndicacao(){
+  const nome = $("#i-nome").value.trim();
+  if(!nome){ aviso("#i-aviso","Informe pelo menos o nome do CIO."); return; }
+
+  const btn = $("#i-enviar");
+  btn.disabled = true; btn.textContent = "Enviando…";
+
+  try{
+    const r = await rpc("patro_indicar_cio", {
+      p_patrocinador_id: PATRO.patrocinador_id,
+      p_nome: nome,
+      p_empresa:  $("#i-empresa").value.trim()  || null,
+      p_cargo:    $("#i-cargo").value.trim()    || null,
+      p_email:    $("#i-email").value.trim()    || null,
+      p_telefone: $("#i-telefone").value.trim() || null,
+      p_observacao: $("#i-obs").value.trim()    || null
+    });
+
+    aviso("#i-aviso", r.ja_na_base
+      ? "Indicação registrada. Esse executivo já está na nossa base — a organização confirma o status."
+      : "Indicação enviada.", "ok");
+
+    ["#i-nome","#i-empresa","#i-cargo","#i-email","#i-telefone","#i-obs"]
+      .forEach(s => $(s).value = "");
+    listarIndicacoes();
+  }catch(e){
+    aviso("#i-aviso", explicar(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Enviar indicação";
+  }
+}
+
+const ROTULO_STATUS = {
+  nova:"Aguardando convite", convidado:"Convidado",
+  inscrito:"Inscrito", recusado:"Não seguiu", duplicado:"Já na base"
+};
+
+async function listarIndicacoes(){
+  try{
+    const lista = await rpc("patro_listar_indicacoes", { p_patrocinador_id: PATRO.patrocinador_id });
+
+    $("#i-lista").innerHTML = lista.length === 0
+      ? `<div class="vazio">Você ainda não indicou ninguém.</div>`
+      : `<div class="cartao"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Status</th></tr>
+          ${lista.map(i => `
+            <tr>
+              <td>${esc(i.nome)}</td>
+              <td>${esc(i.empresa || "—")}</td>
+              <td><span class="selo ${i.status === "inscrito" ? "ok" : "pend"}">
+                ${esc(ROTULO_STATUS[i.status] || i.status)}</span></td>
+            </tr>`).join("")}
+        </table></div>`;
+  }catch(e){
+    aviso("#i-lista", explicar(e));
+  }
+}
+
+// =====================================================================
+// ABA: MANUAL
+// =====================================================================
+async function carregarManual(){
+  const alvo = $("#painel-manual");
+  alvo.innerHTML = `<p class="carregando">Carregando…</p>`;
+
+  try{
+    const m = (await rpc("patro_manual", { p_evento_slug: EVENTO }))[0];
+    if(!m){ alvo.innerHTML = `<div class="vazio">Manual ainda não publicado.</div>`; return; }
+
+    const prazos = [
+      ["Assinatura do contrato", m.prazo_contrato, "Depois desta data a inscrição não é garantida."],
+      ["Rooming list",           m.prazo_rooming,  "Nomes dos ocupantes de cada quarto."],
+      ["Cancelamento sem multa", m.prazo_cancelamento, "Após esta data há cobrança de no-show."]
+    ];
+
+    alvo.innerHTML = `
+      <h2>${esc(m.nome)}</h2>
+      <p class="sub">${esc(m.local || "")} · ${dataBR(m.data_inicio)} a ${dataBR(m.data_fim)}</p>
+      <div class="cartao">
+        <table>
+          <tr><th>Prazo</th><th>Data</th><th>O que é</th></tr>
+          ${prazos.map(([t,d,o]) => `
+            <tr><td><strong>${t}</strong></td>
+                <td class="meta">${dataBR(d)}</td>
+                <td style="color:var(--suave)">${o}</td></tr>`).join("")}
+        </table>
+      </div>`;
+  }catch(e){
+    aviso(alvo, explicar(e));
+  }
+}
+</script>
+</body>
+</html>

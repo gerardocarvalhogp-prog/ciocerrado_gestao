@@ -1,0 +1,2796 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel · CIO Cerrado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
+  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
+  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--papel);color:var(--texto);
+  font-family:'Public Sans',system-ui,sans-serif;font-size:14.5px;line-height:1.5;}
+button{font-family:inherit;cursor:pointer;}
+:focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important;}}
+
+.topo{background:var(--verde);color:#fff;padding:13px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;}
+.marca span{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
+.topo-dir{display:flex;align-items:center;gap:11px;}
+.quem{font-family:'IBM Plex Mono',monospace;font-size:11.5px;opacity:.85;}
+.sair{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
+  border-radius:var(--raio);padding:4px 10px;font-size:12px;}
+.sel-evento{
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);
+  color:#fff;border-radius:var(--raio);padding:5px 9px;font-size:12.5px;
+  font-family:inherit;max-width:260px;}
+.sel-evento option{color:var(--texto);}
+.escopo-global{
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+  background:#EFEFEA;color:var(--suave);border-radius:20px;
+  padding:2px 9px;margin-left:8px;text-transform:uppercase;letter-spacing:.04em;}
+
+.wrap{max-width:1120px;margin:0 auto;padding:22px 20px 80px;}
+.abas{display:flex;gap:2px;border-bottom:1px solid var(--linha);
+  margin-bottom:22px;overflow-x:auto;}
+.aba{background:none;border:none;border-bottom:2px solid transparent;
+  padding:9px 13px;font-size:13.5px;color:var(--suave);white-space:nowrap;}
+.aba[aria-selected="true"]{color:var(--verde);border-bottom-color:var(--verde);font-weight:600;}
+.aba .contador{font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+  background:var(--ouro);color:#fff;border-radius:10px;padding:1px 6px;margin-left:5px;}
+
+h1{font-family:'Archivo',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing:-.015em;}
+h2{font-family:'Archivo',sans-serif;font-size:16px;margin:0 0 8px;}
+.sub{color:var(--suave);font-size:13px;margin:0 0 18px;}
+
+.cartao{background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:15px;margin-bottom:12px;}
+.barra{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;}
+.barra > div{min-width:150px;}
+
+label{display:block;font-size:11.5px;color:var(--suave);margin-bottom:3px;}
+input[type=text],input[type=email],input[type=file],select{
+  width:100%;padding:7px 9px;border:1px solid var(--linha);border-radius:var(--raio);
+  font-family:inherit;font-size:13.5px;background:var(--superficie);color:var(--texto);}
+
+.btn{background:var(--verde);color:#fff;border:none;border-radius:var(--raio);
+  padding:8px 14px;font-size:13.5px;font-weight:500;}
+.btn:hover{background:#0E241F;}
+.btn:disabled{background:#A9B5B0;cursor:not-allowed;}
+.btn.sec{background:transparent;color:var(--verde);border:1px solid var(--linha);}
+.btn.sec:hover{background:#F1F3EE;}
+.btn.mini{padding:4px 9px;font-size:12px;}
+.btn.perigo{background:transparent;color:var(--erro);border:1px solid #E4CFCB;}
+.btn.ok{background:var(--verde-med);}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--suave);
+  border-bottom:1px solid var(--linha);padding:7px 6px;position:sticky;top:0;
+  background:var(--superficie);}
+td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
+.rolagem{max-height:520px;overflow:auto;}
+
+.selo{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;
+  border-radius:20px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.selo.ok{background:#E4F0EA;color:var(--verde-med);}
+.selo.pend{background:#EFEFEA;color:var(--suave);}
+.selo.alerta{background:#F7EFD9;color:var(--ouro);}
+.selo.erro{background:#FBF0EE;color:var(--erro);}
+
+.aviso{border-radius:var(--raio);padding:10px 12px;font-size:13px;margin-bottom:12px;
+  border:1px solid var(--linha);background:var(--superficie);}
+.aviso.erro{background:#FBF0EE;border-color:#E4CFCB;color:var(--erro);}
+.aviso.ok{background:#E8F2EC;border-color:#C9E0D4;color:var(--verde-med);}
+.vazio{border:1px dashed var(--linha);border-radius:var(--raio);padding:22px;
+  text-align:center;color:var(--suave);font-size:13.5px;}
+.carregando{color:var(--suave);font-size:13px;padding:18px 0;}
+.oculto{display:none !important;}
+.paginacao{display:flex;gap:8px;align-items:center;margin-top:12px;
+  font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--suave);}
+
+.login{max-width:380px;margin:12vh auto;padding:0 20px;}
+.login h1{font-size:20px;}
+.meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--suave);}
+.confianca{font-family:'IBM Plex Mono',monospace;font-size:11.5px;}
+</style>
+</head>
+<body>
+
+<div id="tela-login" class="login">
+  <div class="cartao">
+    <h1>Painel CIO Cerrado</h1>
+    <p class="sub">Acesso restrito à equipe. Entre com seu e-mail.</p>
+    <div id="login-aviso"></div>
+    <label for="email">E-mail</label>
+    <input type="email" id="email" autocomplete="email">
+    <div style="margin-top:11px;">
+      <button class="btn" id="btn-entrar" style="width:100%;">Enviar link de acesso</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="oculto">
+  <header class="topo">
+    <div class="marca">CIO Cerrado<span>Painel da organização</span></div>
+    <div class="topo-dir">
+      <select id="sel-evento" class="sel-evento" title="Evento ativo"></select>
+      <span class="quem" id="quem"></span>
+      <button class="sair" id="btn-sair">Sair</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="abas" role="tablist">
+      <button class="aba" role="tab" data-aba="painel" aria-selected="true">Painel</button>
+      <button class="aba" role="tab" data-aba="aprovacoes" aria-selected="false">Aprovações<span class="contador oculto" id="c-aprov"></span></button>
+      <button class="aba" role="tab" data-aba="cadastro" aria-selected="false">Cadastro<span class="contador oculto" id="c-sug"></span></button>
+      <button class="aba" role="tab" data-aba="quartos" aria-selected="false">Quartos</button>
+      <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
+      <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
+      <button class="aba" role="tab" data-aba="pesquisa" aria-selected="false">Pesquisa</button>
+      <button class="aba" role="tab" data-aba="prospeccao" aria-selected="false">Prospecção</button>
+      <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
+      <button class="aba" role="tab" data-aba="relatorios" aria-selected="false">Relatórios</button>
+      <button class="aba" role="tab" data-aba="estrutura" aria-selected="false">Estrutura</button>
+      <button class="aba" role="tab" data-aba="patrocinadores" aria-selected="false">Patrocinadores</button>
+      <button class="aba" role="tab" data-aba="precos" aria-selected="false">Preços</button>
+      <button class="aba" role="tab" data-aba="equipe" aria-selected="false">Equipe</button>
+    </div>
+    <div id="aviso-global"></div>
+    <div id="conteudo"><p class="carregando">Carregando…</p></div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURACAO
+// =====================================================================
+const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
+// Evento ativo. Vem da URL na primeira carga e depois muda pelo
+// seletor do cabecalho — as duas abas globais (Cadastro e Equipe)
+// ignoram este valor.
+let EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+
+// Abas que NAO dependem do evento: a base de gestores e a equipe do
+// painel valem para todas as edicoes.
+const ABAS_GLOBAIS = ["cadastro", "equipe"];
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  db: { schema: "gestao" }
+});
+
+const $  = (s,r=document) => r.querySelector(s);
+const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function aviso(alvo, texto, tipo="erro"){
+  const el = typeof alvo === "string" ? $(alvo) : alvo;
+  if(!el) return;
+  el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
+}
+
+function explicar(e){
+  const m = e?.message || String(e);
+  if(m.includes("Acesso restrito a administradores"))
+    return "Esta ação exige perfil de administrador. Seu acesso é de staff.";
+  if(m.includes("Acesso restrito"))  return "Seu e-mail não está cadastrado na equipe.";
+  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
+  return m;
+}
+
+async function rpc(nome, params){
+  const { data, error } = await sb.rpc(nome, params);
+  if(error) throw error;
+  return data;
+}
+
+const dataBR = d => d ? String(d).split("T")[0].split("-").reverse().join("/") : "—";
+const moeda = v => Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const dataHora = d => d ? new Date(d).toLocaleString("pt-BR") : "—";
+
+// Exporta qualquer lista para Excel, mantendo a ordem das colunas.
+function exportar(linhas, colunas, nomeArquivo, nomeAba="Dados"){
+  if(!linhas || linhas.length === 0){
+    aviso("#aviso-global","Não há dados para exportar."); return;
+  }
+  const dados = linhas.map(l => {
+    const o = {};
+    colunas.forEach(([campo,titulo]) => o[titulo] = l[campo] ?? "");
+    return o;
+  });
+  const ws = XLSX.utils.json_to_sheet(dados);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+  XLSX.writeFile(wb, nomeArquivo);
+}
+
+// =====================================================================
+// LOGIN
+// =====================================================================
+$("#btn-entrar").addEventListener("click", async () => {
+  const email = $("#email").value.trim();
+  if(!email){ aviso("#login-aviso","Informe seu e-mail."); return; }
+  const btn = $("#btn-entrar");
+  btn.disabled = true; btn.textContent = "Enviando…";
+  try{
+    const { error } = await sb.auth.signInWithOtp({
+      email, options:{ emailRedirectTo: location.href }});
+    if(error) throw error;
+    aviso("#login-aviso","Link enviado. Abra seu e-mail para entrar.","ok");
+  }catch(e){ aviso("#login-aviso", explicar(e)); }
+  finally{ btn.disabled = false; btn.textContent = "Enviar link de acesso"; }
+});
+$("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
+$("#btn-sair").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+// =====================================================================
+// BOOT
+// =====================================================================
+let iniciado = false;
+sb.auth.onAuthStateChange(ev => {
+  if(ev === "SIGNED_OUT"){ location.reload(); return; }
+  if(!iniciado) iniciar();
+});
+(async function(){
+  const { data } = await sb.auth.getSession();
+  if(data?.session) iniciar();
+})();
+
+async function iniciar(){
+  if(iniciado) return;
+  iniciado = true;
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user) return;
+
+  $("#tela-login").classList.add("oculto");
+  $("#app").classList.remove("oculto");
+  $("#quem").textContent = user.email;
+
+  $$(".aba").forEach(b => b.addEventListener("click", () => {
+    $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
+    ABA_ATUAL = b.dataset.aba;
+    ABAS[ABA_ATUAL]();
+  }));
+
+  await carregarSeletorEventos();
+  ABAS.painel();
+  atualizarContadores();
+}
+
+let ABA_ATUAL = "painel";
+
+async function carregarSeletorEventos(){
+  const sel = $("#sel-evento");
+  try{
+    const evs = await rpc("admin_listar_eventos");
+
+    if(evs.length === 0){
+      sel.innerHTML = `<option>Nenhum evento</option>`;
+      sel.disabled = true;
+      return;
+    }
+
+    // se a URL trouxe um slug que nao existe, cai no primeiro da lista
+    // em vez de deixar todas as abas vazias sem explicar por que
+    if(!evs.some(e => e.slug === EVENTO)) EVENTO = evs[0].slug;
+
+    const rotulo = { rascunho:"rascunho", aberto:"aberto", encerrado:"encerrado" };
+    sel.innerHTML = evs.map(e => `
+      <option value="${esc(e.slug)}" ${e.slug === EVENTO ? "selected" : ""}>
+        ${esc(e.nome)} · ${rotulo[e.status] || e.status}
+      </option>`).join("");
+    sel.disabled = false;
+
+    sel.addEventListener("change", () => trocarEvento(sel.value));
+  }catch(e){
+    sel.innerHTML = `<option>${esc(EVENTO)}</option>`;
+    sel.disabled = true;
+  }
+}
+
+function trocarEvento(slug){
+  EVENTO = slug;
+
+  // mantem o link compartilhavel: quem copiar a URL abre no mesmo evento
+  const u = new URL(location.href);
+  u.searchParams.set("evento", slug);
+  history.replaceState(null, "", u);
+
+  aviso("#aviso-global", "");
+
+  // as duas abas globais nao mudam de conteudo ao trocar de evento;
+  // redesenhar seria so um piscar sem sentido
+  if(!ABAS_GLOBAIS.includes(ABA_ATUAL)) ABAS[ABA_ATUAL]();
+  atualizarContadores();
+}
+
+async function atualizarContadores(){
+  try{
+    const [pend, sug] = await Promise.all([
+      rpc("admin_listar_pendentes", { p_evento_slug: EVENTO }),
+      rpc("admin_listar_sugestoes", { p_status: "pendente" })
+    ]);
+    marcar("#c-aprov", pend.length);
+    marcar("#c-sug",   sug.length);
+  }catch(e){ /* contador e acessorio: nao bloqueia o painel */ }
+}
+function marcar(sel, n){
+  const el = $(sel);
+  el.textContent = n;
+  el.classList.toggle("oculto", !n);
+}
+
+// =====================================================================
+// ABA: PAINEL
+// =====================================================================
+const ABAS = {};
+
+ABAS.painel = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando painel…</p>`;
+  try{
+    // Pagina de verdade: com limite fixo de 500, um evento maior perderia
+    // gente da lista sem avisar ninguem.
+    const linhas = await puxarTudo("admin_rel_painel");
+
+    const total = linhas.length;
+    const cont = k => linhas.filter(k).length;
+
+    c.innerHTML = `
+      <h1>Painel do evento</h1>
+      <p class="sub">${total} participante(s) · quem está pendente aparece primeiro na busca.</p>
+
+      <div class="barra">
+        <div><label>Buscar</label><input type="text" id="p-busca" placeholder="Nome ou empresa"></div>
+        <div><label>Contrato</label>
+          <select id="p-contrato">
+            <option value="">Todos</option>
+            <option value="assinado">Assinado</option>
+            <option value="enviado">Enviado</option>
+            <option value="nao_enviado">Não enviado</option>
+          </select></div>
+        <div><label>Rooming</label>
+          <select id="p-rooming">
+            <option value="">Todos</option>
+            <option value="completo">Completo</option>
+            <option value="nao_iniciado">Não iniciado</option>
+          </select></div>
+        <div style="min-width:auto;">
+          <button class="btn sec" id="p-exportar">Exportar Excel</button>
+        </div>
+      </div>
+
+      <div class="cartao">
+        <p class="meta" style="margin:0 0 10px;">
+          ${cont(l=>l.status_contrato==="assinado")} contrato(s) assinado(s) ·
+          ${cont(l=>l.status_rooming==="completo")} rooming completo(s) ·
+          ${cont(l=>l.usa_transfer)} usando transfer
+        </p>
+        <div class="rolagem"><table id="p-tabela"></table></div>
+      </div>`;
+
+    const desenhar = () => {
+      const busca = $("#p-busca").value.toLowerCase();
+      const fc = $("#p-contrato").value, fr = $("#p-rooming").value;
+      const vis = linhas.filter(l =>
+        (!busca || `${l.nome} ${l.empresa}`.toLowerCase().includes(busca)) &&
+        (!fc || l.status_contrato === fc) &&
+        (!fr || l.status_rooming === fr));
+
+      $("#p-tabela").innerHTML = `
+        <tr><th>Nome</th><th>Empresa</th><th>Inscrição</th><th>Contrato</th>
+            <th>Rooming</th><th>Transfer</th><th>Quarto</th></tr>
+        ${vis.map(l => `<tr>
+          <td>${esc(l.nome)}</td>
+          <td>${esc(l.empresa||"—")}</td>
+          <td><span class="selo ${l.status_inscricao==="aprovado"?"ok":"pend"}">${esc(l.status_inscricao)}</span></td>
+          <td><span class="selo ${l.status_contrato==="assinado"?"ok":"alerta"}">${esc(l.status_contrato)}</span></td>
+          <td><span class="selo ${l.status_rooming==="completo"?"ok":"pend"}">${esc(l.status_rooming)}</span></td>
+          <td>${l.usa_transfer ? "Sim" : "—"}</td>
+          <td class="meta">${esc(l.quarto||"—")}</td>
+        </tr>`).join("") ||
+        `<tr><td colspan="7" style="color:var(--suave)">Nenhum resultado para esse filtro.</td></tr>`}`;
+    };
+
+    ["#p-busca","#p-contrato","#p-rooming"].forEach(s =>
+      $(s).addEventListener("input", desenhar));
+    $("#p-exportar").addEventListener("click", () => exportar(linhas, [
+      ["nome","Nome"],["empresa","Empresa"],["email","E-mail"],
+      ["status_inscricao","Inscrição"],["status_contrato","Contrato"],
+      ["status_rooming","Rooming"],["quarto","Quarto"]
+    ], "painel-cio-cerrado.xlsx", "Painel"));
+
+    desenhar();
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+// =====================================================================
+// ABA: APROVACOES
+// =====================================================================
+ABAS.aprovacoes = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando fila…</p>`;
+  try{
+    const [pend, indic] = await Promise.all([
+      rpc("admin_listar_pendentes",  { p_evento_slug: EVENTO }),
+      rpc("admin_listar_indicacoes", { p_evento_slug: EVENTO, p_status: "nova" })
+    ]);
+
+    c.innerHTML = `
+      <h1>Aprovações</h1>
+      <p class="sub">Cadastros aguardando decisão e indicações que ainda não viraram inscrição.</p>
+
+      <h2>Aguardando aprovação</h2>
+      <div class="cartao" id="box-pend">${pend.length ? "" :
+        `<div class="vazio">Nada na fila. Novos cadastros aparecem aqui.</div>`}</div>
+
+      <h2 style="margin-top:22px;">Indicações de patrocinadores</h2>
+      <div class="cartao" id="box-indic">${indic.length ? "" :
+        `<div class="vazio">Nenhuma indicação nova.</div>`}</div>`;
+
+    if(pend.length) $("#box-pend").innerHTML = `<table>
+      <tr><th>Nome</th><th>Empresa</th><th>Contato</th><th>Origem</th><th></th></tr>
+      ${pend.map(p => `<tr data-id="${esc(p.participante_id)}">
+        <td><strong>${esc(p.nome)}</strong><br><span class="meta">${esc(p.cargo||"")}</span></td>
+        <td>${esc(p.empresa||"—")}</td>
+        <td class="meta">${esc(p.email)}<br>${esc(p.telefone||"")}</td>
+        <td><span class="selo pend">${esc(p.origem)}</span>
+            ${p.indicado_por ? `<br><span class="meta">por ${esc(p.indicado_por)}</span>` : ""}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn ok mini aprovar">Aprovar</button>
+          <button class="btn perigo mini recusar">Recusar</button>
+        </td></tr>`).join("")}</table>`;
+
+    $$("#box-pend .aprovar").forEach(b => b.addEventListener("click", () => decidir(b, true)));
+    $$("#box-pend .recusar").forEach(b => b.addEventListener("click", () => decidir(b, false)));
+
+    if(indic.length) $("#box-indic").innerHTML = `<table>
+      <tr><th>Indicado</th><th>Empresa</th><th>Contato</th><th>Indicado por</th><th></th></tr>
+      ${indic.map(i => `<tr data-id="${esc(i.indicacao_id)}">
+        <td><strong>${esc(i.nome)}</strong><br><span class="meta">${esc(i.cargo||"")}</span></td>
+        <td>${esc(i.empresa||"—")}</td>
+        <td class="meta">${esc(i.email||"sem e-mail")}<br>${esc(i.telefone||"")}</td>
+        <td>${esc(i.patrocinador)}</td>
+        <td><button class="btn mini converter" ${i.email ? "" : "disabled title='Indicação sem e-mail'"}>Criar inscrição</button></td>
+      </tr>`).join("")}</table>`;
+
+    $$("#box-indic .converter").forEach(b => b.addEventListener("click", async () => {
+      const id = b.closest("tr").dataset.id;
+      b.disabled = true; b.textContent = "Criando…";
+      try{
+        await rpc("admin_converter_indicacao", { p_indicacao_id: id });
+        aviso("#aviso-global","Inscrição criada. Ela entra na fila de aprovação.","ok");
+        ABAS.aprovacoes(); atualizarContadores();
+      }catch(e){
+        aviso("#aviso-global", explicar(e));
+        b.disabled = false; b.textContent = "Criar inscrição";
+      }
+    }));
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+async function decidir(btn, aprovado){
+  const tr = btn.closest("tr");
+  const id = tr.dataset.id;
+  if(!aprovado && !confirm("Recusar este cadastro?")) return;
+
+  $$("button", tr).forEach(b => b.disabled = true);
+  try{
+    await rpc("admin_aprovar_participante",
+      { p_participante_id: id, p_aprovado: aprovado });
+    aviso("#aviso-global", aprovado
+      ? "Aprovado. O contrato entra na fila de envio."
+      : "Cadastro recusado.", "ok");
+    ABAS.aprovacoes(); atualizarContadores();
+  }catch(e){
+    aviso("#aviso-global", explicar(e));
+    $$("button", tr).forEach(b => b.disabled = false);
+  }
+}
+
+// =====================================================================
+// ABA: CADASTRO EM MASSA + SUGESTOES DA IA
+// =====================================================================
+ABAS.cadastro = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Cadastro de gestores <span class="escopo-global">todos os eventos</span></h1>
+    <p class="sub">Base única de gestores, compartilhada entre as edições. Suba a planilha para criar e atualizar em lote.</p>
+
+    <div class="cartao">
+      <h2>Importar planilha</h2>
+      <p class="sub" style="margin-bottom:12px;">
+        Colunas esperadas: nome, email, empresa, cargo, telefone, cnpj, segmento, estado, perfil.
+        Célula vazia não apaga o que já existe. <strong>Troca de empresa</strong> de quem já está
+        cadastrado não é aplicada direto — vira sugestão para você aprovar abaixo.
+      </p>
+      <div class="barra">
+        <div><label>Arquivo (.xlsx ou .csv)</label><input type="file" id="arq" accept=".xlsx,.xls,.csv"></div>
+        <div style="min-width:auto;"><button class="btn" id="btn-importar" disabled>Importar</button></div>
+      </div>
+      <div id="imp-aviso"></div>
+      <div id="imp-previa"></div>
+    </div>
+
+    <h2 style="margin-top:22px;">Sugestões para revisar</h2>
+    <p class="sub">Trocas de empresa, gestores novos e divergências encontradas na base. Nada é aplicado sem sua aprovação.</p>
+    <div class="cartao" id="box-sug"><p class="carregando">Carregando…</p></div>`;
+
+  let LINHAS = [];
+
+  $("#arq").addEventListener("change", async ev => {
+    const f = ev.target.files[0];
+    if(!f) return;
+    try{
+      const buf = await f.arrayBuffer();
+      const wb  = XLSX.read(buf, { type:"array" });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      const cru = XLSX.utils.sheet_to_json(ws, { defval:"" });
+
+      // normaliza o cabecalho: a planilha vem com maiuscula, acento e
+      // espaco, e a funcao do banco espera chaves minusculas e simples
+      LINHAS = cru.map(l => {
+        const o = {};
+        Object.entries(l).forEach(([k,v]) => {
+          const chave = String(k).trim().toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+            .replace(/[^a-z]/g,"")
+            .replace(/^e?mail$/,"email");
+          o[chave] = String(v).trim();
+        });
+        return o;
+      });
+
+      const semEmail = LINHAS.filter(l => !l.email || !l.nome).length;
+      $("#imp-previa").innerHTML = `
+        <p class="meta" style="margin-top:10px;">
+          ${LINHAS.length} linha(s) lida(s)${semEmail ? ` · ${semEmail} sem nome ou e-mail serão ignoradas` : ""}
+        </p>
+        <div class="rolagem" style="max-height:220px;margin-top:8px;">
+          <table><tr><th>Nome</th><th>E-mail</th><th>Empresa</th></tr>
+          ${LINHAS.slice(0,20).map(l => `<tr>
+            <td>${esc(l.nome||"—")}</td><td class="meta">${esc(l.email||"—")}</td>
+            <td>${esc(l.empresa||"—")}</td></tr>`).join("")}</table>
+        </div>`;
+      $("#btn-importar").disabled = LINHAS.length === 0;
+      aviso("#imp-aviso","");
+    }catch(e){
+      aviso("#imp-aviso","Não foi possível ler o arquivo. Confira se é um .xlsx ou .csv válido.");
+    }
+  });
+
+  $("#btn-importar").addEventListener("click", async () => {
+    const btn = $("#btn-importar");
+    btn.disabled = true; btn.textContent = "Importando…";
+    try{
+      const r = await rpc("admin_importar_gestores", { p_linhas: LINHAS });
+      aviso("#imp-aviso",
+        `${r.criados} criado(s), ${r.atualizados} atualizado(s), ${r.erros} ignorado(s)` +
+        (r.sugestoes ? ` · ${r.sugestoes} troca(s) de empresa aguardando sua aprovação abaixo` : "") + ".",
+        r.erros ? "erro" : "ok");
+      // a fila de sugestões pode ter crescido com esta importação
+      carregarSugestoes();
+      atualizarContadores();
+
+      if(r.erros && r.detalhe_erros?.length){
+        $("#imp-previa").innerHTML = `<table style="margin-top:10px;">
+          <tr><th>Linha</th><th>Nome</th><th>Motivo</th></tr>
+          ${r.detalhe_erros.map(d => `<tr>
+            <td class="meta">${d.linha}</td><td>${esc(d.nome||"—")}</td>
+            <td><span class="selo erro">${esc(d.motivo)}</span></td></tr>`).join("")}</table>`;
+      }
+    }catch(e){
+      aviso("#imp-aviso", explicar(e));
+    }finally{
+      btn.disabled = false; btn.textContent = "Importar";
+    }
+  });
+
+  carregarSugestoes();
+};
+
+const ROTULO_SUG = {
+  troca_empresa:"Trocou de empresa",
+  novo_gestor:"Novo gestor",
+  nova_empresa:"Empresa nova",
+  dado_divergente:"Dado divergente"
+};
+
+async function carregarSugestoes(){
+  try{
+    const sug = await rpc("admin_listar_sugestoes", { p_status:"pendente" });
+    $("#box-sug").innerHTML = sug.length === 0
+      ? `<div class="vazio">Nada para revisar agora.</div>`
+      : `<table>
+          <tr><th>Tipo</th><th>Quem</th><th>De → para</th><th>Confiança</th><th>Origem</th><th></th></tr>
+          ${sug.map(s => `<tr data-id="${esc(s.id)}">
+            <td><span class="selo alerta">${esc(ROTULO_SUG[s.tipo]||s.tipo)}</span></td>
+            <td><strong>${esc(s.gestor_nome||s.empresa||"—")}</strong>
+                ${s.campo ? `<br><span class="meta">${esc(s.campo)}</span>` : ""}</td>
+            <td>${esc(s.valor_atual||"—")} → <strong>${esc(s.valor_sugerido||"—")}</strong>
+                ${s.justificativa ? `<br><span class="meta">${esc(s.justificativa)}</span>` : ""}</td>
+            <td class="confianca">${s.confianca != null ? s.confianca+"%" : "—"}</td>
+            <td class="meta">${esc(s.fonte||"—")}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn ok mini aplicar">Aprovar</button>
+              <button class="btn sec mini ignorar">Ignorar</button>
+            </td></tr>`).join("")}</table>`;
+
+    $$("#box-sug .aplicar").forEach(b => b.addEventListener("click", () => revisar(b, true)));
+    $$("#box-sug .ignorar").forEach(b => b.addEventListener("click", () => revisar(b, false)));
+  }catch(e){ aviso("#box-sug", explicar(e)); }
+}
+
+async function revisar(btn, aprovar){
+  const tr = btn.closest("tr");
+  $$("button", tr).forEach(b => b.disabled = true);
+  try{
+    await rpc("admin_aplicar_sugestao",
+      { p_sugestao_id: tr.dataset.id, p_aprovar: aprovar });
+    tr.remove();
+    atualizarContadores();
+  }catch(e){
+    aviso("#aviso-global", explicar(e));
+    $$("button", tr).forEach(b => b.disabled = false);
+  }
+}
+
+// =====================================================================
+// ABA: QUARTOS
+// =====================================================================
+ABAS.quartos = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando alocação…</p>`;
+  try{
+    const [pessoas, livres] = await Promise.all([
+      rpc("admin_listar_alocacao", { p_evento_slug: EVENTO, p_apenas_sem_quarto:false }),
+      rpc("admin_quartos_livres",  { p_evento_slug: EVENTO })
+    ]);
+
+    // agrupa por reserva: o quarto e da reserva, nao da pessoa
+    const reservas = new Map();
+    pessoas.forEach(p => {
+      if(!reservas.has(p.reserva_id))
+        reservas.set(p.reserva_id, {
+          reserva_id:p.reserva_id, empresa:p.empresa, quarto_tipo:p.quarto_tipo,
+          quarto_id:p.quarto_id, quarto_numero:p.quarto_numero, gente:[] });
+      reservas.get(p.reserva_id).gente.push(p.nome);
+    });
+    const lista = [...reservas.values()];
+    const semQuarto = lista.filter(r => !r.quarto_id).length;
+
+    c.innerHTML = `
+      <h1>Separar quartos</h1>
+      <p class="sub">${lista.length} reserva(s) · ${semQuarto} ainda sem número · ${livres.length} quarto(s) livre(s).</p>
+      <div class="barra">
+        <div><label>Buscar</label><input type="text" id="q-busca" placeholder="Empresa ou pessoa"></div>
+        <div><label>Mostrar</label>
+          <select id="q-filtro">
+            <option value="">Todas as reservas</option>
+            <option value="sem">Só as sem número</option>
+          </select></div>
+      </div>
+      <div class="cartao"><div class="rolagem"><table id="q-tabela"></table></div></div>`;
+
+    const opcoes = q => livres.map(l =>
+      `<option value="${esc(l.id)}">${esc(l.numero||"s/n")} · ${esc(l.tipo)} (${l.capacidade})</option>`).join("");
+
+    const desenhar = () => {
+      const busca = $("#q-busca").value.toLowerCase();
+      const so = $("#q-filtro").value;
+      const vis = lista.filter(r =>
+        (!busca || `${r.empresa} ${r.gente.join(" ")}`.toLowerCase().includes(busca)) &&
+        (so !== "sem" || !r.quarto_id));
+
+      $("#q-tabela").innerHTML = `
+        <tr><th>Empresa</th><th>Pessoas</th><th>Tipo</th><th>Quarto</th></tr>
+        ${vis.map(r => `<tr data-reserva="${esc(r.reserva_id)}">
+          <td>${esc(r.empresa||"—")}</td>
+          <td>${r.gente.map(esc).join("<br>")}</td>
+          <td class="meta" style="text-transform:capitalize">${esc(r.quarto_tipo||"—")}</td>
+          <td>
+            ${r.quarto_id
+              ? `<span class="selo ok">${esc(r.quarto_numero||"s/n")}</span>
+                 <button class="btn sec mini soltar" style="margin-left:6px;">Liberar</button>`
+              : `<select class="escolher"><option value="">— escolher —</option>${opcoes(r)}</select>`}
+          </td></tr>`).join("") ||
+        `<tr><td colspan="4" style="color:var(--suave)">Nenhuma reserva com esse filtro.</td></tr>`}`;
+
+      $$("#q-tabela .escolher").forEach(s => s.addEventListener("change", () => alocar(s)));
+      $$("#q-tabela .soltar").forEach(b => b.addEventListener("click", () => alocar(b, true)));
+    };
+
+    ["#q-busca","#q-filtro"].forEach(s => $(s).addEventListener("input", desenhar));
+    desenhar();
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+async function alocar(el, liberar=false){
+  const reserva = el.closest("tr").dataset.reserva;
+  const quarto  = liberar ? null : el.value;
+  if(!liberar && !quarto) return;
+
+  el.disabled = true;
+  try{
+    const r = await rpc("admin_alocar_quarto",
+      { p_reserva_id: reserva, p_quarto_id: quarto });
+
+    if(!r.ok){
+      // o banco recusou por um motivo que a tela precisa explicar
+      aviso("#aviso-global", r.motivo === "quarto_ocupado"
+        ? "Esse quarto acabou de ser ocupado por outra reserva."
+        : `Não cabe: a reserva tem ${r.ocupantes} pessoa(s) e o quarto comporta ${r.capacidade}.`);
+    }
+    ABAS.quartos();
+  }catch(e){
+    aviso("#aviso-global", explicar(e));
+    el.disabled = false;
+  }
+}
+
+// =====================================================================
+// ABA: ETIQUETAS
+// =====================================================================
+ABAS.etiquetas = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Etiquetas</h1>
+    <p class="sub">
+      Quem tem quarto sai primeiro, ordenado por número. Quem não tem — evento sem
+      hospedagem, ou rooming ainda não preenchido — sai depois, em ordem alfabética.
+    </p>
+    <div id="et-resumo"></div>
+    <div class="barra">
+      <div style="max-width:180px;"><label>Categoria</label>
+        <select id="e-cat">
+          <option value="">Todas</option>
+          <option value="PROTAGONISTA">Protagonista</option>
+          <option value="ACOMPANHANTE">Acompanhante</option>
+          <option value="PATROCINADOR">Patrocinador</option>
+          <option value="S/CRACHA">Sem crachá</option>
+        </select></div>
+      <div style="max-width:200px;"><label>Origem</label>
+        <select id="e-origem">
+          <option value="">Todas</option>
+          <option value="quarto">Só quem tem quarto</option>
+          <option value="inscricao">Só inscritos sem quarto</option>
+          <option value="patrocinador">Só equipe de patrocinador</option>
+        </select></div>
+      <div style="min-width:auto;"><button class="btn sec" id="e-exportar">Exportar Excel</button></div>
+    </div>
+    <div class="cartao"><div class="rolagem"><table id="e-tabela"></table></div></div>`;
+
+  let ETIQ = [];
+
+  const carregar = async () => {
+    $("#e-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    try{
+      ETIQ = await rpc("admin_etiquetas", {
+        p_evento_slug: EVENTO,
+        p_categoria: $("#e-cat").value || null,
+        p_origem: $("#e-origem").value || null
+      });
+
+      const semQuarto = ETIQ.filter(e => !e.apto).length;
+
+      $("#e-tabela").innerHTML = `
+        <tr><th>Apto</th><th>Nome</th><th>Empresa</th><th>Categoria</th></tr>
+        ${ETIQ.map(e => `<tr>
+          <td class="meta">${e.apto ? esc(e.apto) : "—"}</td>
+          <td>${esc(e.nome)}</td>
+          <td>${esc(e.empresa||"—")}</td>
+          <td><span class="selo ${e.categoria==="S/CRACHA"?"pend":"ok"}">${esc(e.categoria)}</span></td>
+        </tr>`).join("") || `<tr><td colspan="4" style="color:var(--suave)">Nada com esse filtro.</td></tr>`}`;
+
+      $("#et-resumo").innerHTML = ETIQ.length
+        ? `<div class="cartao"><p class="meta" style="margin:0;">
+             <strong style="font-size:15px;color:var(--verde);">${ETIQ.length}</strong> etiqueta(s)
+             ${semQuarto ? ` · ${semQuarto} sem número de quarto` : ""}
+           </p></div>`
+        : "";
+    }catch(e){ aviso("#e-tabela", explicar(e)); }
+  };
+
+  $("#e-cat").addEventListener("change", carregar);
+  $("#e-origem").addEventListener("change", carregar);
+
+  $("#e-exportar").addEventListener("click", () => exportar(
+    // apto vazio em vez de nulo: a planilha de impressão espera a
+    // coluna presente, mesmo quando não há hospedagem
+    ETIQ.map(e => ({ ...e, apto: e.apto || "" })),
+    [["apto","APTO"],["nome","NOME"],["empresa","EMPRESA"],["categoria","TIPO"]],
+    "etiquetas-cio-cerrado.xlsx", "Etiquetas"));
+
+  carregar();
+};
+
+// =====================================================================
+// ABA: MESAS E JANTARES
+// =====================================================================
+ABAS.sessoes = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando sessões…</p>`;
+  try{
+    const sessoes = await rpc("admin_listar_sessoes", { p_evento_slug: EVENTO, p_tipo: null });
+
+    if(sessoes.length === 0){
+      c.innerHTML = `<h1>Mesas e jantares</h1>
+        <div class="vazio">Nenhuma sessão cadastrada para este evento.</div>`;
+      return;
+    }
+
+    c.innerHTML = `
+      <h1>Mesas e jantares</h1>
+      <p class="sub">Na ordem de prioridade das cotas. Abra uma sessão para ver quem está dentro e sugerir nomes.</p>
+      <div class="cartao"><table id="s-tabela"></table></div>
+      <div id="s-detalhe"></div>`;
+
+    $("#s-tabela").innerHTML = `
+      <tr><th>Patrocinador</th><th>Cota</th><th>Tipo</th><th>Data</th><th>Vagas</th><th></th></tr>
+      ${sessoes.map(s => `<tr data-id="${esc(s.sessao_id)}">
+        <td><strong>${esc(s.patrocinador)}</strong></td>
+        <td class="meta">${esc(s.cota||"—")}</td>
+        <td style="text-transform:capitalize">${esc(String(s.tipo).replace("_"," "))}</td>
+        <td class="meta">${dataBR(s.data)}</td>
+        <td><span class="selo ${Number(s.escolhidos)>=s.vagas?"ok":"pend"}">${s.escolhidos}/${s.vagas}</span></td>
+        <td><button class="btn sec mini abrir">Abrir</button></td>
+      </tr>`).join("")}`;
+
+    $$("#s-tabela .abrir").forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      abrirSessao(tr.dataset.id, sessoes.find(s => s.sessao_id === tr.dataset.id));
+    }));
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+async function abrirSessao(id, s){
+  const box = $("#s-detalhe");
+  box.innerHTML = `<p class="carregando">Carregando convidados…</p>`;
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+  try{
+    const [dentro, sugeridos] = await Promise.all([
+      rpc("admin_convidados_sessao", { p_sessao_id: id }),
+      rpc("admin_match_jantar", { p_sessao_id: id, p_limite: 20 })
+    ]);
+
+    box.innerHTML = `
+      <h2 style="margin-top:22px;">${esc(s.patrocinador)} · ${esc(String(s.tipo).replace("_"," "))}</h2>
+      <p class="sub">${dentro.length} de ${s.vagas} vaga(s) preenchida(s).</p>
+
+      <div class="cartao">
+        <h2>Confirmados</h2>
+        ${dentro.length ? `<table>
+          <tr><th>Nome</th><th>Empresa</th><th>Identificação</th><th>Como entrou</th><th></th></tr>
+          ${dentro.map(d => `<tr data-p="${esc(d.participante_id)}">
+            <td>${esc(d.nome)}<br><span class="meta">${esc(d.cargo||"")}</span></td>
+            <td>${esc(d.empresa||"—")}</td>
+            <td>${d.rotulo ? `<span class="selo alerta">${esc(d.rotulo)}</span>` : `<span class="meta">—</span>`}</td>
+            <td class="meta">${esc(d.origem)}${d.aderencia!=null?` · ${d.aderencia}%`:""}</td>
+            <td><button class="btn perigo mini tirar">Remover</button></td>
+          </tr>`).join("")}</table>
+          <button class="btn sec mini" id="s-mailing" style="margin-top:10px;">Exportar mailing</button>` :
+          `<div class="vazio">Ninguém confirmado ainda.</div>`}
+      </div>
+
+      <div class="cartao">
+        <h2>Adicionar quem não passou pelo Sympla</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Equipe do CIO Cerrado, time do patrocinador ou troca de última hora.
+          Entra já aprovado e sai identificado no mailing.
+        </p>
+        <div class="barra">
+          <div style="min-width:180px;"><label>Nome</label><input type="text" id="av-nome"></div>
+          <div style="min-width:150px;"><label>Empresa</label><input type="text" id="av-empresa"></div>
+          <div style="min-width:170px;"><label>E-mail</label><input type="email" id="av-email"></div>
+          <div style="max-width:140px;"><label>Telefone</label><input type="text" id="av-tel"></div>
+        </div>
+        <div class="barra">
+          <div style="max-width:180px;"><label>Cargo</label><input type="text" id="av-cargo"></div>
+          <div style="max-width:190px;"><label>Identificação no mailing</label>
+            <select id="av-rotulo">
+              <option value="CIO CERRADO">Equipe CIO Cerrado</option>
+              <option value="PATROCINADOR">Patrocinador</option>
+              <option value="CONVIDADO">Convidado</option>
+            </select></div>
+          <div style="min-width:auto;"><button class="btn" id="av-salvar">Adicionar</button></div>
+        </div>
+        <div id="av-aviso"></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Sugestões por aderência</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Cruzamento por segmento, porte e o que o patrocinador vende. Confira antes de confirmar.
+        </p>
+        ${sugeridos.length ? `<table>
+          <tr><th>Nome</th><th>Empresa</th><th>Segmento</th><th>Porte</th><th>Aderência</th><th></th></tr>
+          ${sugeridos.map(g => `<tr data-p="${esc(g.participante_id)}" data-ad="${g.aderencia}">
+            <td>${esc(g.nome)}</td><td>${esc(g.empresa||"—")}</td>
+            <td class="meta">${esc(g.segmento||"—")}</td>
+            <td class="meta">${esc(g.faturamento||"—")}</td>
+            <td><span class="selo ${g.aderencia>=50?"ok":"pend"}">${g.aderencia}%</span></td>
+            <td><button class="btn mini por">Adicionar</button></td>
+          </tr>`).join("")}</table>` :
+          `<div class="vazio">Sem sugestões disponíveis — todos já estão em outra sessão deste tipo.</div>`}
+      </div>`;
+
+    $("#av-salvar").addEventListener("click", async () => {
+      const nome = $("#av-nome").value.trim();
+      if(!nome){ aviso("#av-aviso","Informe o nome."); return; }
+
+      const b = $("#av-salvar");
+      b.disabled = true; b.textContent = "Adicionando…";
+      try{
+        const r = await rpc("admin_convidado_avulso", {
+          p_sessao_id: id, p_nome: nome,
+          p_empresa: $("#av-empresa").value.trim() || null,
+          p_email:   $("#av-email").value.trim()   || null,
+          p_telefone: $("#av-tel").value.trim()    || null,
+          p_cargo:   $("#av-cargo").value.trim()   || null,
+          p_rotulo:  $("#av-rotulo").value
+        });
+        aviso("#aviso-global", r.gestor_reaproveitado
+          ? `${nome} já estava na base — adicionado à sessão.`
+          : `${nome} cadastrado e adicionado.`, "ok");
+        abrirSessao(id, s); ABAS.sessoes();
+      }catch(e){ aviso("#av-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Adicionar"; }
+    });
+
+    const bm = $("#s-mailing", box);
+    if(bm) bm.addEventListener("click", async () => {
+      try{
+        const l = await rpc("admin_mailing_sessao", { p_sessao_id: id });
+        exportar(l, [["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],
+          ["email","E-mail"],["telefone","Telefone"],["rotulo","Identificação"]],
+          `Mailing_${String(s.patrocinador).replace(/\W+/g,"_")}.xlsx`, "Mailing");
+      }catch(e){ aviso("#aviso-global", explicar(e)); }
+    });
+
+    $$(".tirar", box).forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try{
+        await rpc("admin_remover_convidado_sessao",
+          { p_sessao_id:id, p_participante_id: b.closest("tr").dataset.p });
+        abrirSessao(id, s); ABAS.sessoes();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+
+    $$(".por", box).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true; b.textContent = "Adicionando…";
+      try{
+        await rpc("admin_adicionar_convidado_sessao", {
+          p_sessao_id: id,
+          p_participante_id: tr.dataset.p,
+          p_aderencia: Number(tr.dataset.ad) || null
+        });
+        abrirSessao(id, s);
+      }catch(e){
+        aviso("#aviso-global", explicar(e));
+        b.disabled = false; b.textContent = "Adicionar";
+      }
+    }));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+// =====================================================================
+// ABA: RELATORIOS
+// =====================================================================
+ABAS.relatorios = function(){
+  $("#conteudo").innerHTML = `
+    <h1>Relatórios</h1>
+    <p class="sub">Os mesmos relatórios que hoje saem por script. Carregue e exporte.</p>
+
+    <div class="cartao">
+      <h2>Mailing list</h2>
+      <p class="sub" style="margin-bottom:10px;">Participantes aprovados, com CNPJ e segmento.</p>
+      <button class="btn sec" id="r-mailing">Carregar</button>
+      <div id="box-mailing"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Pesquisa de perfil</h2>
+      <p class="sub" style="margin-bottom:10px;">Faturamento, orçamento de TI e áreas de investimento.</p>
+      <button class="btn sec" id="r-pesquisa">Carregar</button>
+      <div id="box-pesquisa"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Check-ins</h2>
+      <p class="sub" style="margin-bottom:10px;">Resumo por patrocinador. Abra uma empresa para ver o detalhe.</p>
+      <button class="btn sec" id="r-checkins">Carregar</button>
+      <div id="box-checkins"></div>
+    </div>`;
+
+  $("#r-mailing").addEventListener("click",  () => relMailing());
+  $("#r-pesquisa").addEventListener("click", () => relPesquisa());
+  $("#r-checkins").addEventListener("click", () => relCheckins());
+};
+
+// Puxa todas as paginas: o Data API corta em 1000 linhas por resposta.
+async function puxarTudo(fn, extras={}, passo=500){
+  let todos = [], offset = 0, total = null;
+  while(total === null || offset < total){
+    const p = await rpc(fn, { p_evento_slug: EVENTO, p_limite: passo, p_offset: offset, ...extras });
+    if(p.length === 0) break;
+    if(total === null) total = Number(p[0].total_geral);
+    todos = todos.concat(p);
+    offset += passo;
+    if(todos.length >= total) break;
+  }
+  return todos;
+}
+
+async function relMailing(){
+  const box = $("#box-mailing");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const l = await puxarTudo("admin_rel_mailing");
+    box.innerHTML = `
+      <p class="meta" style="margin:10px 0;">${l.length} registro(s).</p>
+      <button class="btn sec mini" id="x-mailing">Exportar Excel</button>
+      <div class="rolagem" style="max-height:280px;margin-top:10px;">
+        <table><tr><th>Nome</th><th>Cargo</th><th>Empresa</th><th>E-mail</th><th>Segmento</th></tr>
+        ${l.slice(0,100).map(r => `<tr><td>${esc(r.nome)}</td><td class="meta">${esc(r.cargo||"—")}</td>
+          <td>${esc(r.empresa||"—")}</td><td class="meta">${esc(r.email)}</td>
+          <td class="meta">${esc(r.segmento||"—")}</td></tr>`).join("")}</table>
+      </div>`;
+    $("#x-mailing").addEventListener("click", () => exportar(l, [
+      ["perfil","PERFIL"],["nome","NOME"],["cargo","CARGO"],["empresa","EMPRESA"],
+      ["email","E-MAIL"],["telefone","TELEFONE"],["cnpj","CNPJ"],
+      ["segmento","SEGMENTO"],["estado","ESTADO"]
+    ], "mailing-cio-cerrado.xlsx", "MAILING"));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+async function relPesquisa(){
+  const box = $("#box-pesquisa");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const l = await puxarTudo("admin_rel_pesquisa");
+    box.innerHTML = `
+      <p class="meta" style="margin:10px 0;">${l.length} registro(s).</p>
+      <button class="btn sec mini" id="x-pesquisa">Exportar Excel</button>
+      <div class="rolagem" style="max-height:280px;margin-top:10px;">
+        <table><tr><th>Nome</th><th>Empresa</th><th>Segmento</th><th>Faturamento</th><th>Orçamento TI</th></tr>
+        ${l.slice(0,100).map(r => `<tr><td>${esc(r.nome)}</td><td>${esc(r.empresa||"—")}</td>
+          <td class="meta">${esc(r.segmento||"—")}</td><td class="meta">${esc(r.faturamento||"—")}</td>
+          <td class="meta">${esc(r.orcamento_ti||"—")}</td></tr>`).join("")}</table>
+      </div>`;
+    $("#x-pesquisa").addEventListener("click", () => exportar(l, [
+      ["nome","Nome"],["empresa","Empresa"],["cargo","Cargo"],["segmento","Segmento"],
+      ["faturamento","Faturamento anual"],["orcamento_ti","Orçamento de TI"],
+      ["colaboradores","Colaboradores"],["colaboradores_ti","Colaboradores de TI"],
+      ["erp_atual","ERP atual"]
+    ], "pesquisa-cio-cerrado.xlsx", "Pesquisa"));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+// =====================================================================
+// ABA: ESTRUTURA  (evento · cotas · quartos)
+// =====================================================================
+ABAS.estrutura = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Estrutura do evento</h1>
+    <p class="sub">Dados do evento, cotas e inventário de quartos.</p>
+    <div id="bl-evento"><p class="carregando">Carregando…</p></div>
+    <div id="bl-cotas"></div>
+    <div id="bl-quartos"></div>`;
+  await blocoEvento();
+  await blocoCotas();
+  await blocoQuartos();
+};
+
+async function blocoEvento(){
+  try{
+    const evs = await rpc("admin_listar_eventos");
+    const e = evs.find(x => x.slug === EVENTO) || {};
+
+    $("#bl-evento").innerHTML = `
+      <div class="cartao">
+        <h2>Evento</h2>
+        <p class="sub" style="margin-bottom:12px;">
+          O identificador vai para o link (<span class="meta">?evento=${esc(EVENTO)}</span>).
+          Mudá-lo quebra os links já enviados.
+          <br><strong>Cota única</strong> é para evento sem hierarquia de patrocínio — o jantar avulso, por
+          exemplo: sem fila de escolha e com uma cota só, criada automaticamente.
+        </p>
+        <div class="barra">
+          <div><label>Identificador</label><input type="text" id="ev-slug" value="${esc(e.slug||EVENTO)}"></div>
+          <div style="min-width:240px;"><label>Nome</label><input type="text" id="ev-nome" value="${esc(e.nome||"")}"></div>
+          <div style="min-width:200px;"><label>Local</label><input type="text" id="ev-local" value="${esc(e.local||"")}"></div>
+          <div style="max-width:150px;"><label>Status</label>
+            <select id="ev-status">
+              <option value="rascunho"  ${e.status==="rascunho"  ?"selected":""}>Rascunho</option>
+              <option value="aberto"    ${e.status==="aberto"    ?"selected":""}>Aberto</option>
+              <option value="encerrado" ${e.status==="encerrado" ?"selected":""}>Encerrado</option>
+            </select></div>
+          <div style="max-width:180px;"><label>Formato</label>
+            <select id="ev-unica">
+              <option value="0" ${e.cota_unica ? "" : "selected"}>Várias cotas</option>
+              <option value="1" ${e.cota_unica ? "selected" : ""}>Cota única</option>
+            </select></div>
+        </div>
+        <div class="barra">
+          <div><label>Início</label><input type="date" id="ev-ini" value="${esc(e.data_inicio||"")}"></div>
+          <div><label>Fim</label><input type="date" id="ev-fim" value="${esc(e.data_fim||"")}"></div>
+          <div><label>Prazo do contrato</label><input type="date" id="ev-pc" value="${esc(e.prazo_contrato||"")}"></div>
+          <div><label>Prazo do rooming</label><input type="date" id="ev-pr" value="${esc(e.prazo_rooming||"")}"></div>
+          <div><label>Cancelamento sem multa</label><input type="date" id="ev-pcan" value="${esc(e.prazo_cancelamento||"")}"></div>
+        </div>
+        <div id="ev-aviso"></div>
+        <button class="btn" id="ev-salvar">Salvar evento</button>
+        <button class="btn sec" id="ev-novo" style="margin-left:6px;">Novo evento</button>
+        ${e.participantes ? `<span class="meta" style="margin-left:10px;">${e.participantes} participante(s)</span>` : ""}
+      </div>`;
+
+    $("#ev-novo").addEventListener("click", () => {
+      // limpa tudo: se so trocasse o slug, o evento novo nasceria com as
+      // datas e prazos do anterior sem ninguem perceber
+      ["#ev-slug","#ev-nome","#ev-local","#ev-ini","#ev-fim",
+       "#ev-pc","#ev-pr","#ev-pcan"].forEach(s => $(s).value = "");
+      $("#ev-status").value = "rascunho";
+      $("#ev-slug").focus();
+      aviso("#ev-aviso",
+        "Preencha e salve. O evento nasce em rascunho e sem cotas — cadastre-as em seguida.", "ok");
+    });
+
+    $("#ev-salvar").addEventListener("click", async () => {
+      const b = $("#ev-salvar");
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        const r = await rpc("admin_salvar_evento", {
+          p_slug: $("#ev-slug").value.trim(),
+          p_nome: $("#ev-nome").value.trim(),
+          p_local: $("#ev-local").value.trim() || null,
+          p_data_inicio: $("#ev-ini").value || null,
+          p_data_fim: $("#ev-fim").value || null,
+          p_status: $("#ev-status").value,
+          p_prazo_contrato: $("#ev-pc").value || null,
+          p_prazo_rooming: $("#ev-pr").value || null,
+          p_prazo_cancelamento: $("#ev-pcan").value || null,
+          p_cota_unica: $("#ev-unica").value === "1"
+        });
+        const novo = r.slug !== EVENTO;
+        await carregarSeletorEventos();
+
+        if(novo){
+          // ja leva o usuario para o evento que ele acabou de criar,
+          // senao ele continuaria editando o anterior sem notar
+          $("#sel-evento").value = r.slug;
+          trocarEvento(r.slug);
+          aviso("#aviso-global", `Evento "${r.slug}" criado e selecionado.`, "ok");
+        }else{
+          aviso("#ev-aviso", "Evento salvo.", "ok");
+        }
+      }catch(e){ aviso("#ev-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Salvar evento"; }
+    });
+  }catch(e){ aviso("#bl-evento", explicar(e)); }
+}
+
+async function blocoCotas(){
+  try{
+    const [l, evs] = await Promise.all([
+      rpc("admin_listar_cotas",   { p_evento_slug: EVENTO }),
+      rpc("admin_listar_eventos")
+    ]);
+    const ev = evs.find(x => x.slug === EVENTO) || {};
+    COTA_UNICA = !!ev.cota_unica;
+
+    const comp = q => Object.entries(q||{})
+      .map(([t,n]) => `${n} ${t}${n>1?"s":""}`).join(" + ") || "—";
+
+    $("#bl-cotas").innerHTML = `
+      <div class="cartao">
+        <h2>Cotas</h2>
+        <p class="sub" style="margin-bottom:12px;">
+          ${COTA_UNICA
+            ? "Evento de cota única: sem ordem de prioridade e sem fila de escolha."
+            : "A ordem define quem escolhe primeiro na mesa redonda — 1 escolhe antes de todos."}
+        </p>
+        <div class="barra">
+          <div style="max-width:160px;"><label>Nome</label><input type="text" id="co-nome" placeholder="Esmeralda"></div>
+          ${COTA_UNICA ? "" :
+            `<div style="max-width:90px;"><label>Ordem</label><input type="text" id="co-ordem" placeholder="1"></div>`}
+          <div style="max-width:100px;"><label>Singles</label><input type="text" id="co-q-single" placeholder="0"></div>
+          <div style="max-width:100px;"><label>Duplos</label><input type="text" id="co-q-duplo" placeholder="0"></div>
+          <div style="max-width:100px;"><label>Triplos</label><input type="text" id="co-q-triplo" placeholder="0"></div>
+          <div style="max-width:110px;"><label>Vagas mesa</label><input type="text" id="co-mesa" placeholder="0"></div>
+          <div style="max-width:110px;"><label>Reunião</label>
+            <select id="co-reuniao"><option value="0">Não</option><option value="1">Sim</option></select></div>
+          <div style="max-width:110px;"><label>Jantar</label>
+            <select id="co-jantar"><option value="0">Não</option><option value="1">Sim</option></select></div>
+          <div style="min-width:auto;"><button class="btn" id="co-salvar">Salvar cota</button></div>
+        </div>
+        <p class="meta" style="margin:0 0 8px;">
+          A cota pode misturar tipos — 2 duplos e 2 singles, por exemplo. Deixe zero no que não usar.
+        </p>
+        <div id="co-aviso"></div>
+        ${l.length ? `<table style="margin-top:10px;">
+          <tr>${COTA_UNICA ? "" : "<th>Ordem</th>"}<th>Cota</th><th>Quartos</th><th>Mesa</th>
+              <th>Reunião</th><th>Jantar</th><th>Patrocinadores</th><th></th></tr>
+          ${l.map(c => `<tr data-id="${esc(c.id)}" data-nome="${esc(c.nome)}"
+                            data-ordem="${c.ordem_prioridade}"
+                            data-q='${esc(JSON.stringify(c.quartos||{}))}'
+                            data-mesa="${c.vagas_mesa_redonda}"
+                            data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}">
+            ${COTA_UNICA ? "" : `<td class="meta">${c.ordem_prioridade}</td>`}
+            <td><strong>${esc(c.nome)}</strong></td>
+            <td>${esc(comp(c.quartos))}<br><span class="meta">${c.total_quartos} no total</span></td>
+            <td>${c.vagas_mesa_redonda || "—"}</td>
+            <td>${c.tem_reuniao_exclusiva ? "Sim" : "—"}</td>
+            <td>${c.tem_jantar ? "Sim" : "—"}</td>
+            <td>${(c.lista_patrocinadores||[]).length
+                   ? (c.lista_patrocinadores||[]).map(p => esc(p.empresa)).join("<br>")
+                   : `<span class="meta">nenhum</span>`}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn sec mini co-patro">Patrocinadores</button>
+              <button class="btn sec mini co-editar">Editar</button>
+              ${Number(c.patrocinadores) ? "" : `<button class="btn perigo mini co-apagar">Remover</button>`}
+            </td></tr>`).join("")}</table>`
+          : `<div class="vazio" style="margin-top:10px;">Nenhuma cota cadastrada.</div>`}
+        <div id="co-detalhe"></div>
+      </div>`;
+
+    $("#co-salvar").addEventListener("click", salvarCota);
+
+    $$(".co-editar").forEach(b => b.addEventListener("click", () => {
+      const t = b.closest("tr").dataset;
+      const q = JSON.parse(t.q || "{}");
+      $("#co-nome").value = t.nome;
+      if($("#co-ordem")) $("#co-ordem").value = t.ordem;
+      $("#co-q-single").value = q.single || "";
+      $("#co-q-duplo").value  = q.duplo  || "";
+      $("#co-q-triplo").value = q.triplo || "";
+      $("#co-mesa").value = t.mesa;
+      $("#co-reuniao").value = t.reuniao;
+      $("#co-jantar").value = t.jantar;
+      $("#co-nome").focus();
+    }));
+
+    $$(".co-apagar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!confirm(`Remover a cota "${tr.dataset.nome}"?`)) return;
+      b.disabled = true;
+      try{ await rpc("admin_remover_cota", { p_cota_id: tr.dataset.id }); blocoCotas(); }
+      catch(e){ aviso("#co-aviso", explicar(e)); b.disabled = false; }
+    }));
+
+    $$(".co-patro").forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      patrocinadoresDaCota(tr.dataset.id, tr.dataset.nome);
+    }));
+  }catch(e){ aviso("#bl-cotas", explicar(e)); }
+}
+
+let COTA_UNICA = false;
+
+// Escolher os patrocinadores pela cota, em vez de abrir cada empresa
+// e trocar o campo "cota" um por um.
+async function patrocinadoresDaCota(cotaId, cotaNome){
+  const box = $("#co-detalhe");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const todos = await rpc("admin_listar_patrocinadores", { p_evento_slug: EVENTO });
+
+    box.innerHTML = `
+      <h2 style="margin-top:16px;">Patrocinadores da cota ${esc(cotaNome)}</h2>
+      <p class="sub">Marque quem pertence a esta cota. Desmarcar deixa a empresa sem cota, não a remove.</p>
+      <div class="rolagem" style="max-height:300px;">
+        <table>
+          <tr><th></th><th>Empresa</th><th>Cota atual</th></tr>
+          ${todos.map(p => `<tr>
+            <td><input type="checkbox" class="cp-pick" value="${esc(p.id)}"
+                       ${p.cota === cotaNome ? "checked" : ""}></td>
+            <td>${esc(p.empresa)}</td>
+            <td class="meta">${esc(p.cota || "sem cota")}</td>
+          </tr>`).join("")}
+        </table>
+      </div>
+      <div id="cp-aviso"></div>
+      <button class="btn" id="cp-salvar" style="margin-top:10px;">Salvar cota</button>`;
+
+    $("#cp-salvar").addEventListener("click", async () => {
+      const b = $("#cp-salvar");
+      const ids = $$(".cp-pick:checked", box).map(c => c.value);
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        const r = await rpc("admin_definir_patrocinadores_cota", {
+          p_cota_id: cotaId, p_patrocinadores: ids });
+        aviso("#cp-aviso",
+          `${r.na_cota} na cota` + (r.removidos ? ` · ${r.removidos} removido(s)` : ""), "ok");
+        blocoCotas();
+      }catch(e){ aviso("#cp-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Salvar cota"; }
+    });
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+async function salvarCota(){
+  const nome  = $("#co-nome").value.trim();
+  if(!nome){ aviso("#co-aviso","Informe o nome da cota."); return; }
+
+  const ordem = COTA_UNICA ? 1 : parseInt($("#co-ordem")?.value, 10);
+  if(!COTA_UNICA && (!ordem || ordem < 1)){
+    aviso("#co-aviso","A ordem começa em 1."); return;
+  }
+
+  const quartos = {};
+  [["single","#co-q-single"],["duplo","#co-q-duplo"],["triplo","#co-q-triplo"]]
+    .forEach(([t,s]) => {
+      const n = parseInt($(s).value, 10);
+      if(n > 0) quartos[t] = n;
+    });
+
+  const b = $("#co-salvar");
+  b.disabled = true; b.textContent = "Salvando…";
+  try{
+    await rpc("admin_salvar_cota", {
+      p_evento_slug: EVENTO, p_nome: nome, p_ordem: ordem,
+      p_quartos: quartos,
+      p_vagas_mesa: parseInt($("#co-mesa").value,10) || 0,
+      p_reuniao: $("#co-reuniao").value === "1",
+      p_jantar:  $("#co-jantar").value  === "1"
+    });
+    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo"]
+      .forEach(s => $(s).value = "");
+    if($("#co-ordem")) $("#co-ordem").value = "";
+    blocoCotas();
+  }catch(e){ aviso("#co-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Salvar cota"; }
+}
+
+async function blocoQuartos(){
+  try{
+    const r = await rpc("admin_resumo_quartos", { p_evento_slug: EVENTO });
+    const total = r.reduce((s,x) => s + Number(x.total), 0);
+
+    $("#bl-quartos").innerHTML = `
+      <div class="cartao">
+        <h2>Inventário de quartos</h2>
+        <p class="sub" style="margin-bottom:12px;">
+          ${total} quarto(s) cadastrado(s). Crie por faixa de numeração — repetidos são ignorados.
+        </p>
+        <div class="barra">
+          <div style="max-width:100px;"><label>De</label><input type="text" id="qt-de" placeholder="200"></div>
+          <div style="max-width:100px;"><label>Até</label><input type="text" id="qt-ate" placeholder="279"></div>
+          <div style="max-width:120px;"><label>Tipo</label>
+            <select id="qt-tipo">
+              <option value="single">Single</option>
+              <option value="duplo" selected>Duplo</option>
+              <option value="triplo">Triplo</option>
+            </select></div>
+          <div><label>Bloco</label><input type="text" id="qt-bloco" placeholder="Bloco A"></div>
+          <div style="min-width:auto;"><button class="btn" id="qt-criar">Criar faixa</button></div>
+        </div>
+        <div id="qt-aviso"></div>
+        ${r.length ? `<table style="margin-top:10px;">
+          <tr><th>Tipo</th><th>Total</th><th>Livres</th><th>Ocupados</th></tr>
+          ${r.map(x => `<tr>
+            <td style="text-transform:capitalize">${esc(x.tipo)}</td>
+            <td>${x.total}</td>
+            <td><span class="selo ${Number(x.livres)?"ok":"pend"}">${x.livres}</span></td>
+            <td class="meta">${x.ocupados}</td></tr>`).join("")}</table>`
+          : `<div class="vazio" style="margin-top:10px;">Nenhum quarto cadastrado.</div>`}
+      </div>`;
+
+    $("#qt-criar").addEventListener("click", async () => {
+      const de = parseInt($("#qt-de").value,10), ate = parseInt($("#qt-ate").value,10);
+      if(!de || !ate){ aviso("#qt-aviso","Informe a faixa de numeração."); return; }
+      if(ate < de){ aviso("#qt-aviso","O número final é menor que o inicial."); return; }
+
+      const b = $("#qt-criar");
+      b.disabled = true; b.textContent = "Criando…";
+      try{
+        const res = await rpc("admin_criar_faixa_quartos", {
+          p_evento_slug: EVENTO, p_de: de, p_ate: ate,
+          p_tipo: $("#qt-tipo").value,
+          p_bloco: $("#qt-bloco").value.trim() || null
+        });
+        aviso("#qt-aviso", res.criados
+          ? `${res.criados} quarto(s) criado(s) na faixa ${res.faixa}.`
+          : `Nenhum criado — a faixa ${res.faixa} já existe.`, res.criados ? "ok" : "erro");
+        blocoQuartos();
+      }catch(e){ aviso("#qt-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Criar faixa"; }
+    });
+  }catch(e){ aviso("#bl-quartos", explicar(e)); }
+}
+
+// =====================================================================
+// ABA: PATROCINADORES
+// =====================================================================
+ABAS.patrocinadores = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const [lista, cotas] = await Promise.all([
+      rpc("admin_listar_patrocinadores", { p_evento_slug: EVENTO }),
+      rpc("admin_listar_cotas",          { p_evento_slug: EVENTO })
+    ]);
+
+    if(cotas.length === 0){
+      c.innerHTML = `<h1>Patrocinadores</h1>
+        <div class="vazio">Cadastre as cotas antes, na aba Estrutura.</div>`;
+      return;
+    }
+
+    c.innerHTML = `
+      <h1>Patrocinadores</h1>
+      <p class="sub">${lista.length} cadastrado(s), na ordem de prioridade das cotas.</p>
+
+      <div class="cartao">
+        <h2>Adicionar ou alterar</h2>
+        <p class="sub" style="margin-bottom:12px;">
+          Empresa e cota bastam para cadastrar. O resto a análise busca no site — clique em
+          <strong>Buscar dados</strong> depois de informar a empresa.
+        </p>
+        <div class="barra">
+          <div style="min-width:220px;"><label>Empresa</label><input type="text" id="pt-empresa"></div>
+          <div style="max-width:160px;"><label>Cota</label>
+            <select id="pt-cota">
+              <option value="">Sem cota</option>
+              ${cotas.map(x => `<option value="${esc(x.nome)}">${esc(x.nome)}</option>`).join("")}
+            </select></div>
+          <div style="min-width:180px;"><label>Site</label>
+            <input type="text" id="pt-site" placeholder="empresa.com.br"></div>
+          <div style="min-width:auto;">
+            <button class="btn sec" id="pt-buscar">Buscar dados</button></div>
+        </div>
+
+        <details id="pt-mais">
+          <summary class="meta" style="cursor:pointer;margin:4px 0 10px;">Mais campos</summary>
+          <div class="barra">
+            <div style="max-width:170px;"><label>CNPJ</label><input type="text" id="pt-cnpj"></div>
+            <div style="max-width:160px;"><label>Segmento</label><input type="text" id="pt-segmento"></div>
+            <div style="max-width:150px;"><label>Natureza</label>
+              <select id="pt-natureza">
+                <option value="">—</option>
+                <option value="privada">Privada</option>
+                <option value="hibrida">Híbrida</option>
+                <option value="publica">Pública</option>
+              </select></div>
+            <div style="max-width:150px;"><label>Cidade</label><input type="text" id="pt-cidade"></div>
+            <div style="max-width:80px;"><label>UF</label><input type="text" id="pt-estado"></div>
+          </div>
+          <div class="barra">
+            <div><label>O que vende (alimenta o match dos jantares)</label>
+              <input type="text" id="pt-vende" placeholder="Cloud, AWS, migração e FinOps"></div>
+          </div>
+          <div class="barra">
+            <div><label>Resumo das atividades</label>
+              <input type="text" id="pt-resumo" placeholder="O que a empresa faz, em uma linha"></div>
+            <div style="max-width:130px;"><label>Quartos extras</label><input type="text" id="pt-extras" placeholder="0"></div>
+            <div style="max-width:160px;"><label>Vagas mesa (exceção)</label><input type="text" id="pt-mesa" placeholder="usa a cota"></div>
+          </div>
+        </details>
+
+        <div id="pt-aviso"></div>
+        <button class="btn" id="pt-salvar">Salvar</button>
+      </div>
+
+      <div class="cartao">
+        <div class="cartao-cab" style="margin-bottom:10px;">
+          <h2 style="margin:0;">Cadastrados</h2>
+          <button class="btn sec mini" id="pt-gerar">Gerar quartos das cotas</button>
+        </div>
+        ${lista.length ? `<table>
+          <tr><th>Empresa</th><th>Cota</th><th>O que vende</th><th>Quartos</th><th>Usuários</th><th></th></tr>
+          ${lista.map(p => `<tr data-id="${esc(p.id)}" data-empresa="${esc(p.empresa)}"
+                                data-cota="${esc(p.cota||"")}" data-cnpj="${esc(p.cnpj||"")}"
+                                data-seg="${esc(p.segmento||"")}" data-vende="${esc(p.o_que_vende||"")}"
+                                data-site="${esc(p.site||"")}" data-resumo="${esc(p.resumo||"")}"
+                                data-natureza="${esc(p.natureza||"")}" data-cidade="${esc(p.cidade||"")}"
+                                data-estado="${esc(p.estado||"")}"
+                                data-extras="${p.quartos_extras||0}" data-mesa="${p.vagas_mesa_override??""}">
+            <td><strong>${esc(p.empresa)}</strong>
+                ${p.site ? `<br><span class="meta">${esc(p.site)}</span>` : ""}
+                ${p.fechado_em ? `<br><span class="selo ok">fechou</span>` : ""}
+                ${p.status !== "ativo" ? `<br><span class="selo pend">${esc(p.status)}</span>` : ""}</td>
+            <td class="meta">${esc(p.cota||"sem cota")}
+                ${p.natureza && p.natureza !== "privada"
+                  ? `<br><span class="selo ${p.natureza==="publica"?"erro":"alerta"}">${esc(p.natureza)}</span>` : ""}</td>
+            <td class="meta" style="max-width:220px;">${esc(p.o_que_vende||"—")}</td>
+            <td>${p.reservas}</td>
+            <td>${p.usuarios}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn sec mini pt-ia" title="Buscar dados no site">IA</button>
+              <button class="btn sec mini pt-usuarios">Usuários</button>
+              <button class="btn sec mini pt-editar">Editar</button>
+              <button class="btn perigo mini pt-apagar">Remover</button>
+            </td></tr>`).join("")}</table>`
+          : `<div class="vazio">Nenhum patrocinador cadastrado.</div>`}
+      </div>
+      <div id="pt-detalhe"></div>`;
+
+    $("#pt-salvar").addEventListener("click", salvarPatrocinador);
+
+    $("#pt-buscar").addEventListener("click", async () => {
+      const nome = $("#pt-empresa").value.trim();
+      if(!nome){ aviso("#pt-aviso","Informe a empresa antes de buscar."); return; }
+
+      const b = $("#pt-buscar");
+      b.disabled = true; b.textContent = "Buscando…";
+      try{
+        const d = await pesquisarEmpresa(nome, $("#pt-site").value.trim());
+        // preenche só o que está vazio: o que você digitou vale mais
+        // do que o que a busca encontrou
+        const por = (sel, v) => { if(v && !$(sel).value.trim()) $(sel).value = v; };
+        por("#pt-site", d.site);         por("#pt-segmento", d.segmento);
+        por("#pt-vende", d.o_que_vende); por("#pt-resumo", d.resumo);
+        por("#pt-cidade", d.cidade);     por("#pt-estado", d.estado);
+        if(d.natureza && !$("#pt-natureza").value) $("#pt-natureza").value = d.natureza;
+        $("#pt-mais").open = true;
+
+        // "sucesso" com todos os campos vazios engana: parece que
+        // preencheu quando a busca não achou nada
+        const achou = ["site","resumo","o_que_vende","segmento","cidade","estado"]
+          .filter(k => String(d[k] || "").trim()).length;
+        aviso("#pt-aviso", achou
+          ? `${achou} campo(s) preenchido(s). Confira antes de salvar.`
+          : "A busca não encontrou dados dessa empresa. Preencha à mão.",
+          achou ? "ok" : "erro");
+      }catch(e){ aviso("#pt-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Buscar dados"; }
+    });
+
+    $("#pt-gerar").addEventListener("click", async () => {
+      const b = $("#pt-gerar");
+      b.disabled = true; b.textContent = "Gerando…";
+      try{
+        const r = await rpc("admin_gerar_quartos_todos", { p_evento_slug: EVENTO });
+        aviso("#aviso-global", `${r.reservas_criadas} reserva(s) criada(s).`, "ok");
+        ABAS.patrocinadores();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled=false; b.textContent="Gerar quartos das cotas"; }
+    });
+
+    $$(".pt-editar").forEach(b => b.addEventListener("click", () => {
+      const t = b.closest("tr").dataset;
+      $("#pt-empresa").value = t.empresa; $("#pt-cota").value = t.cota;
+      $("#pt-site").value = t.site;       $("#pt-cnpj").value = t.cnpj;
+      $("#pt-segmento").value = t.seg;    $("#pt-vende").value = t.vende;
+      $("#pt-resumo").value = t.resumo;   $("#pt-natureza").value = t.natureza;
+      $("#pt-cidade").value = t.cidade;   $("#pt-estado").value = t.estado;
+      $("#pt-extras").value = t.extras;   $("#pt-mesa").value = t.mesa;
+      $("#pt-mais").open = true;
+      $("#pt-empresa").focus();
+      window.scrollTo({ top:0, behavior:"smooth" });
+    }));
+
+    $$(".pt-ia").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true; b.textContent = "…";
+      try{
+        const d = await pesquisarEmpresa(tr.dataset.empresa, tr.dataset.site);
+        await rpc("admin_enriquecer_patrocinador", {
+          p_id: tr.dataset.id,
+          p_site: d.site || null, p_resumo: d.resumo || null,
+          p_o_que_vende: d.o_que_vende || null, p_segmento: d.segmento || null,
+          p_natureza: d.natureza || null,
+          p_cidade: d.cidade || null, p_estado: d.estado || null
+        });
+        const achou = ["site","resumo","o_que_vende","segmento","cidade","estado"]
+          .filter(k => String(d[k] || "").trim()).length;
+        aviso("#aviso-global", achou
+          ? `${tr.dataset.empresa}: ${achou} campo(s) atualizado(s).`
+          : `Nada encontrado sobre ${tr.dataset.empresa}. Preencha à mão.`,
+          achou ? "ok" : "erro");
+        ABAS.patrocinadores();
+      }catch(e){
+        aviso("#aviso-global", explicar(e));
+        b.disabled = false; b.textContent = "IA";
+      }
+    }));
+
+    $$(".pt-apagar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!confirm(`Remover "${tr.dataset.empresa}"?`)) return;
+      b.disabled = true;
+      try{ await rpc("admin_remover_patrocinador", { p_id: tr.dataset.id }); ABAS.patrocinadores(); }
+      catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+
+    $$(".pt-usuarios").forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      abrirUsuarios(tr.dataset.id, tr.dataset.empresa);
+    }));
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+async function salvarPatrocinador(){
+  const empresa = $("#pt-empresa").value.trim();
+  if(!empresa){ aviso("#pt-aviso","Informe a empresa."); return; }
+
+  const b = $("#pt-salvar");
+  b.disabled = true; b.textContent = "Salvando…";
+  try{
+    await rpc("admin_salvar_patrocinador", {
+      p_evento_slug: EVENTO, p_empresa: empresa,
+      p_cota_nome: $("#pt-cota").value || null,
+      p_cnpj: $("#pt-cnpj").value.trim() || null,
+      p_segmento: $("#pt-segmento").value.trim() || null,
+      p_o_que_vende: $("#pt-vende").value.trim() || null,
+      p_quartos_extras: parseInt($("#pt-extras").value,10) || 0,
+      p_vagas_mesa_override: parseInt($("#pt-mesa").value,10) || null,
+      p_site: $("#pt-site").value.trim() || null,
+      p_resumo: $("#pt-resumo").value.trim() || null,
+      p_natureza: $("#pt-natureza").value || null,
+      p_cidade: $("#pt-cidade").value.trim() || null,
+      p_estado: $("#pt-estado").value.trim().toUpperCase() || null
+    });
+    ["#pt-empresa","#pt-cnpj","#pt-segmento","#pt-vende","#pt-extras","#pt-mesa",
+     "#pt-site","#pt-resumo","#pt-cidade","#pt-estado"].forEach(s => $(s).value = "");
+    $("#pt-natureza").value = "";
+    ABAS.patrocinadores();
+  }catch(e){ aviso("#pt-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Salvar"; }
+}
+
+// Busca os dados da empresa na web. Devolve JSON para preencher o
+// formulário — nunca salva sozinha: quem confirma é você.
+async function pesquisarEmpresa(nome, site){
+  const d = await ia(
+    `Pesquise a empresa "${nome}"${site ? ` (site: ${site})` : ""} e responda APENAS ` +
+    `um objeto JSON, sem markdown, com estas chaves:\n` +
+    `{"site":"domínio oficial","resumo":"o que a empresa faz, máx 25 palavras",` +
+    `"o_que_vende":"principais produtos e serviços, máx 20 palavras",` +
+    `"segmento":"segmento de atuação em 1-3 palavras",` +
+    `"natureza":"privada|hibrida|publica","cidade":"sede","estado":"UF"}\n` +
+    `natureza: "hibrida" para Sistema S, fundações e associações ligadas a estatais, ` +
+    `fundos de pensão e capital misto; "publica" para governo, autarquias e estatais puras. ` +
+    `Use string vazia no que não encontrar — não invente.`,
+    { buscarWeb: true, json: true, maxTokens: 800 });
+
+  if(!d || typeof d !== "object"){
+    throw new Error("A busca não retornou dados utilizáveis para essa empresa.");
+  }
+  return d;
+}
+
+async function abrirUsuarios(id, empresa){
+  const box = $("#pt-detalhe");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+  try{
+    const l = await rpc("admin_listar_usuarios_patro", { p_patrocinador_id: id });
+    box.innerHTML = `
+      <div class="cartao">
+        <h2>Usuários · ${esc(empresa)}</h2>
+        <p class="sub" style="margin-bottom:12px;">
+          Todos veem os mesmos quartos. O login é por link no e-mail — o endereço precisa estar exato.
+        </p>
+        <div class="barra">
+          <div><label>E-mail</label><input type="email" id="up-email"></div>
+          <div><label>Nome</label><input type="text" id="up-nome"></div>
+          <div style="max-width:150px;"><label>Telefone</label><input type="text" id="up-tel"></div>
+          <div style="min-width:auto;"><button class="btn" id="up-salvar">Adicionar</button></div>
+        </div>
+        <div id="up-aviso"></div>
+        ${l.length ? `<table style="margin-top:8px;">
+          <tr><th>E-mail</th><th>Nome</th><th>Telefone</th><th></th></tr>
+          ${l.map(u => `<tr data-id="${esc(u.id)}">
+            <td>${esc(u.email)}</td><td>${esc(u.nome||"—")}</td>
+            <td class="meta">${esc(u.telefone||"—")}</td>
+            <td><button class="btn perigo mini up-apagar">Remover</button></td>
+          </tr>`).join("")}</table>`
+          : `<div class="vazio" style="margin-top:8px;">
+               Nenhum usuário. Sem isso ninguém desta empresa consegue entrar no portal.
+             </div>`}
+      </div>`;
+
+    $("#up-salvar").addEventListener("click", async () => {
+      const email = $("#up-email").value.trim();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+        aviso("#up-aviso","E-mail inválido. Endereço errado vira acesso que nunca funciona.");
+        return;
+      }
+      const b = $("#up-salvar");
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        await rpc("admin_salvar_usuario_patro", {
+          p_patrocinador_id: id, p_email: email,
+          p_nome: $("#up-nome").value.trim() || null,
+          p_telefone: $("#up-tel").value.trim() || null
+        });
+        abrirUsuarios(id, empresa);
+      }catch(e){ aviso("#up-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Adicionar"; }
+    });
+
+    $$(".up-apagar", box).forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try{
+        await rpc("admin_remover_usuario_patro", { p_id: b.closest("tr").dataset.id });
+        abrirUsuarios(id, empresa);
+      }catch(e){ aviso("#up-aviso", explicar(e)); b.disabled = false; }
+    }));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+// =====================================================================
+// CHAMADA DE IA
+// Passa pela Edge Function "ia": a chave da Anthropic fica no servidor.
+// Chamar api.anthropic.com direto daqui exigiria a chave dentro deste
+// arquivo, que é público.
+// =====================================================================
+async function ia(prompt, { buscarWeb = false, json = false, maxTokens = 2000 } = {}){
+  const { data, error } = await sb.functions.invoke("ia", {
+    body: { prompt, buscar_web: buscarWeb, json, max_tokens: maxTokens }
+  });
+  if(error) throw new Error(error.message || "Falha ao chamar a IA.");
+  if(data?.erro) throw new Error(data.erro);
+  return json ? data.dados : data.texto;
+}
+
+// =====================================================================
+// ABA: PESQUISA DE PERFIL
+// =====================================================================
+ABAS.pesquisa = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Pesquisa de perfil</h1>
+    <p class="sub">Respostas do formulário de inscrição: porte, orçamento e áreas de investimento.</p>
+    <div id="pq-resumo"></div>
+
+    <div class="cartao">
+      <h2>Importar respostas</h2>
+      <p class="sub" style="margin-bottom:12px;">
+        Suba o export <strong>Lista de participantes</strong> do Sympla. As linhas de título antes do
+        cabeçalho são ignoradas automaticamente. O casamento é pela coluna
+        <strong>E-MAIL CORPORATIVO</strong>, comparada com o e-mail da inscrição.
+      </p>
+      <div class="barra">
+        <div><label>Arquivo (.xlsx)</label><input type="file" id="pq-arq" accept=".xlsx,.xls"></div>
+        <div style="min-width:auto;"><button class="btn" id="pq-importar" disabled>Importar</button></div>
+      </div>
+      <div id="pq-aviso"></div>
+      <div id="pq-previa"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Áreas de investimento</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Quantos CIOs pretendem aumentar investimento em cada área nos próximos 12 meses.
+        Clique numa linha para ver quem são.
+      </p>
+      <div id="pq-areas"><p class="carregando">Carregando…</p></div>
+      <div id="pq-detalhe"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Respostas por participante</h2>
+      <button class="btn sec" id="pq-carregar">Carregar</button>
+      <div id="pq-lista"></div>
+    </div>`;
+
+  $("#pq-arq").addEventListener("change", lerPesquisa);
+  $("#pq-importar").addEventListener("click", importarPesquisa);
+  $("#pq-carregar").addEventListener("click", listarPesquisa);
+  resumoPesquisa();
+  areasPesquisa();
+};
+
+async function resumoPesquisa(){
+  try{
+    const r = await rpc("admin_pesquisa_resumo", { p_evento_slug: EVENTO });
+    const pct = r.aprovados ? Math.round(r.responderam / r.aprovados * 100) : 0;
+    $("#pq-resumo").innerHTML = `
+      <div class="cartao">
+        <p class="meta" style="margin:0;">
+          <strong style="font-size:15px;color:var(--verde);">${r.responderam} de ${r.aprovados}</strong>
+          participantes responderam (${pct}%) ·
+          ${r.faltam} pendente(s) · ${r.consentiram_lgpd} consentiram LGPD
+        </p>
+      </div>`;
+  }catch(e){ aviso("#pq-resumo", explicar(e)); }
+}
+
+let PESQ_LINHAS = [];
+
+// Mapeia as 73 colunas do export. As de investimento e as de perfil
+// vão para grupos separados, senão a agregação por área misturaria
+// "COMO A TI ESCOLHE FORNECEDORES" com "INVESTIMENTO INFRA - BACKUP".
+const MAPA_PESQ = {
+  "E-MAIL CORPORATIVO": "email",
+  "Faturamento Anual da Emprea": "faturamento",
+  "Orçamento Anual da Área de TI(CAPEX e OPEX)": "orcamento_ti",
+  "Número de Colaboradores da Empresa": "colaboradores",
+  "Número Colaboradores de TI da Empresa": "colaboradores_ti",
+  "SISTEMA ERP ATUAL": "erp_atual",
+  "Quantidade de dispositivos(Desktops, notebooks, smartphones, etc.)": "dispositivos",
+  "Quais são seus serviços de TI já terceirizados ?": "terceirizados",
+  "TERMO DE CONSENTIMENTO E RESPONSABILIDADE – LGPD": "consentimento_lgpd",
+};
+
+const chave = s => String(s||"").trim().toUpperCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+
+async function lerPesquisa(ev){
+  const f = ev.target.files[0];
+  if(!f) return;
+  try{
+    const buf = await f.arrayBuffer();
+    const wb  = XLSX.read(buf, { type:"array" });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+
+    // O export traz título e local nas primeiras linhas antes do
+    // cabeçalho real. O critério antigo era "primeira linha com mais de
+    // 20 colunas" — funcionava com o export atual (73 colunas), mas
+    // quebrava em qualquer formulário mais curto, caindo na linha 1 e
+    // importando zero. Agora pega a linha mais preenchida entre as
+    // primeiras 20, exigindo ao menos 3 colunas.
+    let iCab = 0, melhor = 0;
+    aoa.slice(0, 20).forEach((l, i) => {
+      const n = l.filter(v => String(v).trim()).length;
+      if(n > melhor){ melhor = n; iCab = i; }
+    });
+
+    if(melhor < 3){
+      aviso("#pq-aviso",
+        "Não encontrei uma linha de cabeçalho neste arquivo. Confira se é o export de participantes do Sympla.");
+      $("#pq-importar").disabled = true;
+      $("#pq-previa").innerHTML = "";
+      return;
+    }
+
+    const cab = aoa[iCab].map(v => String(v).trim());
+    const mapaNorm = {};
+    Object.entries(MAPA_PESQ).forEach(([k,v]) => mapaNorm[chave(k)] = v);
+
+    PESQ_LINHAS = aoa.slice(iCab+1)
+      .filter(l => l.some(v => String(v).trim()))
+      .map(l => {
+        const o = { investimentos:{}, perfil:{} };
+        cab.forEach((titulo, i) => {
+          const valor = String(l[i] ?? "").trim();
+          if(!titulo) return;
+          const campo = mapaNorm[chave(titulo)];
+          if(campo){ o[campo] = valor; return; }
+          if(chave(titulo).startsWith("INVESTIMENTO")){
+            if(valor) o.investimentos[titulo.replace(/^INVESTIMENTO\s*/i,"").trim()] = valor;
+          }else if(valor){
+            o.perfil[titulo] = valor;
+          }
+        });
+        o.nome = String(l[0] ?? "").trim();
+        return o;
+      })
+      .filter(o => o.email);
+
+    const areas = PESQ_LINHAS[0] ? Object.keys(PESQ_LINHAS[0].investimentos).length : 0;
+    $("#pq-previa").innerHTML = `
+      <p class="meta" style="margin-top:10px;">
+        ${PESQ_LINHAS.length} respondente(s) · ${areas} área(s) de investimento por linha
+        · cabeçalho na linha ${iCab+1} (${melhor} colunas)
+      </p>`;
+    $("#pq-importar").disabled = PESQ_LINHAS.length === 0;
+
+    // Zero respondentes quase sempre é coluna de e-mail com outro nome,
+    // não arquivo vazio — dizer isso poupa uma investigação.
+    aviso("#pq-aviso", PESQ_LINHAS.length === 0
+      ? `Li a linha ${iCab+1} como cabeçalho, mas nenhuma linha tinha e-mail. ` +
+        `A coluna precisa se chamar "E-MAIL CORPORATIVO".`
+      : "", "erro");
+  }catch(e){
+    aviso("#pq-aviso","Não consegui ler o arquivo. Confira se é o export do Sympla em .xlsx.");
+  }
+}
+
+async function importarPesquisa(){
+  const b = $("#pq-importar");
+  b.disabled = true; b.textContent = "Importando…";
+  try{
+    const r = await rpc("admin_importar_pesquisa", {
+      p_evento_slug: EVENTO, p_linhas: PESQ_LINHAS });
+
+    aviso("#pq-aviso",
+      `${r.importados} importado(s)` +
+      (r.nao_encontrados ? ` · ${r.nao_encontrados} sem inscrição neste evento` : "") +
+      (r.sem_email ? ` · ${r.sem_email} sem e-mail` : ""),
+      r.nao_encontrados ? "erro" : "ok");
+
+    // quem não casou aparece nominalmente: quase sempre é e-mail
+    // digitado diferente entre a inscrição e a pesquisa
+    if(r.lista_nao_encontrados?.length){
+      $("#pq-previa").innerHTML = `
+        <p class="meta" style="margin-top:12px;"><strong>Sem inscrição neste evento:</strong></p>
+        <div class="rolagem" style="max-height:200px;margin-top:6px;">
+          <table><tr><th>Nome</th><th>E-mail</th></tr>
+          ${r.lista_nao_encontrados.map(x => `<tr>
+            <td>${esc(x.nome||"—")}</td><td class="meta">${esc(x.email)}</td></tr>`).join("")}
+          </table></div>`;
+    }
+    resumoPesquisa(); areasPesquisa();
+  }catch(e){ aviso("#pq-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Importar"; }
+}
+
+async function areasPesquisa(){
+  try{
+    const l = await rpc("admin_pesquisa_areas", { p_evento_slug: EVENTO });
+    $("#pq-areas").innerHTML = l.length === 0
+      ? `<div class="vazio">Nenhuma resposta importada ainda.</div>`
+      : `<div class="rolagem"><table>
+          <tr><th>Área</th><th>Vai aumentar</th><th>Em estudo</th><th>Sem previsão</th><th>Vai diminuir</th></tr>
+          ${l.map(a => `<tr data-area="${esc(a.area)}" style="cursor:pointer;" class="linha-area">
+            <td>${esc(a.area)}</td>
+            <td><span class="selo ${Number(a.aumentar)>0?"ok":"pend"}">${a.aumentar}</span></td>
+            <td class="meta">${a.estudo}</td>
+            <td class="meta">${a.sem_previsao}</td>
+            <td class="meta">${a.diminuir}</td>
+          </tr>`).join("")}</table></div>
+        <button class="btn sec mini" id="pq-x-areas" style="margin-top:10px;">Exportar Excel</button>`;
+
+    $$(".linha-area").forEach(tr => tr.addEventListener("click", () => detalheArea(tr.dataset.area)));
+    const bx = $("#pq-x-areas");
+    if(bx) bx.addEventListener("click", () => exportar(l, [
+      ["area","Área"],["aumentar","Vai aumentar"],["estudo","Em estudo"],
+      ["sem_previsao","Sem previsão"],["diminuir","Vai diminuir"],
+      ["respondentes","Respondentes"]
+    ], "areas-investimento.xlsx", "Áreas"));
+  }catch(e){ aviso("#pq-areas", explicar(e)); }
+}
+
+async function detalheArea(area){
+  const box = $("#pq-detalhe");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const l = await rpc("admin_pesquisa_por_area", {
+      p_evento_slug: EVENTO, p_area: area, p_intencao: "aumentar" });
+
+    box.innerHTML = `
+      <h2 style="margin-top:16px;">${esc(area)}</h2>
+      <p class="sub">${l.length} participante(s) com investimento previsto para aumentar.</p>
+      ${l.length ? `<div class="rolagem" style="max-height:300px;">
+        <table><tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th>Porte</th></tr>
+        ${l.map(x => `<tr><td>${esc(x.nome)}</td><td>${esc(x.empresa||"—")}</td>
+          <td class="meta">${esc(x.cargo||"—")}</td>
+          <td class="meta">${esc(x.faturamento||"—")}</td></tr>`).join("")}</table></div>
+        <button class="btn sec mini" id="pq-x-area" style="margin-top:10px;">Exportar Excel</button>`
+        : `<div class="vazio">Ninguém marcou aumento nesta área.</div>`}`;
+
+    const bx = $("#pq-x-area");
+    if(bx) bx.addEventListener("click", () => exportar(l, [
+      ["nome","Nome"],["empresa","Empresa"],["cargo","Cargo"],["email","E-mail"],
+      ["segmento","Segmento"],["faturamento","Faturamento"],["resposta","Resposta"]
+    ], `investimento-${area.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}.xlsx`, "Lista"));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+async function listarPesquisa(){
+  const box = $("#pq-lista");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const l = await puxarTudo("admin_rel_pesquisa");
+    const semResposta = l.filter(x => !x.respondeu).length;
+
+    box.innerHTML = `
+      <p class="meta" style="margin:10px 0;">
+        ${l.length} aprovado(s)${semResposta ? ` · ${semResposta} ainda sem resposta` : ""}
+      </p>
+      <button class="btn sec mini" id="pq-x-tudo">Exportar Excel (todas as colunas)</button>
+      <div class="rolagem" style="max-height:320px;margin-top:10px;">
+        <table><tr><th>Nome</th><th>Empresa</th><th>Porte</th><th>Orçamento TI</th><th>ERP</th><th>Respondeu</th></tr>
+        ${l.slice(0,150).map(x => `<tr>
+          <td>${esc(x.nome)}</td><td>${esc(x.empresa||"—")}</td>
+          <td class="meta">${esc(x.faturamento||"—")}</td>
+          <td class="meta">${esc(x.orcamento_ti||"—")}</td>
+          <td class="meta">${esc(x.erp_atual||"—")}</td>
+          <td><span class="selo ${x.respondeu?"ok":"pend"}">${x.respondeu?"sim":"não"}</span></td>
+        </tr>`).join("")}</table>
+      </div>`;
+
+    // Excel achata as ~50 áreas em colunas: é o formato que você já usa
+    $("#pq-x-tudo").addEventListener("click", () => {
+      const areas = new Set();
+      l.forEach(x => Object.keys(x.investimentos||{}).forEach(k => areas.add(k)));
+      const dados = l.map(x => {
+        const o = {
+          "Nome": x.nome, "Empresa": x.empresa, "Cargo": x.cargo,
+          "E-mail": x.email, "Telefone": x.telefone, "Segmento": x.segmento,
+          "Estado": x.estado, "CNPJ": x.cnpj,
+          "Faturamento": x.faturamento, "Orçamento TI": x.orcamento_ti,
+          "Colaboradores": x.colaboradores, "Colaboradores TI": x.colaboradores_ti,
+          "ERP": x.erp_atual, "Dispositivos": x.dispositivos,
+          "Terceirizados": x.terceirizados,
+          "LGPD": x.consentimento_lgpd ? "aceito" : "",
+        };
+        [...areas].forEach(a => o[a] = (x.investimentos||{})[a] ?? "");
+        Object.entries(x.perfil||{}).forEach(([k,v]) => o[k] = v);
+        return o;
+      });
+      const ws = XLSX.utils.json_to_sheet(dados);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Pesquisa");
+      XLSX.writeFile(wb, "pesquisa-perfil.xlsx");
+    });
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+// =====================================================================
+// ABA: PROSPECCAO  (quem convidar para os jantares)
+//
+// Espelha o agente de jantares: abrangencia em texto livre interpretada
+// pela IA, perfil do patrocinador pesquisado na web, classificacao de
+// natureza juridica, score com justificativa, escolha de 1 ou 2
+// executivos por empresa e os mesmos quatro exports.
+// A diferenca e a fonte: base do banco em vez de planilha enviada.
+// =====================================================================
+let PROSP = [];
+let PROSP_PATRO = "";
+let PROSP_EXECS = "1";
+
+ABAS.prospeccao = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const [sessoes, rodadas, locais] = await Promise.all([
+      rpc("admin_listar_sessoes", { p_evento_slug: EVENTO, p_tipo: "jantar" }),
+      rpc("admin_listar_rodadas"),
+      rpc("admin_localidades_base")
+    ]);
+
+    const totalEmp = locais.reduce((s,l) => s + Number(l.empresas), 0);
+
+    c.innerHTML = `
+      <h1>Prospecção de convidados</h1>
+      <p class="sub">
+        Quem convidar da base do CIO Cerrado — diferente da aba Mesas e jantares,
+        que distribui quem já está inscrito.
+      </p>
+
+      <div class="cartao">
+        <h2>Patrocinador</h2>
+        <div class="barra">
+          <div style="min-width:220px;"><label>Jantar</label>
+            <select id="pr-sessao">
+              <option value="">Sem vincular a um jantar</option>
+              ${sessoes.map(s => `<option value="${esc(s.sessao_id)}" data-patro="${esc(s.patrocinador)}">
+                ${esc(s.patrocinador)}${s.data ? " · "+dataBR(s.data) : ""} (${s.escolhidos}/${s.vagas})
+              </option>`).join("")}
+            </select></div>
+          <div style="min-width:200px;"><label>Empresa patrocinadora</label>
+            <input type="text" id="pr-nome" placeholder="preenche ao escolher o jantar"></div>
+          <div style="min-width:170px;"><label>Site</label>
+            <input type="text" id="pr-site" placeholder="empresa.com.br"></div>
+        </div>
+        <div class="barra">
+          <div><label>Perfil de convidado desejado (opcional)</label>
+            <input type="text" id="pr-perfil" placeholder="Ex.: indústrias com SAP e faturamento acima de 1 Bi"></div>
+        </div>
+        <div class="barra">
+          <div><label>Observações do organizador (opcional)</label>
+            <input type="text" id="pr-obs" placeholder="Contexto que a análise deve considerar"></div>
+        </div>
+      </div>
+
+      <div class="cartao">
+        <h2>Filtros</h2>
+        <div class="barra">
+          <div style="min-width:280px;"><label>Abrangência geográfica</label>
+            <input type="text" id="pr-abr" value="Grande Brasília (DF + entorno)">
+            <span class="meta">Texto livre — a análise interpreta "e região", "entorno", siglas.</span></div>
+          <div style="max-width:170px;"><label>Faturamento mínimo</label>
+            <input type="text" id="pr-fatmin" placeholder="Ex.: 500 milhões"></div>
+          <div style="max-width:170px;"><label>Máximo de convidados</label>
+            <input type="text" id="pr-max" placeholder="sem limite"></div>
+          <div style="max-width:200px;"><label>Executivos por empresa</label>
+            <select id="pr-execs">
+              <option value="1">Só o 1º executivo</option>
+              <option value="2">1º e 2º executivo</option>
+            </select></div>
+        </div>
+        <div class="barra">
+          <div><label class="check"><input type="checkbox" id="pr-priv" checked> Só empresas privadas</label></div>
+          <div><label class="check"><input type="checkbox" id="pr-hib" checked> Incluir híbridas (Sistema S, fundos de pensão)</label></div>
+          <div><label class="check"><input type="checkbox" id="pr-forn" checked> Excluir fornecedores</label></div>
+          <div><label class="check"><input type="checkbox" id="pr-hist" checked> Excluir quem já foi a um jantar</label></div>
+        </div>
+        <p class="meta" style="margin:0;">${totalEmp} empresa(s) na base.</p>
+      </div>
+
+      ${rodadas.length ? `
+      <div class="cartao">
+        <h2>Não repetir convidados destas rodadas</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Marque as análises anteriores cujas empresas não devem aparecer de novo.
+        </p>
+        <table>
+          ${rodadas.map(r => `<tr>
+            <td style="width:26px;"><input type="checkbox" class="pr-rod" value="${esc(r.rodada_id)}"></td>
+            <td><strong>${esc(r.patrocinador)}</strong><br>
+                <span class="meta">${esc(r.evento)} · ${dataBR(r.quando)}</span></td>
+            <td class="meta">${r.empresas} empresa(s)</td>
+          </tr>`).join("")}
+        </table>
+      </div>` : ""}
+
+      <div class="cartao">
+        <button class="btn" id="pr-rodar">Analisar</button>
+        <span class="meta" style="margin-left:10px;">
+          Pesquisa o patrocinador na web e pontua cada empresa. Leva alguns minutos.
+        </span>
+        <div id="pr-aviso" style="margin-top:10px;"></div>
+      </div>
+
+      <div id="pr-status"></div>
+      <div id="pr-resultado"></div>`;
+
+    // escolher o jantar preenche o nome do patrocinador
+    $("#pr-sessao").addEventListener("change", e => {
+      const p = e.target.selectedOptions[0]?.dataset?.patro || "";
+      if(p) $("#pr-nome").value = p;
+    });
+
+    // híbridas só faz sentido quando "só privadas" está ligado
+    const sincHib = () => { $("#pr-hib").disabled = !$("#pr-priv").checked; };
+    $("#pr-priv").addEventListener("change", sincHib);
+    sincHib();
+
+    $("#pr-rodar").addEventListener("click", rodarProspeccao);
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+async function rodarProspeccao(){
+  const btn = $("#pr-rodar");
+  const nome = $("#pr-nome").value.trim();
+
+  if(!nome){
+    aviso("#pr-aviso","Informe a empresa patrocinadora — é o perfil dela que define a aderência.");
+    return;
+  }
+
+  PROSP_PATRO = nome;
+  PROSP_EXECS = $("#pr-execs").value;
+
+  btn.disabled = true;
+  const status = t => $("#pr-status").innerHTML = `<p class="carregando">${esc(t)}</p>`;
+
+  try{
+    // rodadas marcadas viram lista de empresas bloqueadas
+    const marcadas = $$(".pr-rod:checked").map(c => c.value);
+    let bloquear = [];
+    if(marcadas.length){
+      status("Levantando empresas das rodadas anteriores…");
+      for(const r of marcadas){
+        const emp = await rpc("admin_empresas_da_rodada", { p_rodada: r });
+        bloquear = bloquear.concat(emp.map(x => x.empresa));
+      }
+    }
+
+    status("Buscando empresas na base…");
+    let base = await rpc("admin_prospeccao_base", {
+      p_evento_slug: EVENTO,
+      p_excluir_fornecedores: $("#pr-forn").checked,
+      p_excluir_empresas: bloquear.length ? bloquear : null,
+      p_excluir_convidados: $("#pr-hist").checked,
+      p_tipo_sessao: "jantar",
+      p_limite: 500
+    });
+
+    if(base.length === 0){
+      $("#pr-status").innerHTML = "";
+      aviso("#pr-aviso","Nenhuma empresa nova com esses filtros. Tente desmarcar rodadas anteriores ou o histórico.");
+      btn.disabled = false; return;
+    }
+
+    // ---- abrangência geográfica interpretada pela IA ----
+    const abr = $("#pr-abr").value.trim();
+    if(abr){
+      status(`Interpretando a abrangência "${abr}"…`);
+      const pares = [...new Set(base.map(e =>
+        `${(e.cidade||"").trim()}|${(e.estado||"").trim()}`))].filter(p => p !== "|");
+
+      if(pares.length){
+        try{
+          const idx = await ia(
+            `Abrangência geográfica desejada (texto do organizador do evento): "${abr}"\n\n` +
+            `Lista de localidades (indice: cidade|UF):\n` +
+            pares.map((p,i) => `${i}: ${p}`).join("\n") +
+            `\n\nQuais índices pertencem a essa abrangência? Interprete com bom senso: ` +
+            `"e região"/"entorno" inclui a região metropolitana e municípios vizinhos; ` +
+            `siglas como BSB = Brasília; "todo o Brasil" = todos. ` +
+            `Responda APENAS um array JSON de índices, sem markdown. Ex.: [0,3,7]`,
+            { json: true, maxTokens: 1500 });
+
+          const ok = new Set((Array.isArray(idx) ? idx : []).map(Number)
+            .map(i => pares[i]).filter(Boolean).map(p => p.toUpperCase()));
+
+          if(ok.size){
+            base = base.filter(e =>
+              ok.has(`${(e.cidade||"").trim()}|${(e.estado||"").trim()}`.toUpperCase()));
+          }
+        }catch(e){
+          // Se a IA falhar, cai para comparação textual simples em vez
+          // de ignorar o filtro e trazer o Brasil inteiro.
+          const a = abr.toUpperCase();
+          base = base.filter(e => {
+            const cid = (e.cidade||"").trim().toUpperCase();
+            const est = (e.estado||"").trim().toUpperCase();
+            return (cid && a.includes(cid)) || (est && a.includes(est));
+          });
+          status("Não consegui interpretar a abrangência; usei comparação simples.");
+        }
+      }
+    }
+
+    if(base.length === 0){
+      $("#pr-status").innerHTML = "";
+      aviso("#pr-aviso",`Nenhuma empresa dentro de "${abr}". Amplie a abrangência.`);
+      btn.disabled = false; return;
+    }
+
+    // ---- perfil do patrocinador ----
+    status(`Pesquisando o perfil de ${nome}…`);
+    const site = $("#pr-site").value.trim();
+    let perfil = nome + (site ? " — " + site : "");
+    try{
+      perfil = await ia(
+        `Pesquise a empresa "${nome}"${site ? ` (site: ${site})` : ""} e responda em no máximo ` +
+        `120 palavras: o que ela vende, principais serviços/produtos, e que perfil de cliente ` +
+        `empresarial ela busca. Responda só o texto, sem preâmbulo.`,
+        { buscarWeb: true, maxTokens: 600 });
+    }catch(e){
+      status(`Não consegui pesquisar ${nome} na web. Seguindo com o cadastro.`);
+    }
+
+    // ---- classificação e score em lotes ----
+    const soPriv = $("#pr-priv").checked;
+    const incHib = $("#pr-hib").checked;
+    const perfilDesejado = $("#pr-perfil").value.trim();
+    const fatMin = $("#pr-fatmin").value.trim();
+    const obs = $("#pr-obs").value.trim();
+
+    const regraIncluir = soPriv
+      ? (incHib
+          ? '- incluir=true para privadas e híbridas; incluir=false para públicas.'
+          : '- incluir=true somente para privadas; false para híbridas e públicas.')
+      : '- incluir=true para todas.';
+
+    const LOTE = 12;
+    const nLotes = Math.ceil(base.length / LOTE);
+    const saida = [];
+
+    for(let i = 0; i < nLotes; i++){
+      status(`Analisando aderência — lote ${i+1} de ${nLotes} (${base.length} empresas)…`);
+      const chunk = base.slice(i*LOTE, (i+1)*LOTE);
+
+      const lista = chunk.map((e,j) =>
+        `${j}|${e.empresa}|seg:${e.segmento||"?"}|fat:${e.faturamento||"?"}|func:${e.funcionarios||"?"}`
+      ).join("\n");
+
+      const prompt = `Você é analista de prospecção B2B.
+
+PATROCINADOR (quem vai oferecer o jantar): ${nome}
+Perfil: ${perfil}
+${perfilDesejado ? "Perfil de convidado desejado: " + perfilDesejado : ""}
+${fatMin ? "Faturamento mínimo desejado: " + fatMin : ""}
+${obs ? "Observações do organizador: " + obs : ""}
+
+REGRAS DE CLASSIFICAÇÃO:
+- natureza "privada": empresa privada comum.
+- natureza "hibrida": Sistema S (SENAI/SESI/SESC/SEBRAE/SEST SENAT), serviços sociais autônomos, fundações/associações privadas ligadas a estatais (ex.: fundos de pensão, autogestões de saúde), capital misto.
+- natureza "publica": órgãos de governo, autarquias, tribunais, ministérios, forças armadas, estatais puras, organismos internacionais.
+${regraIncluir}
+- score 0-100 = aderência comercial entre a empresa e o que o patrocinador vende (porte, segmento, maturidade provável).
+
+EMPRESAS (indice|nome|dados):
+${lista}
+
+Responda APENAS um array JSON, sem markdown, um objeto por empresa:
+[{"i":0,"natureza":"privada","incluir":true,"score":85,"just":"máx 15 palavras"}]`;
+
+      let arr = [];
+      try{
+        arr = await ia(prompt, { json: true, maxTokens: 2000 }) || [];
+      }catch(e){ arr = []; }
+
+      chunk.forEach((e,j) => {
+        const m = (Array.isArray(arr) ? arr : []).find(x => x.i === j) || {};
+        saida.push({
+          ...e,
+          natureza: m.natureza || "privada",
+          incluir: m.incluir !== false,
+          score: Math.max(0, Math.min(100, Number(m.score) || 50)),
+          just: m.just || "",
+          manter: m.incluir !== false,
+          sem_analise: !m.natureza
+        });
+      });
+    }
+
+    saida.sort((a,b) => b.score - a.score);
+
+    // limite conta ASSENTOS, não empresas: com 2 executivos, uma
+    // empresa ocupa duas vagas do jantar
+    const cap = parseInt($("#pr-max").value, 10);
+    if(cap > 0){
+      let vagas = 0;
+      for(const r of saida){
+        if(!r.incluir){ r.manter = false; continue; }
+        const assentos = PROSP_EXECS === "2" ? (r.exec2_nome ? 2 : 1) : 1;
+        if(vagas + assentos <= cap){ r.manter = true; vagas += assentos; }
+        else r.manter = false;
+      }
+    }
+
+    PROSP = saida;
+    $("#pr-status").innerHTML = "";
+    desenharProspeccao();
+  }catch(e){
+    $("#pr-status").innerHTML = "";
+    aviso("#pr-aviso", explicar(e));
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+const assentosDe = r => PROSP_EXECS === "2" ? (r.exec2_nome ? 2 : 1) : 1;
+
+function desenharProspeccao(){
+  const box = $("#pr-resultado");
+  const dentro = PROSP.filter(r => r.manter && r.incluir);
+  const nConvidados = dentro.reduce((n,r) => n + assentosDe(r), 0);
+  const semAnalise = PROSP.filter(r => r.sem_analise).length;
+
+  box.innerHTML = `
+    <div class="cartao">
+      <div class="cartao-cab" style="margin-bottom:10px;">
+        <div>
+          <h2 style="margin:0;">${dentro.length} empresa(s) · ${nConvidados} convidado(s)</h2>
+          <p class="meta">de ${PROSP.length} analisada(s)${semAnalise ? ` · ${semAnalise} sem pontuação (revise)` : ""}</p>
+        </div>
+        <div style="white-space:nowrap;">
+          <button class="btn sec mini" id="pr-x-completa">Análise completa</button>
+          <button class="btn sec mini" id="pr-x-validacao">Validação</button>
+          <button class="btn sec mini" id="pr-x-sympla">Convites Sympla</button>
+          <button class="btn sec mini" id="pr-copiar">Copiar e-mails</button>
+        </div>
+      </div>
+      <div class="rolagem" style="max-height:460px;">
+        <table>
+          <tr><th></th><th>Empresa</th><th>Executivos</th><th>Porte</th>
+              <th>Natureza</th><th>Aderência</th><th>Por quê</th></tr>
+          ${PROSP.map((r,i) => `<tr data-i="${i}" ${r.incluir ? "" : 'style="opacity:.5"'}>
+            <td><input type="checkbox" class="pr-pick" ${r.manter ? "checked" : ""}></td>
+            <td><strong>${esc(r.empresa)}</strong>
+                <br><span class="meta">${esc(r.segmento||"—")}${r.cidade ? " · "+esc(r.cidade) : ""}${r.estado ? "/"+esc(r.estado) : ""}</span>
+                ${r.ja_convidado_em ? `<br><span class="selo alerta">já foi em ${esc(r.ja_convidado_em)}</span>` : ""}</td>
+            <td>${esc(r.exec1_nome||"—")}<br><span class="meta">${esc(r.exec1_cargo||"")}</span>
+                ${r.exec2_nome ? `<br>${PROSP_EXECS === "2"
+                    ? `${esc(r.exec2_nome)}<br><span class="meta">${esc(r.exec2_cargo||"")}</span>`
+                    : `<span class="meta">2ª opção: ${esc(r.exec2_nome)}</span>`}` : ""}</td>
+            <td class="meta">${esc(r.faturamento||"—")}${r.funcionarios ? `<br>${esc(r.funcionarios)} func.` : ""}</td>
+            <td><span class="selo ${r.natureza==="publica"?"erro":r.natureza==="hibrida"?"alerta":"pend"}">${esc(r.natureza)}</span></td>
+            <td><span class="selo ${r.score>=70?"ok":r.score>=50?"alerta":"pend"}">${r.score}%</span></td>
+            <td class="meta">${esc(r.just||"—")}</td>
+          </tr>`).join("")}
+        </table>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn" id="pr-salvar">Salvar seleção</button>
+        <span class="meta" id="pr-conta" style="margin-left:10px;"></span>
+      </div>
+      <div id="pr-aviso2"></div>
+    </div>`;
+
+  const sincronizar = () => {
+    $$(".pr-pick").forEach((c,i) => PROSP[i].manter = c.checked);
+    const sel = PROSP.filter(r => r.manter);
+    const n = sel.reduce((s,r) => s + assentosDe(r), 0);
+    $("#pr-conta").textContent = `${sel.length} empresa(s) · ${n} convidado(s)`;
+  };
+  $$(".pr-pick").forEach(c => c.addEventListener("change", sincronizar));
+  sincronizar();
+
+  const sel = () => PROSP.filter(r => r.manter);
+  const arq = s => `Jantar_${PROSP_PATRO.replace(/\W+/g,"_")}_${s}.xlsx`;
+
+  $("#pr-x-completa").addEventListener("click", () => exportar(
+    sel().map((r,i) => ({
+      n: i+1,
+      exec1: r.exec1_nome || "—", cargo1: r.exec1_cargo || "—",
+      exec2: r.exec2_nome || "—", cargo2: r.exec2_cargo || "—",
+      empresa: r.empresa, segmento: r.segmento,
+      natureza: r.natureza, score: r.score + "%", just: r.just
+    })),
+    [["n","#"],["exec1","Executivo Principal"],["cargo1","Cargo"],
+     ["exec2","2ª Opção"],["cargo2","Cargo (2ª Opção)"],
+     ["empresa","Empresa"],["segmento","Segmento"],["natureza","Natureza"],
+     ["score","% Aderência"],["just","Justificativa"]],
+    arq("Analise_Completa"), "Lista"));
+
+  $("#pr-x-validacao").addEventListener("click", () => exportar(
+    sel().map((r,i) => ({
+      n: i+1, empresa: r.empresa, segmento: r.segmento,
+      cidade: r.cidade || "—", estado: r.estado || "—", score: r.score + "%"
+    })),
+    [["n","#"],["empresa","Empresa"],["segmento","Segmento"],
+     ["cidade","Cidade"],["estado","Estado"],["score","% Aderência"]],
+    arq("Validacao"), "Lista"));
+
+  $("#pr-x-sympla").addEventListener("click", () => {
+    // uma linha POR EXECUTIVO, não por empresa: é o formato que o
+    // Sympla importa
+    const linhas = [];
+    sel().forEach(r => {
+      const execs = PROSP_EXECS === "2"
+        ? [[r.exec1_nome, r.exec1_cargo, r.exec1_email, r.exec1_telefone],
+           [r.exec2_nome, r.exec2_cargo, r.exec2_email, r.exec2_telefone]]
+        : [[r.exec1_nome, r.exec1_cargo, r.exec1_email, r.exec1_telefone]];
+
+      execs.forEach(([n,c,em,t]) => {
+        if(!n) return;
+        const partes = String(n).split(/\s+/);
+        linhas.push({
+          nome: partes[0] || "", sobrenome: partes.slice(1).join(" "),
+          email: em || "", telefone: t || "", empresa: r.empresa, cargo: c || ""
+        });
+      });
+    });
+
+    exportar(linhas, [["nome","Nome"],["sobrenome","Sobrenome"],["email","E-mail"],
+      ["telefone","Telefone"],["empresa","Empresa"],["cargo","Cargo"]],
+      arq("Convites_Sympla"), "Convites");
+
+    const semEmail = linhas.filter(l => !l.email).length;
+    if(semEmail) aviso("#pr-aviso2",
+      `${semEmail} convidado(s) sem e-mail na base — complete antes de importar no Sympla.`);
+  });
+
+  $("#pr-copiar").addEventListener("click", async () => {
+    const emails = [];
+    sel().forEach(r => {
+      emails.push(r.exec1_email);
+      if(PROSP_EXECS === "2") emails.push(r.exec2_email);
+    });
+    const unicos = [...new Set(emails.map(e => (e||"").trim()).filter(Boolean))];
+
+    if(!unicos.length){ aviso("#pr-aviso2","Nenhum e-mail na base para os selecionados."); return; }
+    const texto = unicos.join(";");
+    try{
+      await navigator.clipboard.writeText(texto);
+      const total = sel().reduce((s,r) => s + assentosDe(r), 0);
+      aviso("#pr-aviso2",
+        `${unicos.length} e-mail(s) copiados no formato Sympla` +
+        (total > unicos.length ? ` — ${total - unicos.length} sem e-mail na base` : "") +
+        ". Cole em Divulgue → Convite por e-mail.", "ok");
+    }catch{
+      window.prompt("Copie a lista de e-mails:", texto);
+    }
+  });
+
+  $("#pr-salvar").addEventListener("click", async () => {
+    const b = $("#pr-salvar");
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      const r = await rpc("admin_salvar_prospeccao", {
+        p_evento_slug: EVENTO,
+        p_sessao_id: $("#pr-sessao").value || null,
+        p_itens: PROSP.map(x => ({
+          gestor_id: x.exec1_id, empresa: x.empresa, score: x.score,
+          natureza: x.natureza, justificativa: x.just, aprovado: !!x.manter
+        }))
+      });
+      aviso("#pr-aviso2",
+        `${r.salvos} registro(s) salvos. Esta rodada passa a aparecer na lista de "não repetir".`,
+        "ok");
+    }catch(e){ aviso("#pr-aviso2", explicar(e)); }
+    finally{ b.disabled = false; b.textContent = "Salvar seleção"; }
+  });
+}
+
+// =====================================================================
+// ABA: PRECOS
+// =====================================================================
+// Itens lidos por nome no calculo da fatura. Nao podem ser removidos;
+// para nao cobrar, o valor fica em zero.
+const ITENS_FIXOS = ["acompanhante_adulto","crianca","transfer"];
+
+ABAS.precos = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Preços do evento</h1>
+    <p class="sub">Valores usados no cálculo da fatura adicional. Cada evento tem a sua tabela.</p>
+
+    <div class="cartao">
+      <h2>Adicionar ou alterar</h2>
+      <div class="barra">
+        <div><label>Item</label>
+          <input type="text" id="pr-item" list="pr-sugestoes" placeholder="ex.: crianca">
+          <datalist id="pr-sugestoes">
+            <option value="acompanhante_adulto">
+            <option value="crianca">
+            <option value="transfer">
+            <option value="quarto_single">
+            <option value="quarto_duplo">
+            <option value="quarto_triplo">
+          </datalist></div>
+        <div><label>Descrição</label><input type="text" id="pr-desc" placeholder="Como aparece na fatura"></div>
+        <div style="max-width:110px;"><label>Idade de</label><input type="text" id="pr-imin" placeholder="—"></div>
+        <div style="max-width:110px;"><label>até</label><input type="text" id="pr-imax" placeholder="—"></div>
+        <div style="max-width:150px;"><label>Valor (R$)</label><input type="text" id="pr-valor" placeholder="0,00"></div>
+        <div style="min-width:auto;"><button class="btn" id="pr-salvar">Salvar preço</button></div>
+      </div>
+      <p class="meta" style="margin:0 0 8px;">
+        Deixe as idades em branco para preço único. Para cobrar por faixa, crie uma linha
+        por faixa — ex.: criança <strong>0 a 5</strong> cortesia, <strong>6 a 11</strong> meia,
+        <strong>12 ou mais</strong> inteira. A idade considerada é a do início do evento.
+      </p>
+      <div id="pr-aviso"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Tabela atual</h2>
+      <div id="pr-lista"><p class="carregando">Carregando…</p></div>
+    </div>`;
+
+  $("#pr-salvar").addEventListener("click", salvarPreco);
+  $("#pr-valor").addEventListener("keydown", e => { if(e.key==="Enter") salvarPreco(); });
+  listarPrecos();
+};
+
+// Aceita "1.234,56" e "1234.56": a pessoa digita como está acostumada.
+function lerValor(txt){
+  const t = String(txt||"").trim().replace(/[^\d.,-]/g,"");
+  if(!t) return NaN;
+  const v = t.includes(",") ? t.replace(/\./g,"").replace(",",".") : t;
+  return Number(v);
+}
+
+async function listarPrecos(){
+  try{
+    const l = await rpc("admin_listar_precos", { p_evento_slug: EVENTO });
+    $("#pr-lista").innerHTML = l.length === 0
+      ? `<div class="vazio">Nenhum preço cadastrado. Adicione acima.</div>`
+      : `<table>
+          <tr><th>Item</th><th>Descrição / faixa</th><th>Valor</th><th></th></tr>
+          ${l.map(p => `<tr data-id="${esc(p.id)}" data-item="${esc(p.item)}"
+                            data-desc="${esc(p.descricao||"")}" data-valor="${p.valor}"
+                            data-imin="${p.idade_min ?? ""}" data-imax="${p.idade_max ?? ""}">
+            <td class="meta">${esc(p.item)}
+              ${ITENS_FIXOS.includes(p.item) ? `<br><span class="selo pend">usado na fatura</span>` : ""}</td>
+            <td>${esc(p.descricao||"—")}
+              ${p.faixa ? `<br><span class="selo alerta">${esc(p.faixa.trim())}</span>` : ""}</td>
+            <td><strong>${moeda(p.valor)}</strong></td>
+            <td style="white-space:nowrap;">
+              <button class="btn sec mini editar">Editar</button>
+              <button class="btn perigo mini apagar">Remover</button>
+            </td></tr>`).join("")}</table>`;
+
+    $$("#pr-lista .editar").forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      $("#pr-item").value  = tr.dataset.item;
+      $("#pr-desc").value  = tr.dataset.desc;
+      $("#pr-imin").value  = tr.dataset.imin;
+      $("#pr-imax").value  = tr.dataset.imax;
+      $("#pr-valor").value = String(tr.dataset.valor).replace(".",",");
+      $("#pr-item").focus();
+      window.scrollTo({ top:0, behavior:"smooth" });
+    }));
+
+    $$("#pr-lista .apagar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!confirm(`Remover o preço "${tr.dataset.item}"?`)) return;
+      b.disabled = true;
+      try{
+        await rpc("admin_remover_preco", { p_preco_id: tr.dataset.id });
+        listarPrecos();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+  }catch(e){ aviso("#pr-lista", explicar(e)); }
+}
+
+async function salvarPreco(){
+  const item  = $("#pr-item").value.trim();
+  const valor = lerValor($("#pr-valor").value);
+
+  if(!item){ aviso("#pr-aviso","Informe o item."); return; }
+  if(Number.isNaN(valor)){ aviso("#pr-aviso","Informe um valor numérico."); return; }
+  if(valor < 0){ aviso("#pr-aviso","O valor não pode ser negativo."); return; }
+
+  const idade = s => {
+    const v = $(s).value.trim();
+    if(v === "") return null;
+    const n = parseInt(v, 10);
+    return Number.isNaN(n) ? undefined : n;
+  };
+  const imin = idade("#pr-imin"), imax = idade("#pr-imax");
+
+  if(imin === undefined || imax === undefined){
+    aviso("#pr-aviso","Idade precisa ser um número, ou em branco."); return;
+  }
+  if(imin !== null && imax !== null && imax < imin){
+    aviso("#pr-aviso","A idade final é menor que a inicial."); return;
+  }
+
+  const btn = $("#pr-salvar");
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try{
+    const r = await rpc("admin_salvar_preco", {
+      p_evento_slug: EVENTO, p_item: item, p_valor: valor,
+      p_descricao: $("#pr-desc").value.trim() || null,
+      p_idade_min: imin, p_idade_max: imax
+    });
+    aviso("#pr-aviso",
+      `Preço de "${r.item}"${r.faixa || ""} salvo em ${moeda(valor)}.`, "ok");
+    ["#pr-item","#pr-desc","#pr-valor","#pr-imin","#pr-imax"]
+      .forEach(s => $(s).value = "");
+    listarPrecos();
+  }catch(e){ aviso("#pr-aviso", explicar(e)); }
+  finally{ btn.disabled = false; btn.textContent = "Salvar preço"; }
+}
+
+// =====================================================================
+// ABA: EQUIPE
+// =====================================================================
+ABAS.equipe = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Equipe <span class="escopo-global">todos os eventos</span></h1>
+    <p class="sub">Quem acessa o painel, em qualquer edição. O login é por link no e-mail — o endereço precisa estar exato.</p>
+
+    <div class="cartao">
+      <h2>Adicionar ou alterar</h2>
+      <div class="barra">
+        <div><label>E-mail</label><input type="email" id="eq-email" placeholder="pessoa@ciocerrado.com.br"></div>
+        <div><label>Nome</label><input type="text" id="eq-nome"></div>
+        <div style="max-width:190px;"><label>Perfil</label>
+          <select id="eq-role">
+            <option value="staff">Staff — operação do dia</option>
+            <option value="admin">Admin — acesso total</option>
+          </select></div>
+        <div style="min-width:auto;"><button class="btn" id="eq-salvar">Salvar</button></div>
+      </div>
+      <p class="meta" style="margin:0 0 8px;">
+        Staff opera check-in, etiquetas, alocação e relatórios.
+        Admin também aprova inscrições, importa cadastro, edita preços e gerencia a equipe.
+      </p>
+      <div id="eq-aviso"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Acessos ativos</h2>
+      <div id="eq-lista"><p class="carregando">Carregando…</p></div>
+    </div>`;
+
+  $("#eq-salvar").addEventListener("click", salvarMembro);
+  listarEquipe();
+};
+
+async function listarEquipe(){
+  try{
+    const l = await rpc("admin_listar_equipe");
+    const { data:{ user } } = await sb.auth.getUser();
+    const meu = (user?.email || "").toLowerCase();
+
+    $("#eq-lista").innerHTML = `<table>
+      <tr><th>E-mail</th><th>Nome</th><th>Perfil</th><th>Desde</th><th></th></tr>
+      ${l.map(m => {
+        const souEu = m.email.toLowerCase() === meu;
+        return `<tr data-id="${esc(m.id)}" data-email="${esc(m.email)}"
+                    data-nome="${esc(m.nome||"")}" data-role="${esc(m.role)}">
+          <td>${esc(m.email)} ${souEu ? `<span class="selo ok">você</span>` : ""}</td>
+          <td>${esc(m.nome||"—")}</td>
+          <td><span class="selo ${m.role==="admin"?"alerta":"pend"}">${esc(m.role)}</span></td>
+          <td class="meta">${dataBR(m.created_at)}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn sec mini editar">Editar</button>
+            ${souEu ? "" : `<button class="btn perigo mini apagar">Remover</button>`}
+          </td></tr>`;
+      }).join("")}</table>`;
+
+    $$("#eq-lista .editar").forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      $("#eq-email").value = tr.dataset.email;
+      $("#eq-nome").value  = tr.dataset.nome;
+      $("#eq-role").value  = tr.dataset.role;
+      $("#eq-email").focus();
+      window.scrollTo({ top:0, behavior:"smooth" });
+    }));
+
+    $$("#eq-lista .apagar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!confirm(`Remover o acesso de ${tr.dataset.email}?`)) return;
+      b.disabled = true;
+      try{
+        await rpc("admin_remover_membro", { p_id: tr.dataset.id });
+        listarEquipe();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+  }catch(e){ aviso("#eq-lista", explicar(e)); }
+}
+
+async function salvarMembro(){
+  const email = $("#eq-email").value.trim();
+  if(!email){ aviso("#eq-aviso","Informe o e-mail."); return; }
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    aviso("#eq-aviso","E-mail inválido. Um endereço errado aqui vira acesso que nunca funciona.");
+    return;
+  }
+
+  const btn = $("#eq-salvar");
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try{
+    await rpc("admin_salvar_membro", {
+      p_email: email,
+      p_nome:  $("#eq-nome").value.trim() || null,
+      p_role:  $("#eq-role").value
+    });
+    aviso("#eq-aviso", `Acesso de ${email} salvo.`, "ok");
+    ["#eq-email","#eq-nome"].forEach(s => $(s).value = "");
+    listarEquipe();
+  }catch(e){ aviso("#eq-aviso", explicar(e)); }
+  finally{ btn.disabled = false; btn.textContent = "Salvar"; }
+}
+
+async function relCheckins(){
+  const box = $("#box-checkins");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  try{
+    const resumo = await rpc("admin_rel_checkins_resumo", { p_evento_slug: EVENTO });
+    const total = resumo.reduce((s,r) => s + Number(r.total_checkins), 0);
+
+    box.innerHTML = `
+      <p class="meta" style="margin:10px 0;">
+        ${resumo.length} patrocinador(es) · ${total} check-in(s) no total.
+      </p>
+      <button class="btn sec mini" id="x-resumo">Exportar resumo</button>
+      <div class="rolagem" style="max-height:280px;margin-top:10px;">
+        <table><tr><th>Empresa</th><th>Check-ins</th><th></th></tr>
+        ${resumo.map(r => `<tr data-emp="${esc(r.empresa)}">
+          <td>${esc(r.empresa)}</td><td>${r.total_checkins}</td>
+          <td><button class="btn sec mini detalhe">Detalhe</button></td></tr>`).join("")}</table>
+      </div>
+      <div id="box-detalhe"></div>`;
+
+    $("#x-resumo").addEventListener("click", () => exportar(resumo, [
+      ["empresa","Empresa"],["total_checkins","Total de Check-ins"]
+    ], "checkins-resumo.xlsx", "Resumo Geral"));
+
+    $$(".detalhe", box).forEach(b => b.addEventListener("click", async () => {
+      const emp = b.closest("tr").dataset.emp;
+      const d = $("#box-detalhe");
+      d.innerHTML = `<p class="carregando">Carregando ${esc(emp)}…</p>`;
+      try{
+        const l = await puxarTudo("admin_rel_checkins_detalhe", { p_empresa: emp });
+        d.innerHTML = `
+          <h2 style="margin-top:16px;">${esc(emp)}</h2>
+          <p class="meta">${l.length} check-in(s).</p>
+          <button class="btn sec mini" id="x-det">Exportar Excel</button>
+          <div class="rolagem" style="max-height:240px;margin-top:10px;">
+            <table><tr><th>Nome</th><th>E-mail</th><th>Quando</th></tr>
+            ${l.map(r => `<tr><td>${esc(r.nome)}</td><td class="meta">${esc(r.email||"—")}</td>
+              <td class="meta">${dataHora(r.registrado_em)}</td></tr>`).join("")}</table>
+          </div>`;
+        $("#x-det").addEventListener("click", () => exportar(
+          l.map(r => ({...r, registrado_em: dataHora(r.registrado_em)})),
+          [["nome","Nome do Usuário"],["email","E-mail"],["registrado_em","Data/Hora do Check-in"]],
+          `checkins-${emp.toLowerCase().replace(/[^a-z0-9]+/g,"-")}.xlsx`, emp.slice(0,30)));
+      }catch(e){ aviso(d, explicar(e)); }
+    }));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+</script>
+</body>
+</html>
