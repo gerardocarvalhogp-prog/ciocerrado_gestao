@@ -1,5 +1,5 @@
 # Supabase CLI — estado local da maquina, nao do projeto
-supabase/.temp/
+**/.temp/
 .branches/
 
 # Segredos: a service_role NUNCA entra aqui.
