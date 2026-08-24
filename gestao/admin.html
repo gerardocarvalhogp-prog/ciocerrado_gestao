@@ -1083,6 +1083,231 @@ async function relPesquisa(){
 }
 
 // =====================================================================
+// ABA: FINANCEIRO
+//
+// A fatura é recalculada do zero a cada save do rooming, mas só
+// enquanto está "estimada". Emitir é o ato que congela o valor: daí em
+// diante o portal pode mexer no quarto que a conta não muda mais.
+// Por isso o botão de recalcular avisa que só pega as estimadas.
+// =====================================================================
+const ROTULO_FAT = {
+  estimada:"Estimada", emitida:"Emitida", paga:"Paga", cancelada:"Cancelada"
+};
+const SELO_FAT = {
+  estimada:"pend", emitida:"alerta", paga:"ok", cancelada:"erro"
+};
+
+ABAS.financeiro = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+
+  try{
+    const r = await rpc("admin_financeiro_resumo", { p_evento_slug: EVENTO });
+
+    c.innerHTML = `
+      <h1>Financeiro</h1>
+      <p class="sub">
+        Valores adicionais de acompanhante, criança, transfer e quarto extra.
+        A cota do patrocinador não entra aqui — ela é do contrato.
+      </p>
+
+      <div class="cartao">
+        <p class="meta" style="margin:0;">
+          <strong style="font-size:15px;color:var(--verde);">${moeda(r.em_aberto)}</strong>
+          em aberto em ${r.qtd_aberto} fatura(s) ·
+          ${moeda(r.recebido)} recebido em ${r.qtd_pago} ·
+          total lançado ${moeda(r.total)}
+          ${Number(r.vencidas) ? ` · <span class="selo erro">${r.vencidas} vencida(s)</span>` : ""}
+        </p>
+      </div>
+
+      <div class="barra">
+        <div><label>Status</label>
+          <select id="fi-status">
+            <option value="">Todas</option>
+            <option value="estimada">Estimada</option>
+            <option value="emitida">Emitida</option>
+            <option value="paga">Paga</option>
+            <option value="cancelada">Cancelada</option>
+          </select></div>
+        <div><label>Buscar</label>
+          <input type="text" id="fi-busca" placeholder="Nome ou empresa"></div>
+        <div style="min-width:auto;">
+          <button class="btn sec" id="fi-recalcular">Recalcular estimadas</button></div>
+        <div style="min-width:auto;">
+          <button class="btn sec" id="fi-exportar">Exportar Excel</button></div>
+      </div>
+
+      <div id="fi-aviso"></div>
+      <div class="cartao"><div class="rolagem"><table id="fi-tabela"></table></div></div>
+      <div id="fi-detalhe"></div>`;
+
+    let FAT = [];
+
+    const desenhar = () => {
+      const busca = $("#fi-busca").value.toLowerCase();
+      const vis = FAT.filter(f =>
+        !busca || `${f.nome} ${f.empresa||""}`.toLowerCase().includes(busca));
+
+      $("#fi-tabela").innerHTML = `
+        <tr><th>Quem</th><th>Tipo</th><th>Itens</th><th>Valor</th>
+            <th>Status</th><th>Vencimento</th><th></th></tr>
+        ${vis.map(f => `<tr data-id="${esc(f.id)}" data-nome="${esc(f.nome)}"
+                            data-status="${esc(f.status)}">
+          <td><strong>${esc(f.nome)}</strong>
+              ${f.empresa && f.empresa !== f.nome
+                ? `<br><span class="meta">${esc(f.empresa)}</span>` : ""}
+              ${f.email ? `<br><span class="meta">${esc(f.email)}</span>` : ""}</td>
+          <td class="meta">${f.tipo === "patrocinador" ? "Patrocinador" : "Participante"}</td>
+          <td class="meta" style="max-width:260px;">${esc(f.itens || "—")}</td>
+          <td><strong>${moeda(f.total)}</strong></td>
+          <td><span class="selo ${SELO_FAT[f.status]||"pend"}">${esc(ROTULO_FAT[f.status]||f.status)}</span>
+              ${f.paga_em ? `<br><span class="meta">${dataBR(f.paga_em)}</span>` : ""}</td>
+          <td class="meta">${f.vencimento ? dataBR(f.vencimento) : "—"}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn sec mini fi-ver">Itens</button>
+            <button class="btn sec mini fi-marcar">Alterar</button>
+          </td></tr>`).join("") ||
+        `<tr><td colspan="7" style="color:var(--suave)">Nenhuma fatura com esse filtro.</td></tr>`}`;
+
+      $$("#fi-tabela .fi-ver").forEach(b =>
+        b.addEventListener("click", () => verItens(b.closest("tr"))));
+      $$("#fi-tabela .fi-marcar").forEach(b =>
+        b.addEventListener("click", () => abrirMarcar(b.closest("tr"))));
+    };
+
+    const carregar = async () => {
+      $("#fi-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+      try{
+        // pagina de verdade: uma edição com 130 CIOs e 61 patrocinadores
+        // passa folgado do teto de 1000 linhas do Data API
+        FAT = await puxarTudo("admin_listar_faturas",
+          { p_status: $("#fi-status").value || null });
+        desenhar();
+      }catch(e){ aviso("#fi-tabela", explicar(e)); }
+    };
+
+    $("#fi-status").addEventListener("change", carregar);
+    $("#fi-busca").addEventListener("input", desenhar);
+
+    $("#fi-exportar").addEventListener("click", () => exportar(FAT, [
+      ["tipo","Tipo"],["nome","Nome"],["empresa","Empresa"],["email","E-mail"],
+      ["itens","Itens"],["total","Valor"],["status","Status"],
+      ["vencimento","Vencimento"],["forma_pagamento","Forma de pagamento"],
+      ["observacao","Observação"]
+    ], "financeiro-cio-cerrado.xlsx", "Faturas"));
+
+    $("#fi-recalcular").addEventListener("click", async () => {
+      if(!confirm("Recalcular as faturas estimadas deste evento?\n\n" +
+                  "As já emitidas, pagas ou canceladas não são tocadas.")) return;
+      const b = $("#fi-recalcular");
+      b.disabled = true; b.textContent = "Recalculando…";
+      try{
+        const x = await rpc("admin_recalcular_faturas", { p_evento_slug: EVENTO });
+        aviso("#fi-aviso",
+          `${x.participantes} participante(s) e ${x.patrocinadores} patrocinador(es) ` +
+          `recalculados · total ${moeda(x.total)}.`, "ok");
+        ABAS.financeiro();
+      }catch(e){
+        aviso("#fi-aviso", explicar(e));
+        b.disabled = false; b.textContent = "Recalcular estimadas";
+      }
+    });
+
+    await carregar();
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+async function verItens(tr){
+  const box = $("#fi-detalhe");
+  box.innerHTML = `<p class="carregando">Carregando itens…</p>`;
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+  try{
+    const l = await rpc("admin_fatura_itens", { p_fatura_id: tr.dataset.id });
+    box.innerHTML = `
+      <h2 style="margin-top:16px;">Itens · ${esc(tr.dataset.nome)}</h2>
+      <div class="cartao">
+        ${l.length ? `<table>
+          <tr><th>Descrição</th><th>Qtd</th><th>Unitário</th><th>Total</th></tr>
+          ${l.map(i => `<tr>
+            <td>${esc(i.descricao)}</td>
+            <td class="meta">${i.quantidade}</td>
+            <td class="meta">${moeda(i.valor_unit)}</td>
+            <td><strong>${moeda(i.valor_total)}</strong></td>
+          </tr>`).join("")}
+        </table>` : `<div class="vazio">
+          Sem itens. A fatura fica em zero quando não há acompanhante,
+          criança, transfer nem quarto extra.
+        </div>`}
+      </div>`;
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+function abrirMarcar(tr){
+  const box = $("#fi-detalhe");
+  const atual = tr.dataset.status;
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+  box.innerHTML = `
+    <h2 style="margin-top:16px;">Alterar · ${esc(tr.dataset.nome)}</h2>
+    <div class="cartao">
+      <p class="sub" style="margin-bottom:12px;">
+        Emitir congela o valor: a partir daí o recálculo automático deixa de
+        mexer nesta fatura, mesmo que o rooming mude.
+      </p>
+      <div class="barra">
+        <div style="max-width:170px;"><label>Status</label>
+          <select id="fm-status">
+            ${["estimada","emitida","paga","cancelada"].map(s =>
+              `<option value="${s}" ${s===atual?"selected":""}>${ROTULO_FAT[s]}</option>`).join("")}
+          </select></div>
+        <div style="max-width:180px;"><label>Vencimento</label>
+          <input type="date" id="fm-venc"></div>
+        <div style="max-width:200px;"><label>Forma de pagamento</label>
+          <input type="text" id="fm-forma" placeholder="Pix, boleto, transferência"></div>
+      </div>
+      <div class="barra">
+        <div><label>Observação</label><input type="text" id="fm-obs"></div>
+      </div>
+      <div id="fm-aviso"></div>
+      <button class="btn" id="fm-salvar">Salvar</button>
+      <button class="btn sec" id="fm-cancelar" style="margin-left:6px;">Fechar</button>
+    </div>`;
+
+  $("#fm-cancelar").addEventListener("click", () => box.innerHTML = "");
+
+  $("#fm-salvar").addEventListener("click", async () => {
+    const b = $("#fm-salvar");
+    const status = $("#fm-status").value;
+
+    // a forma de pagamento só é gravada quando o status é "paga"; pedir
+    // aqui evita a pessoa preencher e o valor sumir sem explicação
+    if(status === "paga" && !$("#fm-forma").value.trim()){
+      aviso("#fm-aviso","Informe a forma de pagamento para marcar como paga.");
+      return;
+    }
+
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      const x = await rpc("admin_marcar_fatura", {
+        p_fatura_id: tr.dataset.id,
+        p_status: status,
+        p_forma_pagamento: $("#fm-forma").value.trim() || null,
+        p_observacao: $("#fm-obs").value.trim() || null,
+        p_vencimento: $("#fm-venc").value || null
+      });
+      aviso("#aviso-global",
+        `${tr.dataset.nome}: ${ROTULO_FAT[x.de]||x.de} → ${ROTULO_FAT[x.para]||x.para}.`, "ok");
+      box.innerHTML = "";
+      ABAS.financeiro();
+    }catch(e){
+      aviso("#fm-aviso", explicar(e));
+      b.disabled = false; b.textContent = "Salvar";
+    }
+  });
+}
+
+// =====================================================================
 // ABA: ESTRUTURA  (evento · cotas · quartos)
 // =====================================================================
 ABAS.estrutura = async function(){
