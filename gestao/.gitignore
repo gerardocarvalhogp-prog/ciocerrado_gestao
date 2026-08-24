@@ -15,3 +15,4 @@ desktop.ini
 
 # Backup da reconciliacao (historico local, ja coberto pelos commits)
 _backup-meus/
+.local-preview/

@@ -657,6 +657,11 @@ async function salvarQuarto(ed, q){
       p_brinde_descricao: ed.querySelector(".f-brinde-desc").value.trim() || null
     });
     aviso("#aviso-global", `${q.rotulo} salvo.`, "ok");
+    // o contador "N preenchido(s)" do cabeçalho vem de patro_meu_painel,
+    // não da lista de quartos: sem recarregar os dois, o cartão vira
+    // PREENCHIDO e o cabeçalho continua em zero até a pessoa dar F5.
+    // Comprar e cancelar já faziam isso; salvar tinha ficado de fora.
+    await recarregarPainel();
     carregarQuartos();
   }catch(e){
     aviso(alvoAviso, explicar(e));
