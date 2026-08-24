@@ -102,9 +102,31 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 ## Estado atual
 
 - [x] Schema SQL (25 tabelas, RLS, views)
-- [ ] Funções — **começar pelo portal do patrocinador** (cotas, quartos, brindes,
-      múltiplos usuários)
-- [ ] Front do portal do patrocinador
-- [ ] Inscrição → contrato → rooming
-- [ ] Jantares e eventos menores
-- [ ] Exportações (etiquetas, app do evento, listas de importação)
+- [x] Funções — as 92 RPCs que as telas chamam existem
+- [x] Front do portal do patrocinador, rooming, admin, check-in e jantares
+- [x] Banco versionado em `supabase/migrations/` (20 migrations + seed)
+- [ ] **Nada disso rodou num Postgres ainda** — ver abaixo
+- [ ] Pagamento da fatura, webhook do Autentique, espelho de quartos do
+      resort, rastreio de brindes
+
+### O que está verificado e o que não está
+
+Conferido por análise estática, sem banco:
+
+- os nomes de parâmetro batem nas 92 chamadas (teste exato)
+- forma do retorno (tabela→array, jsonb→objeto) bate em todas
+- nenhuma coluna inexistente em `INSERT`/`UPDATE`
+- nenhuma colisão entre coluna de `RETURNS TABLE` e coluna de tabela
+  (o *"column reference is ambiguous"* que o QA de 18/08 pegou)
+
+**Não** verificado: se cada função devolve o valor certo, comportamento
+de RLS, e erro de compilação plpgsql. Isso só `supabase db reset`
+responde — é o próximo passo.
+
+### Duas armadilhas herdadas
+
+1. A cadeia `…101100` a `…102000` redefine 47 funções das migrations
+   anteriores, incluindo as correções do QA. Ordem invertida reverte as
+   correções **sem erro nenhum**.
+2. O projeto hospedado é o mesmo do sistema de massagem em produção.
+   Antes de qualquer `db push`, confira `public.norm_doc` (ver README §1).

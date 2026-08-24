@@ -1,0 +1,59 @@
+# =====================================================================
+# Supabase CLI · projeto de gestao do CIO Cerrado
+#
+# Existe para dar um banco LOCAL descartavel. O projeto remoto
+# (jlvcjqfrsxxexflvwbvn) hospeda tambem o sistema de agendamento de
+# massagem, que esta em producao no schema `public` — testar migration
+# direto la nao e opcao.
+#
+#   supabase start              sobe o banco local
+#   supabase db reset           apaga, roda as 20 migrations e o seed
+#
+# `db reset` e o teste de verdade: se as migrations nao rodam do zero,
+# o erro aparece aqui e nao no painel de producao.
+# =====================================================================
+
+project_id = "gestao-cio-cerrado"
+
+[api]
+enabled = true
+port = 54321
+
+# `gestao` PRECISA estar nesta lista, senao o supabase-js nao enxerga
+# nenhuma funcao — e o equivalente local do passo manual
+# Settings > Data API > Exposed schemas, no painel do projeto remoto.
+schemas = ["public", "graphql_public", "gestao"]
+extra_search_path = ["public", "extensions"]
+
+# O mesmo teto de 1000 linhas do projeto hospedado. Manter igual e o que
+# faz o bug de paginacao aparecer localmente em vez de so em producao —
+# o detalhe de check-ins passa disso (~130 x 61 empresas).
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# espelha o projeto remoto (17.6.1.155)
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://ciocerrado.netlify.app"]
+
+# O sistema todo entra por magic link; sem isto o login local nao funciona.
+[auth.email]
+enable_signup = true
+enable_confirmations = false

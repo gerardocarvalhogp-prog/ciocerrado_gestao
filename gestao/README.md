@@ -8,56 +8,69 @@ de massagem que ocupa o `public`.
 
 ---
 
-## 1. Banco — rodar nesta ordem
+## 1. Banco — migrations
 
-No SQL Editor do Supabase, um arquivo por vez:
+O banco vive em `supabase/migrations/`, versionado. **Não cole SQL no
+painel**: a ordem entre os arquivos é significativa (ver abaixo) e o
+painel não a garante.
 
-| # | Arquivo | O que traz |
-|---|---------|-----------|
-| 1 | `schema.sql` | 25 tabelas, RLS, views |
-| 2 | `schema-extra.sql` | `sessoes.passou_em` e `checkins.desfeito_em` — colunas que os passos 11–20 leem e nenhum deles cria |
-| 3 | `funcoes-base-helpers.sql` | `_exige_admin`, `_exige_staff`, `_exige_patrocinador`, `_meu_participante` |
-| 4 | `funcoes-patro.sql` | portal do patrocinador |
-| 5 | `funcoes-part.sql` | fluxo do participante |
-| 6 | `funcoes-admin.sql` | operação do evento |
-| 7 | `funcoes-admin-listas.sql` | relatórios paginados |
-| 8 | `funcoes-admin-config.sql` | equipe |
-| 9 | `funcoes-admin-cadastros.sql` | evento, cotas, patrocinadores, usuários, quartos |
-| 10 | `funcoes-checkin.sql` | desfazer check-in |
-| 11 | `funcoes-pesquisa.sql` | pesquisa de perfil (importação e análise) |
-| 12 | `migracao-02.sql` | cota única, composição de quartos, patrocinador enriquecido |
-| 13 | `funcoes-prospeccao.sql` | prospecção de convidados para jantares |
-| 14 | `funcoes-etiquetas.sql` | etiquetas com e sem hospedagem |
-| 15 | `funcoes-financeiro.sql` | valores extras, cobrança e recebimento |
-| 16 | `migracao-03.sql` | preço por faixa etária |
-| 17 | `correcoes-01.sql` | bugs do relatório de QA (ambiguidade de coluna, importação, match) |
-| 18 | `migracao-04.sql` | prospecção completa (posição do gestor, abrangência, 1º/2º executivo) |
-| 19 | `migracao-05.sql` | convidado avulso em jantares + check-in de quem não está na lista |
-| 20 | `migracao-06.sql` | módulo de jantares separado do evento |
-| 21 | `seed.sql` | primeiro admin, evento em rascunho, cotas e preços em zero |
+```bash
+supabase db reset
+```
 
-**A ordem 4–10 antes de 11–20 não é decorativa.** Os arquivos 11–20 são
-patches incrementais que redefinem 47 funções também presentes em 4–10 —
-entre elas as correções do QA de 18/08. Como no Postgres a última
-definição vence, inverter a ordem reverteria essas correções sem erro
-nenhum na tela.
+Apaga o banco local, roda as 20 migrations em ordem e aplica o
+`supabase/seed.sql`. É o teste de verdade — se as migrations não sobem
+do zero, o erro aparece aqui, não em produção.
 
-Os passos 2 e 3 existem porque os arquivos-base originais se perderam: a
-cadeia 11–20 chama quatro helpers `_exige_*`/`_meu_participante` e lê
-duas colunas que nenhum arquivo presente cria. Sem eles, os `CREATE`
-passam e a primeira chamada quebra em tempo de execução.
+Para aplicar no projeto hospedado, depois de passar no local:
 
-Depois, no painel do Supabase: **Settings → Data API → Settings →
-Exposed schemas** e acrescente `gestao` ao lado de `public`.
-Sem isso o `supabase-js` não enxerga nada.
+```bash
+supabase db push
+```
+
+### A ordem importa
+
+| Faixa | O que é |
+|---|---|
+| `…100100` a `…100300` | schema base, duas colunas que faltavam, helpers `_exige_*` |
+| `…100400` a `…101000` | funções base: portal, participante, admin, check-in |
+| `…101100` a `…102000` | a cadeia incremental: pesquisa, cota única, prospecção, etiquetas, financeiro, faixa etária, correções do QA, jantares |
+
+A terceira faixa **redefine 47 funções** da segunda — entre elas as
+correções do QA de 18/08. Como no Postgres a última definição vence,
+inverter a ordem reverteria essas correções sem erro nenhum na tela. Os
+timestamps já garantem isso; o cuidado é ao criar migration nova.
+
+`…100200` e `…100300` existem porque os arquivos-base originais se
+perderam: a cadeia chama quatro helpers `_exige_*`/`_meu_participante` e
+lê `sessoes.passou_em` e `checkins.desfeito_em`, que nenhum outro
+arquivo cria. Sem eles, os `CREATE` passam e a primeira chamada quebra
+em tempo de execução.
+
+### Antes do primeiro `db push`
+
+O projeto hospedado é **o mesmo do sistema de agendamento de massagem**,
+que está em produção no schema `public`. O `schema_base` avisa que uma
+tentativa anterior pode ter sobrescrito `public.norm_doc`. Confira antes:
+
+```sql
+select public.norm_doc('048.742.986-99');
+```
+
+Deve voltar `04874298699`. Se vier com ponto e hífen, o sistema de
+massagem já está com a função errada — corrija antes de seguir.
+
+### Expor o schema
+
+No projeto hospedado, uma vez: **Settings → Data API → Exposed schemas**,
+acrescente `gestao` ao lado de `public`. Sem isso o `supabase-js` não
+enxerga nada. No local isso já vem do `config.toml` (`[api] schemas`).
 
 Confira se funcionou:
 
 ```sql
 select count(*) from gestao.eventos;
 ```
-
----
 
 ## 2. Telas
 
