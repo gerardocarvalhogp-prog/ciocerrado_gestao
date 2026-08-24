@@ -1,0 +1,58 @@
+# =====================================================================
+# Netlify · CIO Cerrado
+#
+# ATENCAO AO DIRETORIO DE PUBLICACAO.
+#
+# Esta pasta e a raiz do site. Ela serve DOIS sistemas:
+#
+#   /              sistema de agendamento de massagem  (EM PRODUCAO)
+#   /gestao/       sistema de gestao de eventos
+#
+# Publicar a partir de gestao/ substituiria o site inteiro e derrubaria
+# o agendamento de massagem. O publish abaixo e "." de proposito.
+#
+#   netlify deploy --dir=.            (preview, gera URL temporaria)
+#   netlify deploy --dir=. --prod     (producao)
+#
+# Rode sempre desta pasta, nunca de dentro de gestao/.
+# =====================================================================
+
+[build]
+  publish = "."
+  # Site estatico: nao ha passo de build. Os .html carregam supabase-js
+  # e SheetJS por CDN.
+  command = ""
+
+# Sem cache no HTML: as telas carregam a chave anon e o slug do evento
+# em constantes no proprio arquivo. Com cache longo, uma correcao
+# publicada demora a chegar em quem ja abriu a pagina antes.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/gestao/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Imagens e icones mudam pouco.
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/*.webp"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+# As telas nao devem ser indexadas: sao paineis operacionais, com dados
+# de participantes atras do login.
+[[headers]]
+  for = "/gestao/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
