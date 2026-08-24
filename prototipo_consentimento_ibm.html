@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protótipo — Consentimento IBM | CIO Cerrado Experience 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --tinta:#101820;--papel:#f5f6f4;--branco:#fff;--verde:#2f7d5b;--verde-claro:#e8f2ed;
+    --linha:#dfe2de;--texto:#1b1f22;--suave:#5d6670;--alerta:#a4342b;--ambar:#8a6d1f;--demo:#2b3a8f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--papel);color:var(--texto);font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;line-height:1.55}
+  .demo-bar{
+    background:var(--demo);color:#fff;padding:10px 18px;font-size:13px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;position:sticky;top:0;z-index:20;
+  }
+  .demo-bar b{letter-spacing:.08em;text-transform:uppercase;font-size:11px;background:rgba(255,255,255,.16);padding:3px 9px;border-radius:99px}
+  .demo-bar .grupo{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .demo-bar button{
+    font:inherit;font-weight:600;font-size:13px;cursor:pointer;border-radius:8px;padding:6px 13px;
+    border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;
+  }
+  .demo-bar button.on{background:#fff;color:var(--demo);border-color:#fff}
+  header.barra{background:var(--tinta);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .marca-txt{font-weight:700;letter-spacing:.06em;font-size:14px}
+  main{max-width:760px;margin:0 auto;padding:26px 20px 70px}
+  main.largo{max-width:1180px}
+  .cartao{background:var(--branco);border:1px solid var(--linha);border-radius:14px;padding:26px 24px;margin-bottom:18px}
+  h1{font-size:24px;line-height:1.25;margin:0 0 8px;font-weight:600}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--suave);font-weight:600;margin-bottom:10px}
+  p{margin:0 0 14px}
+  .suave{color:var(--suave);font-size:14px}
+  label.campo{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+  input[type=email],input[type=tel],input[type=search],select{width:100%;padding:12px 14px;border:1px solid var(--linha);border-radius:10px;font:inherit;background:#fff}
+  input:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--verde);outline-offset:2px}
+  button{font:inherit;font-weight:600;cursor:pointer;border-radius:10px;padding:13px 22px;border:1px solid transparent}
+  .btn-primario{background:var(--verde);color:#fff;width:100%}
+  .btn-primario:hover{background:#27684b}
+  .btn-secundario{background:#fff;border:1px solid var(--linha);color:var(--texto);padding:11px 18px;width:auto}
+  .btn-secundario:hover{border-color:var(--verde);color:var(--verde)}
+  .alternador{display:flex;gap:8px;margin-bottom:12px}
+  .alternador button{flex:1;background:#fff;border:1px solid var(--linha);color:var(--suave);padding:10px 12px;font-size:14px;border-radius:10px;width:auto}
+  .alternador button.on{background:var(--verde-claro);border-color:var(--verde);color:#1f5a41}
+  .ficha{border:1px solid var(--linha);border-radius:12px;background:#fbfcfb;padding:16px 18px;margin-bottom:22px;font-size:14.5px}
+  .ficha .linha{display:flex;justify-content:space-between;gap:14px;padding:6px 0;border-bottom:1px dashed var(--linha)}
+  .ficha .linha:last-child{border:0}
+  .ficha .rot{color:var(--suave);white-space:nowrap}
+  .ficha .val{font-weight:500;text-align:right}
+  details.teste{margin-top:18px;border-top:1px dashed var(--linha);padding-top:14px}
+  details.teste summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--demo)}
+  .linha-teste{display:block;width:100%;text-align:left;background:#fbfcfb;border:1px solid var(--linha);border-radius:9px;
+    padding:9px 12px;margin-bottom:6px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;cursor:pointer;color:var(--texto)}
+  .linha-teste:hover{border-color:var(--demo)}
+  .linha-teste b{font-family:'IBM Plex Sans',sans-serif}
+  .aviso-dp{background:var(--verde-claro);border-left:4px solid var(--verde);padding:16px 18px;border-radius:0 10px 10px 0;font-size:14.5px;margin:4px 0 22px}
+  .aviso-dp strong{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#1f5a41;margin-bottom:8px}
+  .opcao{display:flex;gap:13px;align-items:flex-start;border:1px solid var(--linha);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;background:#fff}
+  .opcao:hover{border-color:var(--verde)}
+  .opcao input{margin-top:3px;width:20px;height:20px;flex:none;accent-color:var(--verde)}
+  .opcao span{font-size:14.5px}
+  a{color:var(--verde);text-underline-offset:2px}
+  .erro{background:#fbeceb;border-left:4px solid var(--alerta);color:#7d2820;padding:12px 14px;border-radius:0 8px 8px 0;font-size:14px;margin-bottom:14px}
+  .ok{background:var(--verde-claro);border-left:4px solid var(--verde);color:#1f5a41;padding:12px 14px;border-radius:0 8px 8px 0;font-size:14px;margin-bottom:14px}
+  .oculto{display:none}
+  .resumo{border:1px solid var(--linha);border-radius:12px;padding:16px;background:#fbfcfb;font-size:14.5px}
+  .resumo div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--linha)}
+  .resumo div:last-child{border:0}
+  .tag{font-weight:600}.tag.sim{color:var(--verde)}.tag.nao{color:var(--suave)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+  .kpi{background:#fff;border:1px solid var(--linha);border-radius:14px;padding:18px}
+  .kpi .n{font-size:30px;font-weight:600;font-family:'IBM Plex Mono',monospace;line-height:1.1}
+  .kpi .r{font-size:11.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-top:6px}
+  .kpi.aceito .n{color:var(--verde)}.kpi.recusado .n{color:var(--alerta)}.kpi.pendente .n{color:var(--ambar)}
+  .barra-progresso{height:8px;border-radius:99px;background:var(--linha);overflow:hidden;display:flex}
+  .barra-progresso i{display:block;height:100%}
+  .legenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--suave);margin-top:8px}
+  .legenda b{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+  .acoes{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:20px 0 14px}
+  .acoes .busca{flex:1;min-width:200px}
+  .acoes select{width:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
+  th{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--suave);background:#fafbfa;position:sticky;top:0}
+  tbody tr:hover{background:#fafbfa}
+  .pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}
+  .pill.aceito{background:var(--verde-claro);color:#1f5a41}
+  .pill.recusado{background:#fbeceb;color:#7d2820}
+  .pill.pendente{background:#fdf4e0;color:#7a5f18}
+  .sim{color:var(--verde);font-weight:600}.nao{color:var(--suave)}
+  .tabela-wrap{max-height:58vh;overflow:auto;border:1px solid var(--linha);border-radius:12px;background:#fff}
+  .mono{font-family:'IBM Plex Mono',monospace;font-size:12.5px}
+  footer{border-top:1px solid var(--linha);background:#fff;padding:20px;text-align:center}
+  @media (prefers-reduced-motion:no-preference){.cartao{animation:sobe .3s ease both}}
+  @keyframes sobe{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <span class="grupo"><b>Protótipo</b> Dados de demonstração · 24 participantes · nada é salvo ao recarregar</span>
+  <span class="grupo">
+    <button id="v-form" class="on">Visão do convidado</button>
+    <button id="v-admin">Relatório da organização</button>
+    <button id="reset">Reiniciar demo</button>
+  </span>
+</div>
+
+<header class="barra">
+  <span class="marca-txt">CIO CERRADO</span>
+  <span class="marca-txt">EXPERIENCE 2026</span>
+</header>
+
+<!-- ==================== VISÃO DO CONVIDADO ==================== -->
+<main id="app-form">
+
+  <section id="etapa-email" class="cartao">
+    <div class="eyebrow">Autorização de contato</div>
+    <h1>Uma pergunta rápida antes do evento</h1>
+    <p>Um dos patrocinadores do CIO Cerrado Experience 2026 é a <strong>IBM</strong>. Para que possamos compartilhar contatos com ela dentro das regras de privacidade, precisamos da sua resposta — leva menos de um minuto.</p>
+    <p class="suave">Para confirmar que é você, pedimos o e-mail da sua inscrição e um dado de verificação.</p>
+
+    <div id="erro-email" class="erro oculto"></div>
+
+    <label class="campo" for="email">E-mail corporativo</label>
+    <input type="email" id="email" autocomplete="off" placeholder="voce@suaempresa.com.br" inputmode="email">
+    <p></p>
+
+    <label class="campo">Confirme com um destes dados</label>
+    <div class="alternador">
+      <button type="button" id="modo-nasc" class="on">Data de nascimento</button>
+      <button type="button" id="modo-cpf">CPF</button>
+    </div>
+    <div id="campo-nasc"><input type="date" id="nascimento" min="1930-01-01" max="2010-12-31"></div>
+    <div id="campo-cpf" class="oculto"><input type="text" id="cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" autocomplete="off"></div>
+    <p class="suave" style="margin-top:8px">Usamos esse dado apenas para conferir sua identidade. Ele não é armazenado nem compartilhado com a IBM.</p>
+
+    <button class="btn-primario" id="btn-continuar">Continuar</button>
+
+    <details class="teste">
+      <summary>Credenciais de teste do protótipo</summary>
+      <p class="suave" style="margin:10px 0 8px">Nomes e empresas são reais; <strong>as datas e CPFs abaixo são fictícios</strong>, criados só para o protótipo. Clique numa linha para preencher o formulário.</p>
+      <div id="lista-teste"></div>
+    </details>
+  </section>
+
+  <section id="etapa-form" class="cartao oculto">
+    <div class="eyebrow">Autorização de contato</div>
+    <h1 id="saudacao">Olá</h1>
+    <p class="suave">Estes são os dados da sua inscrição. São eles que serão compartilhados, caso você autorize:</p>
+    <div class="ficha" id="ficha"></div>
+
+    <div class="aviso-dp">
+      <strong>Aviso de privacidade</strong>
+      Ao interagir com a IBM, você autoriza que a CIO Cerrado ou seu fornecedor forneça suas informações de contato à IBM, para que a IBM possa dar continuidade à sua interação. O uso das suas informações de contato pela IBM é regido pela
+      <a href="https://www.ibm.com/us-en/privacy" target="_blank" rel="noopener">Declaração de Privacidade da IBM</a>.
+    </div>
+
+    <p class="suave">As opções abaixo são opcionais. Marque apenas o que você autoriza:</p>
+
+    <label class="opcao">
+      <input type="checkbox" id="optin-email">
+      <span>Gostaria que meus dados de contato fossem compartilhados com a IBM para que ela possa me manter informado(a) sobre produtos, serviços e ofertas. Mais informações sobre como a IBM utiliza dados e as formas de
+        <a href="https://www.ibm.com/account/reg/us-en/signup?formid=urx-42537" target="_blank" rel="noopener">cancelar</a>
+        o recebimento dessas comunicações podem ser encontradas na
+        <a href="https://www.ibm.com/us-en/privacy" target="_blank" rel="noopener">Declaração de Privacidade da IBM</a>.
+        Caso seja um residente da Califórnia nos Estados Unidos, deve consultar a
+        <a href="https://www.ibm.com/us-en/privacy/ccpa" target="_blank" rel="noopener">Declaração de Privacidade Suplementar da Califórnia</a>.
+      </span>
+    </label>
+
+    <label class="opcao">
+      <input type="checkbox" id="optin-telefone">
+      <span>Autorizo também o contato por <strong>telefone ou WhatsApp</strong>, nas mesmas condições descritas acima.</span>
+    </label>
+
+    <div id="bloco-telefone" class="oculto">
+      <label class="campo" for="telefone">Telefone para contato</label>
+      <input type="tel" id="telefone" placeholder="(62) 90000-0000">
+      <p></p>
+    </div>
+
+    <button class="btn-primario" id="btn-registrar">Registrar minha resposta</button>
+    <p class="suave" style="margin-top:12px">Se você não marcar nenhuma opção, registramos que <strong>não</strong> autoriza o compartilhamento para marketing — e isso não afeta em nada a sua participação no evento.</p>
+  </section>
+
+  <section id="etapa-fim" class="cartao oculto">
+    <div class="eyebrow">Resposta registrada</div>
+    <h1 id="titulo-fim">Obrigado!</h1>
+    <p id="texto-fim"></p>
+    <div class="resumo">
+      <div><span>Comunicações por e-mail</span><span id="r-email" class="tag"></span></div>
+      <div><span>Comunicações por telefone/WhatsApp</span><span id="r-fone" class="tag"></span></div>
+      <div><span>Registrado em</span><span id="r-data" class="mono"></span></div>
+    </div>
+    <p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-secundario" id="btn-alterar">Alterar minha resposta</button>
+      <button class="btn-secundario" id="btn-outro">Testar com outro participante</button>
+    </p>
+  </section>
+
+  <p class="suave" style="text-align:center">Dúvidas: <a href="mailto:comunicacao@ciocerrado.com.br">comunicacao@ciocerrado.com.br</a></p>
+</main>
+
+<!-- ==================== RELATÓRIO ==================== -->
+<main id="app-admin" class="largo oculto">
+  <div class="eyebrow">Data Privacy &amp; Notice and Choice</div>
+  <h1>Consentimento IBM — participantes confirmados</h1>
+  <p class="suave" id="carimbo"></p>
+
+  <div class="cards" id="kpis"></div>
+  <div class="barra-progresso" id="progresso"></div>
+  <div class="legenda">
+    <span><b style="background:var(--verde)"></b>Aceitaram</span>
+    <span><b style="background:var(--alerta)"></b>Recusaram</span>
+    <span><b style="background:#e6c76a"></b>Pendentes</span>
+  </div>
+
+  <div class="acoes">
+    <span class="busca"><input type="search" id="busca" placeholder="Buscar por nome, empresa ou e-mail"></span>
+    <select id="filtro">
+      <option value="">Todos os status</option>
+      <option value="aceito">Aceitos</option>
+      <option value="recusado">Recusados</option>
+      <option value="pendente">Pendentes</option>
+    </select>
+    <button class="btn-secundario" id="exp-completo">Baixar relatório completo (.xlsx)</button>
+    <button class="btn-secundario" id="exp-pendentes">Lista de pendentes (.xlsx)</button>
+    <button class="btn-secundario" id="exp-ibm" style="border-color:var(--verde);color:var(--verde)">Baixar Leads Report IBM (.xlsx)</button>
+  </div>
+
+  <div id="msg-rel"></div>
+
+  <div class="tabela-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Nome</th><th>Empresa</th><th>Cargo</th><th>E-mail</th>
+        <th>Status</th><th>Opt-in<br>e-mail</th><th>Opt-in<br>telefone</th><th>Respondido em</th><th>Versão<br>do texto</th>
+      </tr></thead>
+      <tbody id="linhas"></tbody>
+    </table>
+  </div>
+  <p class="suave" id="rodape-contagem"></p>
+  <p class="suave">No sistema real esta tela abre apenas por link próprio, com login por e-mail para a lista de administradores.</p>
+</main>
+
+<footer><span class="suave">CIO Cerrado Experience 2026 · Tauá Resort, Alexânia · 12 a 16 de agosto de 2026</span></footer>
+
+<script>
+const SEED = [
+ {
+  "email": "giovanni@bestwayseeds.com.br",
+  "nome": "Giovanni",
+  "sobrenome": "Anício de Sena",
+  "empresa": "Bestway Seeds do Brasil S/A",
+  "cargo": "Gerente de TI",
+  "industria": "Agro",
+  "telefone": "34992009500",
+  "nasc_demo": "19041991",
+  "cpf_demo": "652.467.578-16",
+  "status": "aceito",
+  "oe": true,
+  "ot": true
+ },
+ {
+  "email": "gabriel.sa@grupolagoaquente.com.br",
+  "nome": "Gabriel",
+  "sobrenome": "de Assis Sá",
+  "empresa": "Lagoa Parques e Hoteis",
+  "cargo": "Gerente de TI",
+  "industria": "Outros",
+  "telefone": "64992569046",
+  "nasc_demo": "22091968",
+  "cpf_demo": "716.327.395-72",
+  "status": "aceito",
+  "oe": true,
+  "ot": false
+ },
+ {
+  "email": "wandersonfelipe@greal.com.br",
+  "nome": "Wanderson",
+  "sobrenome": "Caetano Felipe",
+  "empresa": "Grupo Real",
+  "cargo": "Coordenador de Segurança da Informação",
+  "industria": "Comercio Varejista e Atacadista",
+  "telefone": "34999073302",
+  "nasc_demo": "23041972",
+  "cpf_demo": "548.172.361-34",
+  "status": "aceito",
+  "oe": true,
+  "ot": false
+ },
+ {
+  "email": "lucas@jobsa.com.br",
+  "nome": "Lucas",
+  "sobrenome": "Gonçalves",
+  "empresa": "SOLOTEK FERTILIZANTES",
+  "cargo": "CIO",
+  "industria": "Agro",
+  "telefone": "62991475003",
+  "nasc_demo": "06021976",
+  "cpf_demo": "888.650.475-34",
+  "status": "aceito",
+  "oe": true,
+  "ot": true
+ },
+ {
+  "email": "laerte.marroni@bomjesus.com",
+  "nome": "Laerte",
+  "sobrenome": "Marroni",
+  "empresa": "bomjesusagro",
+  "cargo": "Diretor de TI",
+  "industria": "Agro",
+  "telefone": "66996046917",
+  "nasc_demo": "16061969",
+  "cpf_demo": "752.910.513-64",
+  "status": "aceito",
+  "oe": true,
+  "ot": false
+ },
+ {
+  "email": "ti@radiologicarv.com.br",
+  "nome": "Leandro",
+  "sobrenome": "de Freitas Martins",
+  "empresa": "Clínica Radiológica de Rio Verde",
+  "cargo": "Gestor de TI",
+  "industria": "Serviços Outros",
+  "telefone": "64996750047",
+  "nasc_demo": "07021975",
+  "cpf_demo": "578.411.316-24",
+  "status": "aceito",
+  "oe": true,
+  "ot": false
+ },
+ {
+  "email": "gustavo.lopes@uniceub.br",
+  "nome": "Gustavo",
+  "sobrenome": "Lopes",
+  "empresa": "UniCEUB",
+  "cargo": "Gerente Executivo de TI - CIO",
+  "industria": "Educação",
+  "telefone": "61981181113",
+  "nasc_demo": "21101983",
+  "cpf_demo": "436.780.979-44",
+  "status": "aceito",
+  "oe": true,
+  "ot": true
+ },
+ {
+  "email": "leonardorosa@jspecas.com.br",
+  "nome": "Leonardo",
+  "sobrenome": "Duarte Rosa",
+  "empresa": "Rede Js Peças",
+  "cargo": "Head de TI e Digital",
+  "industria": "Comercio Varejista e Atacadista",
+  "telefone": "62984273660",
+  "nasc_demo": "13071969",
+  "cpf_demo": "533.178.514-95",
+  "status": "aceito",
+  "oe": true,
+  "ot": false
+ },
+ {
+  "email": "wsoares@brasal.com.br",
+  "nome": "Wanessa",
+  "sobrenome": "Soares",
+  "empresa": "Brasal Refrigerantes",
+  "cargo": "Gerente de TI",
+  "industria": "Industria de Alimentos",
+  "telefone": "61999763476",
+  "nasc_demo": "14011989",
+  "cpf_demo": "575.321.647-22",
+  "status": "aceito",
+  "oe": true,
+  "ot": false
+ },
+ {
+  "email": "henrique@condorbrasil.com.br",
+  "nome": "Henrique",
+  "sobrenome": "Lima",
+  "empresa": "Condor Atacadista",
+  "cargo": "CIO",
+  "industria": "Comercio Varejista e Atacadista",
+  "telefone": "61998158565",
+  "nasc_demo": "12011973",
+  "cpf_demo": "821.468.109-43",
+  "status": "recusado",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "lincoln.costa@innovapharma.com",
+  "nome": "Lincoln",
+  "sobrenome": "Costa",
+  "empresa": "Nutriex",
+  "cargo": "Diretor de TI",
+  "industria": "Industria Química",
+  "telefone": "62992459441",
+  "nasc_demo": "19031963",
+  "cpf_demo": "542.285.384-18",
+  "status": "recusado",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "wilber.silva@novomundo.com.br",
+  "nome": "Wilber",
+  "sobrenome": "Silva",
+  "empresa": "NOVO MUNDO SA",
+  "cargo": "GERENTE DE TI",
+  "industria": "Outros",
+  "telefone": "62992993776",
+  "nasc_demo": "25031974",
+  "cpf_demo": "801.845.947-56",
+  "status": "recusado",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "massay.costa@boasafrasementes.com.br",
+  "nome": "Massay de Oliveira",
+  "sobrenome": "Costa",
+  "empresa": "Boa Safra Sementes",
+  "cargo": "Gerente de TI",
+  "industria": "Agro",
+  "telefone": "31992763518",
+  "nasc_demo": "21101977",
+  "cpf_demo": "270.610.964-75",
+  "status": "recusado",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "mikie@marquise.com.br",
+  "nome": "Mikie",
+  "sobrenome": "Ripardo",
+  "empresa": "Grupo Marquise",
+  "cargo": "CIO",
+  "industria": "Construção Civil",
+  "telefone": "8587614940",
+  "nasc_demo": "10031984",
+  "cpf_demo": "643.799.993-10",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "glicejo.lopes@costaatacadao.com.br",
+  "nome": "Glicejo",
+  "sobrenome": "Lopes",
+  "empresa": "Costa Atacadao",
+  "cargo": "Gerente de TI",
+  "industria": "Comercio Varejista e Atacadista",
+  "telefone": "62997017660",
+  "nasc_demo": "03021963",
+  "cpf_demo": "689.454.647-99",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "edir.junior@grupojosealves.com",
+  "nome": "Edir",
+  "sobrenome": "Junior",
+  "empresa": "Grupo José Alves",
+  "cargo": "Gerente de Sistemas",
+  "industria": "Industria de Alimentos",
+  "telefone": "62981069600",
+  "nasc_demo": "15021983",
+  "cpf_demo": "822.724.893-87",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "kaio.fabio@terral.com.br",
+  "nome": "Kaio Fabio",
+  "sobrenome": "Sousa",
+  "empresa": "Grupo Terral",
+  "cargo": "Gerente TI",
+  "industria": "Grupos Empresariais",
+  "telefone": "62984000575",
+  "nasc_demo": "26081987",
+  "cpf_demo": "752.243.802-32",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "rafael.sugiyama@agrex.com.br",
+  "nome": "Rafael",
+  "sobrenome": "Sugiyama",
+  "empresa": "AGREX",
+  "cargo": "Gerente de TI",
+  "industria": "Agro",
+  "telefone": "11991805066",
+  "nasc_demo": "26041985",
+  "cpf_demo": "660.557.242-20",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "oscar.costa@kingspan.com",
+  "nome": "Oscar",
+  "sobrenome": "Jr.",
+  "empresa": "Kingspan Isoeste S/A",
+  "cargo": "Head of IT Latam",
+  "industria": "Industria Outros",
+  "telefone": "62993478291",
+  "nasc_demo": "05051972",
+  "cpf_demo": "484.169.161-80",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "cintia.carrijo@comiva.com.br",
+  "nome": "Cintia",
+  "sobrenome": "Carrijo Dutra",
+  "empresa": "Cooperativa Mista Agropecuaria Do Vale Do Araguaia",
+  "cargo": "Coordenadora de TI",
+  "industria": "Agro",
+  "telefone": "64999543319",
+  "nasc_demo": "18121973",
+  "cpf_demo": "574.158.297-45",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "andre.cordeiro@vitamedic.ind.br",
+  "nome": "André",
+  "sobrenome": "Cordeiro Macedo Maciel",
+  "empresa": "Vitamedic Indústria Farmacêutica Ltda",
+  "cargo": "Gerente de TI",
+  "industria": "Industria Farmacêutica",
+  "telefone": "62996648484",
+  "nasc_demo": "22061964",
+  "cpf_demo": "386.257.356-69",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "tecnologia@shcosmeticos.com.br",
+  "nome": "Alberto",
+  "sobrenome": "Pedro",
+  "empresa": "Shopping dos Cosméticos",
+  "cargo": "Gerente de TI",
+  "industria": "Comercio Varejista e Atacadista",
+  "telefone": "62998310801",
+  "nasc_demo": "07071965",
+  "cpf_demo": "636.919.426-41",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "patricia.souza@credirural.coop.br",
+  "nome": "Patrícia",
+  "sobrenome": "Souza Amorim",
+  "empresa": "Cooperativa de Crédito de Livre Admissão do Sudoeste Goiano",
+  "cargo": "Assessora de TI",
+  "industria": "Bancos e Serviços Financeiros",
+  "telefone": "64992212985",
+  "nasc_demo": "04051982",
+  "cpf_demo": "280.112.114-91",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ },
+ {
+  "email": "fernando@escolainteramerica.com.br",
+  "nome": "Fernando",
+  "sobrenome": "Rodrigues Ramos",
+  "empresa": "Escola Interamérica",
+  "cargo": "Gerente TI",
+  "industria": "Educação",
+  "telefone": "62981702591",
+  "nasc_demo": "13101976",
+  "cpf_demo": "771.683.145-53",
+  "status": "pendente",
+  "oe": false,
+  "ot": false
+ }
+];
+const VERSAO_TEXTO = 'v1-2026-08';
+const CAMPAIGN_CODE = '';
+const ACTIVITY_TYPE = 'Event';
+const ACTIVITY_NAME = 'CIO Cerrado Experience 2026';
+const ATTENDEE_TYPE = 'Cliente';
+
+const $ = id => document.getElementById(id);
+let base = [], atual = null;
+
+function clonarSeed(){
+  const agora = Date.now();
+  base = SEED.map((r,i) => ({
+    ...r,
+    optin_email: r.oe, optin_telefone: r.ot,
+    respondido_em: r.status === 'pendente' ? null : new Date(agora - (i+1)*3600*1000*7).toISOString(),
+    texto_versao: r.status === 'pendente' ? null : VERSAO_TEXTO
+  }));
+}
+clonarSeed();
+
+// ---------- navegação da demo ----------
+function verFormulario(){
+  $('app-form').classList.remove('oculto'); $('app-admin').classList.add('oculto');
+  $('v-form').classList.add('on'); $('v-admin').classList.remove('on');
+  window.scrollTo({top:0});
+}
+function verAdmin(){
+  $('app-admin').classList.remove('oculto'); $('app-form').classList.add('oculto');
+  $('v-admin').classList.add('on'); $('v-form').classList.remove('on');
+  render(); window.scrollTo({top:0});
+}
+$('v-form').onclick = verFormulario;
+$('v-admin').onclick = verAdmin;
+$('reset').onclick = () => { clonarSeed(); reiniciarForm(); render(); };
+
+// ---------- credenciais de teste (fictícias) ----------
+function montarAtalho(){
+  $('lista-teste').innerHTML = base.map(r => `
+    <button type="button" class="linha-teste" data-email="${r.email}" data-nasc="${r.nasc_demo}">
+      <b>${esc(r.nome)} ${esc(r.sobrenome)}</b> · ${({aceito:'já aceitou',recusado:'já recusou',pendente:'pendente'})[r.status]}<br>
+      ${esc(r.email)} · nasc. ${r.nasc_demo.slice(0,2)}/${r.nasc_demo.slice(2,4)}/${r.nasc_demo.slice(4)} · CPF ${r.cpf_demo}
+    </button>`).join('');
+  $('lista-teste').querySelectorAll('.linha-teste').forEach(b => b.onclick = () => {
+    $('email').value = b.dataset.email;
+    const n = b.dataset.nasc;
+    $('nascimento').value = `${n.slice(4)}-${n.slice(2,4)}-${n.slice(0,2)}`;
+    modoNasc();
+  });
+}
+function modoNasc(){
+  modo='nasc'; $('modo-nasc').classList.add('on'); $('modo-cpf').classList.remove('on');
+  $('campo-nasc').classList.remove('oculto'); $('campo-cpf').classList.add('oculto');
+}
+function modoCpf(){
+  modo='cpf'; $('modo-cpf').classList.add('on'); $('modo-nasc').classList.remove('on');
+  $('campo-cpf').classList.remove('oculto'); $('campo-nasc').classList.add('oculto');
+}
+let modo = 'nasc';
+$('modo-nasc').onclick = modoNasc;
+$('modo-cpf').onclick = modoCpf;
+$('cpf').addEventListener('input', e => {
+  const d = e.target.value.replace(/\D/g,'').slice(0,11);
+  e.target.value = d.replace(/^(\d{3})(\d)/,'$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/,'.$1-$2');
+});
+function montarChave(){
+  if(modo === 'cpf'){
+    const d = $('cpf').value.replace(/\D/g,'');
+    return d.length === 11 ? d : null;
+  }
+  const v = $('nascimento').value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [a,m,dd] = v.split('-');
+  return dd + m + a;
+}
+function formataFone(t){
+  const d = String(t||'').replace(/\D/g,'');
+  if(d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if(d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return d;
+}
+montarAtalho();
+
+// ---------- fluxo do convidado ----------
+function etapa(qual){
+  ['etapa-email','etapa-form','etapa-fim'].forEach(e => $(e).classList.toggle('oculto', e !== qual));
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function reiniciarForm(){
+  atual = null; $('email').value = ''; $('nascimento').value = ''; $('cpf').value = '';
+  $('erro-email').classList.add('oculto'); montarAtalho(); etapa('etapa-email');
+}
+$('optin-telefone').onchange = e => $('bloco-telefone').classList.toggle('oculto', !e.target.checked);
+
+$('btn-continuar').onclick = () => {
+  const email = $('email').value.trim().toLowerCase();
+  const err = $('erro-email'); err.classList.add('oculto');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    err.textContent = 'Informe um e-mail válido.'; return err.classList.remove('oculto');
+  }
+  const chave = montarChave();
+  if(!chave){
+    err.textContent = modo === 'cpf' ? 'Informe os 11 dígitos do CPF.' : 'Informe sua data de nascimento completa.';
+    return err.classList.remove('oculto');
+  }
+  const r = base.find(x => x.email === email);
+  const confere = r && (chave === r.nasc_demo || chave === r.cpf_demo.replace(/\D/g,''));
+  if(!confere){
+    err.textContent = 'Os dados não conferem com a nossa lista de participantes confirmados. Confira o e-mail usado na inscrição — pode ser o corporativo ou o pessoal — e tente o outro dado de verificação.';
+    return err.classList.remove('oculto');
+  }
+  atual = r;
+  $('saudacao').textContent = 'Olá, ' + r.nome.split(' ')[0] + '!';
+  $('ficha').innerHTML = [
+    ['Nome', esc((r.nome + ' ' + r.sobrenome).trim())],
+    ['Empresa', esc(r.empresa || '—')],
+    ['Cargo', esc(r.cargo || '—')],
+    ['E-mail', esc(r.email)],
+    ['Telefone', esc(formataFone(r.telefone) || '—')]
+  ].map(([k,v]) => `<div class="linha"><span class="rot">${k}</span><span class="val">${v}</span></div>`).join('');
+  $('optin-email').checked = !!r.optin_email;
+  $('optin-telefone').checked = !!r.optin_telefone;
+  $('bloco-telefone').classList.toggle('oculto', !r.optin_telefone);
+  $('telefone').value = formataFone(r.telefone) || '';
+  etapa('etapa-form');
+};
+
+$('btn-registrar').onclick = () => {
+  const oe = $('optin-email').checked, ot = $('optin-telefone').checked;
+  atual.optin_email = oe;
+  atual.optin_telefone = ot;
+  atual.status = (oe || ot) ? 'aceito' : 'recusado';
+  atual.respondido_em = atual.respondido_em || new Date().toISOString();
+  atual.texto_versao = VERSAO_TEXTO;
+  if(ot && $('telefone').value) atual.telefone = $('telefone').value.replace(/\D/g,'');
+
+  $('titulo-fim').textContent = (oe||ot) ? 'Obrigado! Sua autorização foi registrada.' : 'Pronto — sua resposta foi registrada.';
+  $('texto-fim').textContent = (oe||ot)
+    ? 'Seus dados de contato serão compartilhados com a IBM conforme as opções abaixo. Você pode cancelar o recebimento a qualquer momento pelo link da Declaração de Privacidade da IBM.'
+    : 'Registramos que você não autoriza o uso dos seus dados para comunicações de marketing da IBM. Nos vemos no evento.';
+  $('r-email').textContent = oe ? 'Autorizado' : 'Não autorizado';
+  $('r-email').className = 'tag ' + (oe ? 'sim' : 'nao');
+  $('r-fone').textContent = ot ? 'Autorizado' : 'Não autorizado';
+  $('r-fone').className = 'tag ' + (ot ? 'sim' : 'nao');
+  $('r-data').textContent = new Date(atual.respondido_em).toLocaleString('pt-BR');
+  montarAtalho();
+  etapa('etapa-fim');
+};
+
+$('btn-alterar').onclick = () => etapa('etapa-form');
+$('btn-outro').onclick = reiniciarForm;
+
+// ---------- relatório ----------
+function esc(s){ return String(s??'').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function msg(texto, tipo='ok'){ $('msg-rel').innerHTML = texto ? `<div class="${tipo}">${texto}</div>` : ''; }
+
+function filtrados(){
+  const q = $('busca').value.trim().toLowerCase(), f = $('filtro').value;
+  return base.filter(r => {
+    if(f && r.status !== f) return false;
+    if(!q) return true;
+    return [r.nome,r.sobrenome,r.empresa,r.email,r.cargo].join(' ').toLowerCase().includes(q);
+  });
+}
+$('busca').oninput = render; $('filtro').onchange = render;
+
+function render(){
+  const total = base.length, c = s => base.filter(r => r.status === s).length;
+  const a = c('aceito'), rec = c('recusado'), pen = c('pendente');
+  $('carimbo').textContent = 'Atualizado em ' + new Date().toLocaleString('pt-BR') + ' · base de demonstração';
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="n">${total}</div><div class="r">Participantes</div></div>
+    <div class="kpi"><div class="n">${a+rec}</div><div class="r">Responderam</div></div>
+    <div class="kpi aceito"><div class="n">${a}</div><div class="r">Aceitaram</div></div>
+    <div class="kpi recusado"><div class="n">${rec}</div><div class="r">Recusaram</div></div>
+    <div class="kpi pendente"><div class="n">${pen}</div><div class="r">Pendentes</div></div>`;
+  const pct = n => total ? (n/total*100).toFixed(1)+'%' : '0%';
+  $('progresso').innerHTML =
+    `<i style="width:${pct(a)};background:var(--verde)"></i><i style="width:${pct(rec)};background:var(--alerta)"></i><i style="width:${pct(pen)};background:#e6c76a"></i>`;
+
+  const lista = filtrados();
+  $('linhas').innerHTML = lista.map((r,i) => `
+    <tr>
+      <td class="mono">${i+1}</td>
+      <td>${esc(r.nome)} ${esc(r.sobrenome)}</td>
+      <td>${esc(r.empresa)}</td>
+      <td>${esc(r.cargo)}</td>
+      <td class="mono">${esc(r.email)}</td>
+      <td><span class="pill ${r.status}">${({aceito:'Aceito',recusado:'Recusado',pendente:'Pendente'})[r.status]}</span></td>
+      <td class="${r.optin_email?'sim':'nao'}">${r.optin_email?'Sim':'Não'}</td>
+      <td class="${r.optin_telefone?'sim':'nao'}">${r.optin_telefone?'Sim':'Não'}</td>
+      <td class="mono">${r.respondido_em ? new Date(r.respondido_em).toLocaleString('pt-BR') : '—'}</td>
+      <td class="mono">${r.texto_versao || '—'}</td>
+    </tr>`).join('');
+  $('rodape-contagem').textContent = `Exibindo ${lista.length} de ${total} participantes.`;
+}
+
+// ---------- exportações ----------
+function baixar(aoa, aba, arquivo, larguras){
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = larguras.map(w => ({wch:w}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, aba);
+  XLSX.writeFile(wb, arquivo);
+}
+const hoje = () => new Date().toISOString().slice(0,10);
+const rotulo = {aceito:'Aceito',recusado:'Recusado',pendente:'Pendente'};
+
+$('exp-completo').onclick = () => {
+  const cab = ['Nome','Sobrenome','Empresa','Cargo','Segmento','E-mail','Telefone','Status','Opt-in e-mail','Opt-in telefone','Respondido em','Versão do texto aceito'];
+  const linhas = base.map(r => [r.nome,r.sobrenome,r.empresa,r.cargo,r.industria,r.email,r.telefone,
+    rotulo[r.status], r.optin_email?'Sim':'Não', r.optin_telefone?'Sim':'Não',
+    r.respondido_em ? new Date(r.respondido_em).toLocaleString('pt-BR') : '', r.texto_versao||'']);
+  baixar([cab,...linhas],'Consentimento IBM',`DEMO_Consentimento_IBM_${hoje()}.xlsx`,[22,20,26,24,20,34,16,12,13,15,20,16]);
+  msg(`Relatório completo gerado com ${base.length} participantes — inclui pendentes e recusados. Este arquivo é de controle interno, não vai para a IBM.`);
+};
+
+$('exp-pendentes').onclick = () => {
+  const pend = base.filter(r => r.status === 'pendente');
+  if(!pend.length) return msg('Não há pendentes na base de demonstração.','erro');
+  const cab = ['Nome','Sobrenome','Empresa','Cargo','E-mail','Telefone'];
+  baixar([cab,...pend.map(r=>[r.nome,r.sobrenome,r.empresa,r.cargo,r.email,r.telefone])],
+    'Pendentes',`DEMO_Pendentes_Consentimento_${hoje()}.xlsx`,[22,20,26,24,34,16]);
+  msg(`${pend.length} pendentes exportados — é a lista do lembrete D-3.`);
+};
+
+$('exp-ibm').onclick = () => {
+  const cab = ['Campaign Code (IBM use only)','Attendee Type','First Name','Last Name','Company','Industry','Country','Job Role','Email','Phone','Opt in Email (Yes/No)','Opt in Phone (Yes/No)','Activity Type','Activity Name'];
+  const eleg = base.filter(r => r.status === 'aceito');
+  if(!eleg.length) return msg('Ainda não há participantes com autorização registrada.','erro');
+  const linhas = eleg.map(r => [CAMPAIGN_CODE, ATTENDEE_TYPE, r.nome, r.sobrenome, r.empresa, r.industria,
+    'Brazil', r.cargo, r.email, r.telefone, r.optin_email?'Yes':'No', r.optin_telefone?'Yes':'No', ACTIVITY_TYPE, ACTIVITY_NAME]);
+  baixar([cab,...linhas],'EDIT',`DEMO_LeadsReport_IBM_${hoje()}.xlsx`,[26,14,20,20,26,20,12,24,34,16,20,20,16,30]);
+  msg(`Leads Report gerado com ${eleg.length} leads autorizados, na aba EDIT e nas 14 colunas do modelo da IBM. Pendentes e recusados ficam de fora.`);
+};
+
+render();
+</script>
+</body>
+</html>

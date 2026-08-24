@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Painel · Agendamento de massagem</title>
+<link rel="icon" type="image/png" href="favicon.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600&family=Inter:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0E2A38;--bg:#EDF1F0;--surface:#FFFFFF;--line:rgba(14,42,56,.12);--muted:#5B7180;--accent:#12925A;--accent-d:#0E7A4A;--accent-l:#3FBE82;--gold:#B8862B}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px 40px}
+.brandbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 -20px;padding:15px 20px;background:var(--ink);color:#fff}
+.brandbar__logo{height:40px;width:auto;display:block}
+.brandbar__evt{font-weight:700;font-size:13px;color:#fff}
+.brandbar__sub{font-size:11px;color:#9db7c2}
+.eyebrow{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+h2{font-family:'Fraunces',serif;font-weight:400;font-size:27px;margin-top:6px}
+h3{font-size:15px;font-weight:600;margin:0 0 4px}
+.nav{display:flex;gap:6px;margin:18px 0 10px;flex-wrap:wrap;align-items:center}
+.tab{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:9px 16px;font-size:13.5px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.tab--on{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+.signout{margin-left:auto;background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;text-decoration:underline;font-family:inherit}
+.evsel{display:flex;align-items:center;gap:8px;margin:2px 0 14px;flex-wrap:wrap}
+.evsel label{font-size:12.5px;color:var(--muted)}
+select,.field input{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:14px;font-family:inherit;color:var(--ink)}
+select:focus,.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(18,146,90,.15)}
+.field{margin:0 0 14px;display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:500}
+.req{color:#a5453a}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media (max-width:560px){.grid2{grid-template-columns:1fr}}
+.cta{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:12px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.cta:hover:not(:disabled){background:var(--accent-d)}.cta:disabled{opacity:.45;cursor:not-allowed}
+.cta--sm{padding:9px 14px;font-size:13px}
+a.cta{text-decoration:none;display:inline-block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:12px}
+.msg{font-size:13px;margin-top:10px}.msg--ok{color:var(--accent)}.msg--err{color:#a5453a}
+.stats{display:flex;gap:10px;margin:14px 0}
+.stat{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;gap:3px}
+.stat__n{font-family:'Fraunces',serif;font-size:26px;color:var(--accent)}
+.stat__l{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:6px 0 14px;flex-wrap:wrap}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.chip--on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.export{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 16px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:auto}
+.tablewrap--scroll{max-height:340px}
+.tablewrap--scroll thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+th{text-align:left;padding:12px 14px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);font-weight:600}
+td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.mono{font-family:'Fraunces',serif;white-space:nowrap}
+.muted{color:var(--muted)}
+.badge{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.b-aberto{background:#e5f3ec;color:#0E7A4A}.b-rascunho{background:#f0efe6;color:#8a7a2b}.b-encerrado{background:#f1e6e4;color:#9a4b3f}
+.evhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.evlink{display:flex;gap:8px;align-items:center;margin-top:8px}
+.evlink input{flex:1;font-size:12.5px;color:var(--muted)}
+.imp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.imp input[type=file]{font-size:12.5px}
+.adminrow{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid var(--line);font-size:14px}
+.adminrow:last-child{border-bottom:none}
+.rm{background:none;border:none;color:#a5453a;cursor:pointer;font-size:13px;text-decoration:underline;font-family:inherit}
+.loading{text-align:center;color:var(--muted);padding:40px 0}
+.finehint{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+.warn{font-size:12px;color:#8a7a2b}
+.search{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 13px;font-size:14px;font-family:inherit;color:var(--ink);margin-bottom:8px}
+.search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(18,146,90,.15)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brandbar">
+    <img src="logo-cio-cerrado.webp" alt="CIO Cerrado" class="brandbar__logo" />
+    <div><div class="brandbar__evt">CIO Cerrado · Plataforma de eventos</div>
+      <div class="brandbar__sub">Painel administrativo · Agendamento de massagem</div></div>
+  </header>
+  <div id="app"><div class="loading">Carregando…</div></div>
+</div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+
+/* ===================== CONFIGURE AQUI ===================== */
+const SUPABASE_URL = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_3m3DPfUXoRKR_qNaTKa3_g_Jw2NeA_F";  // cole aqui a chave sb_publishable_...
+/* ========================================================= */
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById("app");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+const brDate = (iso) => iso ? String(iso).split("-").reverse().join("/") : "";
+const onlyDigits = (s) => (s||"").replace(/\D/g,"");
+function maskCpf(v){ const d=onlyDigits(v).slice(0,11); let o=d.slice(0,3); if(d.length>3)o+="."+d.slice(3,6); if(d.length>6)o+="."+d.slice(6,9); if(d.length>9)o+="-"+d.slice(9,11); return o; }
+function maskPhone(v){ const d=onlyDigits(v).slice(0,11); if(!d) return ""; if(d.length<=2) return "("+d; if(d.length<=6) return "("+d.slice(0,2)+") "+d.slice(2); if(d.length<=10) return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6); return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7); }
+function filterTable(tbodyId, q){
+  const norm=(s)=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const nq=norm(q).trim(); const qd=(q||"").replace(/\D/g,"");
+  const tb=document.getElementById(tbodyId); if(!tb) return;
+  tb.querySelectorAll("tr").forEach((tr)=>{
+    if(!nq && !qd){ tr.style.display=""; return; }
+    const t=norm(tr.textContent); const d=tr.textContent.replace(/\D/g,"");
+    tr.style.display = ((nq && t.includes(nq)) || (qd && d.includes(qd))) ? "" : "none";
+  });
+}
+
+let view = "report";
+let eventos = [];
+let selId = null;
+let booted = false;
+let editingDoc = null;
+const selEvento = () => eventos.find((e) => e.id === selId) || eventos[0];
+
+/* ---------------- LOGIN ---------------- */
+function renderLogin(msg) {
+  app.innerHTML = `
+    <div class="eyebrow" style="margin-top:22px">Acesso restrito</div>
+    <h2>Painel de administração</h2>
+    <p class="finehint">Entre com um e-mail de administrador. Enviaremos um link de acesso.</p>
+    <div class="field" style="max-width:360px;margin-top:14px"><label>E-mail de administrador</label>
+      <input id="email" type="email" placeholder="voce@empresa.com.br" /></div>
+    <button id="go" class="cta">Enviar link de acesso</button>
+    ${msg ? `<p class="msg ${msg.startsWith("Erro")||msg.includes("permiss")?"msg--err":"msg--ok"}">${esc(msg)}</p>` : ""}`;
+  document.getElementById("go").onclick = async () => {
+    const email = document.getElementById("email").value.trim();
+    if (!email) return;
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+    renderLogin(error ? ("Erro ao enviar: " + (error.message || "tente de novo.")) : "Link enviado! Verifique a caixa de entrada (e o spam) e abra o link neste mesmo navegador.");
+  };
+}
+
+/* ---------------- SHELL ---------------- */
+function shell(active, withSelector, contentHtml) {
+  const evOpts = eventos.map((e) => `<option value="${e.id}" ${e.id===selId?"selected":""}>${esc(e.nome)}${e.status!=="aberto"?" ("+e.status+")":""}</option>`).join("");
+  app.innerHTML = `
+    <nav class="nav">
+      <button class="tab ${active==="report"?"tab--on":""}" data-v="report">Relatório</button>
+      <button class="tab ${active==="guests"?"tab--on":""}" data-v="guests">Convidadas</button>
+      <button class="tab ${active==="events"?"tab--on":""}" data-v="events">Eventos</button>
+      <button class="tab ${active==="admins"?"tab--on":""}" data-v="admins">Administradores</button>
+      <button id="out" class="signout">sair</button>
+    </nav>
+    ${withSelector ? `<div class="evsel"><label>Evento:</label>
+      <select id="evsel">${evOpts}</select></div>` : ""}
+    <div id="content">${contentHtml || '<div class="loading">Carregando…</div>'}</div>`;
+  app.querySelectorAll("[data-v]").forEach((b) => b.onclick = () => { view = b.dataset.v; route(); });
+  document.getElementById("out").onclick = async () => { await sb.auth.signOut(); renderLogin(); };
+  const es = document.getElementById("evsel");
+  if (es) es.onchange = () => { selId = Number(es.value); route(); };
+}
+const content = () => document.getElementById("content");
+async function route() {
+  if (view === "report") return renderReport();
+  if (view === "guests") return renderGuests();
+  if (view === "events") return renderEvents();
+  if (view === "admins") return renderAdmins();
+}
+
+/* ---------------- RELATÓRIO ---------------- */
+let rows = [], slots = [], dayFilter = "all", repQuery = "";
+async function renderReport() {
+  shell("report", true);
+  const ev = selEvento(); if (!ev) { content().innerHTML = `<p class="finehint">Nenhum evento.</p>`; return; }
+  const [{ data: r, error: e1 }, { data: s, error: e2 }] = await Promise.all([
+    sb.from("reservations").select("*").eq("evento_id", ev.id).eq("status","active").order("created_at"),
+    sb.from("slots").select("*").eq("evento_id", ev.id).order("position"),
+  ]);
+  if (e1 || e2) { content().innerHTML = `<p class="msg msg--err">Não foi possível carregar o relatório.</p>`; return; }
+  slots = s || [];
+  const byId = Object.fromEntries(slots.map((x) => [x.id, x]));
+  rows = (r || []).map((x) => ({ ...x, slot: byId[x.slot_id] || {} }));
+  dayFilter = "all"; repQuery = ""; paintReport();
+}
+function paintReport() {
+  const totalCap = slots.reduce((n, s) => n + s.capacity, 0);
+  const occ = totalCap ? Math.round((rows.length / totalCap) * 100) : 0;
+  const filtered = (dayFilter === "all" ? rows : rows.filter((r) => r.slot.day_id === dayFilter)).sort((a, b) => (a.slot.position||0)-(b.slot.position||0));
+  const days = [...new Map(slots.map((s) => [s.day_id, s.date_label])).entries()];
+  const usedBy = {}; rows.forEach((r) => { usedBy[r.slot_id] = (usedBy[r.slot_id]||0)+1; });
+  content().innerHTML = `
+    <div class="stats">
+      <div class="stat"><span class="stat__n">${rows.length}</span><span class="stat__l">reservas</span></div>
+      <div class="stat"><span class="stat__n">${totalCap}</span><span class="stat__l">vagas totais</span></div>
+      <div class="stat"><span class="stat__n">${occ}%</span><span class="stat__l">ocupação</span></div>
+    </div>
+    <div class="bar">
+      <div class="filters">
+        <button class="chip ${dayFilter==="all"?"chip--on":""}" data-d="all">Todos</button>
+        ${days.map(([id,lbl]) => `<button class="chip ${dayFilter===id?"chip--on":""}" data-d="${id}">${esc(lbl)}</button>`).join("")}
+      </div>
+      <button id="export" class="export" ${rows.length?"":"disabled"}>⬇ Exportar Excel</button>
+    </div>
+    <input id="rep-search" class="search" placeholder="Buscar por nome, CPF, empresa, CIO ou telefone…" value="${esc(repQuery)}" />
+    <div class="tablewrap"><table>
+      <thead><tr><th>Horário</th><th>Dia</th><th>Acompanhante</th><th>Empresa</th><th>CIO</th><th>Telefone</th><th>Ações</th></tr></thead>
+      <tbody id="rep-tbody">
+        ${filtered.length ? filtered.map((r) => `<tr data-row="${r.id}">
+          <td class="mono">${esc(r.slot.starts)}–${esc(r.slot.ends)}</td>
+          <td>${esc(r.slot.date_label)}</td>
+          <td>${esc(r.name)}<br><span class="muted" style="font-size:12px">${esc(r.email)}</span><span style="display:none">${esc(r.doc||"")}</span></td>
+          <td>${esc(r.empresa||"")}</td>
+          <td>${esc(r.cio_nome||"")}</td>
+          <td>${esc(r.phone||"")}</td>
+          <td class="acts" style="white-space:nowrap"><button class="rm" data-resched="${r.id}" style="color:var(--accent)">remarcar</button> · <button class="rm" data-cancelres="${r.id}">cancelar</button></td>
+        </tr>`).join("") : `<tr><td colspan="7" class="muted" style="text-align:center">Nenhuma reserva.</td></tr>`}
+      </tbody>
+    </table></div>
+    <p class="finehint">O Excel traz todos os campos (acompanhante, empresa, CIO e contatos, triagem e preferências) na aba <b>Agendamentos</b> e as vagas por horário na aba <b>Ocupação</b>.</p>`;
+  const ex = document.getElementById("export"); if (ex) ex.onclick = exportXlsx;
+  content().querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { dayFilter = b.dataset.d; paintReport(); });
+  const rs = document.getElementById("rep-search");
+  if (rs) rs.oninput = () => { repQuery = rs.value; filterTable("rep-tbody", repQuery); };
+  if (repQuery) filterTable("rep-tbody", repQuery);
+
+  content().querySelectorAll("[data-cancelres]").forEach((b) => b.onclick = async () => {
+    const r = rows.find((x) => x.id === b.dataset.cancelres);
+    if (!confirm(`Cancelar a reserva de ${r?r.name:"esta convidada"}? Ela será avisada por e-mail e a vaga liberada.`)) return;
+    const { error } = await sb.rpc("admin_cancel_reservation", { p_reservation_id: b.dataset.cancelres });
+    if (error) { alert("Erro: "+(error.message||"")); return; }
+    renderReport();
+  });
+  content().querySelectorAll("[data-resched]").forEach((b) => b.onclick = () => {
+    const id = b.dataset.resched;
+    const r = rows.find((x) => x.id === id);
+    const td = b.closest(".acts");
+    const opts = slots.map((s) => {
+      const free = s.capacity - (usedBy[s.id]||0);
+      const isCur = r && s.id === r.slot_id;
+      const full = free <= 0 && !isCur;
+      return `<option value="${s.id}" ${isCur?"selected":""} ${full?"disabled":""}>${esc(s.date_label)} ${esc(s.starts)}–${esc(s.ends)} ${isCur?"(atual)":`(${free} ${free===1?"vaga":"vagas"})`}</option>`;
+    }).join("");
+    td.innerHTML = `<select class="rs-sel" style="max-width:210px">${opts}</select> <button class="cta cta--sm rs-ok">OK</button> <button class="rm rs-x">x</button>`;
+    td.querySelector(".rs-x").onclick = () => paintReport();
+    td.querySelector(".rs-ok").onclick = async () => {
+      const newSlot = Number(td.querySelector(".rs-sel").value);
+      if (r && newSlot === r.slot_id) { paintReport(); return; }
+      const { error } = await sb.rpc("admin_reschedule", { p_reservation_id: id, p_slot_id: newSlot });
+      if (error) { alert(error.message && error.message.includes("SLOT_FULL") ? "Esse horário está lotado." : ("Erro: "+(error.message||""))); return; }
+      renderReport();
+    };
+  });
+}
+function exportXlsx() {
+  const ev = selEvento();
+  const filtered = (dayFilter === "all" ? rows : rows.filter((r) => r.slot.day_id === dayFilter)).sort((a,b)=>(a.slot.position||0)-(b.slot.position||0));
+  const ag = filtered.map((r) => ({
+    Dia: r.slot.date_label, "Horário": `${r.slot.starts}–${r.slot.ends}`, Acompanhante: r.name, Empresa: r.empresa, CIO: r.cio_nome,
+    "E-mail do CIO": r.cio_email, "Telefone do CIO": r.cio_telefone, "E-mail dela": r.email, "Telefone dela": r.phone, CPF: r.cpf,
+    Nascimento: brDate(r.birth), Gestante: r.pregnant, "Cirurgia (3 meses)": r.surgery, "Detalhe cirurgia": r.surgery_detail,
+    "Procedimento": r.medium, "Intensidade": r.intensity, "Feito em": r.created_at ? new Date(r.created_at).toLocaleString("pt-BR") : "",
+  }));
+  const counts = {}; rows.forEach((r) => { counts[r.slot_id]=(counts[r.slot_id]||0)+1; });
+  const oc = slots.map((s) => ({ Dia:s.date_label, "Horário":`${s.starts}–${s.ends}`, Capacidade:s.capacity, Reservadas:counts[s.id]||0, Livres:s.capacity-(counts[s.id]||0) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ag), "Agendamentos");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oc), "Ocupação");
+  XLSX.writeFile(wb, `agendamentos-${ev?ev.slug:"evento"}.xlsx`);
+}
+
+/* ---------------- CONVIDADAS ---------------- */
+function fmtDoc(d, cpf) {
+  if (!cpf) return d || "";
+  const s = onlyDigits(d);
+  return s.length === 11 ? `${s.slice(0,3)}.${s.slice(3,6)}.${s.slice(6,9)}-${s.slice(9)}` : (d||"");
+}
+function printGuests(ev, list, cpf) {
+  const rows = (list||[]).map((p) => `<tr><td>${esc(p.nome)}</td><td>${esc(fmtDoc(p.doc,cpf))}</td><td>${esc(p.empresa||"")}</td><td>${esc(p.cio_nome||"")}</td><td>${esc(p.cio_email||"")}</td><td>${esc(p.cio_telefone||"")}</td></tr>`).join("");
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Convidadas — ${esc(ev.nome)}</title>
+    <style>body{font-family:Arial,sans-serif;color:#0E2A38;padding:24px}h1{font-size:18px;margin:0 0 4px}p{color:#555;font-size:12px;margin:0 0 12px}
+    table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#0E2A38;color:#fff}
+    tr:nth-child(even) td{background:#f4f6f5}@media print{@page{margin:14mm}}</style></head><body>
+    <h1>Convidadas — ${esc(ev.nome)}</h1><p>${(list||[]).length} cadastradas · gerado em ${new Date().toLocaleString("pt-BR")}</p>
+    <table><thead><tr><th>Nome</th><th>${cpf?"CPF":"E-mail"}</th><th>Empresa</th><th>CIO</th><th>E-mail do CIO</th><th>Telefone do CIO</th></tr></thead><tbody>${rows}</tbody></table>
+    <script>window.onload=function(){window.print()}<\/script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Habilite pop-ups para imprimir a lista."); return; }
+  w.document.write(html); w.document.close();
+}
+async function renderGuests() {
+  shell("guests", true);
+  editingDoc = null;
+  const ev = selEvento(); if (!ev) { content().innerHTML = `<p class="finehint">Nenhum evento.</p>`; return; }
+  const cpf = ev.identificacao === "cpf";
+  const { data: list } = await sb.rpc("admin_list_participantes", { p_evento_id: ev.id });
+  const n = (list||[]).length;
+  content().innerHTML = `
+    <h2 style="margin-top:6px">Convidadas — ${esc(ev.nome)}</h2>
+    <div class="card">
+      <h3 id="c-title">Cadastrar convidada avulsa</h3>
+      <div class="grid2">
+        <div class="field"><label>${cpf?"CPF":"E-mail"}<span class="req"> *</span></label><input id="c-doc" placeholder="${cpf?"000.000.000-00":"convidada@email.com"}" /></div>
+        <div class="field"><label>Nome da convidada<span class="req"> *</span></label><input id="c-nome" placeholder="Nome completo" /></div>
+        <div class="field"><label>Empresa</label><input id="c-empresa" /></div>
+        <div class="field"><label>Nome do CIO</label><input id="c-cio" /></div>
+        <div class="field"><label>E-mail do CIO</label><input id="c-cioemail" /></div>
+        <div class="field"><label>Telefone do CIO</label><input id="c-ciofone" placeholder="(00) 00000-0000" /></div>
+      </div>
+      <button id="c-go" class="cta">Cadastrar convidada</button>
+      <button id="c-cancel" class="tab" style="display:none;margin-left:8px">Cancelar edição</button>
+      <p id="c-msg" class="msg"></p>
+    </div>
+    <div class="bar" style="margin-top:18px">
+      <p class="finehint" style="margin:0"><b>${n}</b> cadastradas · entram pelo ${cpf?"CPF":"e-mail"}.</p>
+      <button id="print" class="export" ${n?"":"disabled"}>🖨 Imprimir lista</button>
+    </div>
+    <input id="c-search" class="search" placeholder="Buscar por nome, CPF, empresa ou CIO…" />
+    <div class="tablewrap tablewrap--scroll"><table>
+      <thead><tr><th>Nome</th><th>${cpf?"CPF":"E-mail"}</th><th>Empresa</th><th>CIO</th><th></th></tr></thead>
+      <tbody id="c-tbody">${n ? list.map((p) => `<tr><td>${esc(p.nome)}</td><td class="mono">${esc(fmtDoc(p.doc,cpf))}</td><td>${esc(p.empresa||"")}</td><td>${esc(p.cio_nome||"")}</td><td><button class="rm" data-edit="${esc(p.doc)}" style="color:var(--accent)">editar</button></td></tr>`).join("") : `<tr><td colspan="5" class="muted" style="text-align:center">Nenhuma convidada.</td></tr>`}</tbody>
+    </table></div>`;
+  const pb = document.getElementById("print"); if (pb) pb.onclick = () => printGuests(ev, list, cpf);
+  const cs = document.getElementById("c-search"); if (cs) cs.addEventListener("input", () => filterTable("c-tbody", cs.value));
+  const cdoc = document.getElementById("c-doc"); if (cpf) cdoc.addEventListener("input", () => { cdoc.value = maskCpf(cdoc.value); });
+  const cfone = document.getElementById("c-ciofone"); cfone.addEventListener("input", () => { cfone.value = maskPhone(cfone.value); });
+
+  const setMode = (edit) => {
+    document.getElementById("c-title").textContent = edit ? "Editar cadastro da convidada" : "Cadastrar convidada avulsa";
+    document.getElementById("c-go").textContent = edit ? "Salvar alterações" : "Cadastrar convidada";
+    document.getElementById("c-cancel").style.display = edit ? "inline-block" : "none";
+  };
+  const clearForm = () => { ["c-doc","c-nome","c-empresa","c-cio","c-cioemail","c-ciofone"].forEach((id)=>document.getElementById(id).value=""); editingDoc=null; setMode(false); document.getElementById("c-msg").textContent=""; };
+
+  content().querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => {
+    const p = (list||[]).find((x) => String(x.doc) === b.dataset.edit); if (!p) return;
+    document.getElementById("c-doc").value = fmtDoc(p.doc, cpf);
+    document.getElementById("c-nome").value = p.nome||"";
+    document.getElementById("c-empresa").value = p.empresa||"";
+    document.getElementById("c-cio").value = p.cio_nome||"";
+    document.getElementById("c-cioemail").value = p.cio_email||"";
+    document.getElementById("c-ciofone").value = p.cio_telefone||"";
+    editingDoc = String(p.doc); setMode(true);
+    document.getElementById("c-doc").scrollIntoView({ behavior:"smooth", block:"center" });
+  });
+  document.getElementById("c-cancel").onclick = clearForm;
+
+  document.getElementById("c-go").onclick = async () => {
+    const msg = document.getElementById("c-msg");
+    const doc = document.getElementById("c-doc").value.trim();
+    const nome = document.getElementById("c-nome").value.trim();
+    if (!doc || !nome) { msg.className="msg msg--err"; msg.textContent="Preencha ao menos "+(cpf?"CPF":"e-mail")+" e nome."; return; }
+    if (cpf && onlyDigits(doc).length!==11) { msg.className="msg msg--err"; msg.textContent="CPF inválido (11 dígitos)."; return; }
+    const campos = {
+      p_nome: nome,
+      p_empresa: document.getElementById("c-empresa").value.trim(),
+      p_cio_nome: document.getElementById("c-cio").value.trim(),
+      p_cio_email: document.getElementById("c-cioemail").value.trim(),
+      p_cio_telefone: document.getElementById("c-ciofone").value.trim(),
+    };
+    let error;
+    if (editingDoc) {
+      ({ error } = await sb.rpc("admin_update_participante", { p_evento_id: ev.id, p_old_doc: editingDoc, p_new_doc: doc, ...campos }));
+    } else {
+      ({ error } = await sb.rpc("admin_add_participante", { p_evento_id: ev.id, p_doc: doc, ...campos }));
+    }
+    if (error) {
+      const m = error.message||"";
+      msg.className="msg msg--err";
+      msg.textContent = m.includes("DOC_EM_USO") ? "Já existe outra convidada com esse CPF." : m.includes("CPF_INVALIDO") ? "CPF inválido." : ("Erro: "+m);
+      return;
+    }
+    renderGuests();
+  };
+}
+
+/* ---------------- EVENTOS ---------------- */
+function statusBadge(s){ return `<span class="badge b-${s}">${s}</span>`; }
+async function renderEvents() {
+  shell("events", false);
+  const lists = {};
+  await Promise.all(eventos.map(async (e) => { const { data } = await sb.rpc("admin_list_participantes", { p_evento_id: e.id }); lists[e.id] = data || []; }));
+  content().innerHTML = `
+    <h2 style="margin-top:6px">Eventos</h2>
+    ${eventos.map((e) => {
+      const link = `${location.origin}/index.html?evento=${encodeURIComponent(e.slug)}`;
+      return `<div class="card">
+        <div class="evhead">
+          <div><h3>${esc(e.nome)} ${statusBadge(e.status)}</h3>
+            <span class="muted" style="font-size:12.5px">${esc(e.slug)} · ${e.identificacao==="cpf"?"por CPF":"por e-mail"}${e.data_inicio?" · "+brDate(e.data_inicio):""}${e.data_fim?"–"+brDate(e.data_fim):""}</span></div>
+          <div><select data-status="${e.id}">
+            ${["rascunho","aberto","encerrado"].map((s)=>`<option value="${s}" ${e.status===s?"selected":""}>${s}</option>`).join("")}
+          </select></div>
+        </div>
+        <div class="evlink"><input type="text" readonly value="${esc(link)}" /><button class="cta cta--sm" data-copy="${esc(link)}">Copiar link</button></div>
+        <div class="imp">
+          <span class="muted" style="font-size:12.5px">Horários:</span>
+          <a class="cta cta--sm" href="modelo-slots.xlsx" download>⬇ Baixar modelo</a>
+          <input type="file" accept=".xlsx,.xls" data-imp="slots" data-ev="${e.id}" />
+        </div>
+        <div class="imp">
+          <span class="muted" style="font-size:12.5px">Convidadas:</span>
+          <a class="cta cta--sm" href="modelo-participantes.xlsx" download>⬇ Baixar modelo</a>
+          <input type="file" accept=".xlsx,.xls" data-imp="part" data-ev="${e.id}" />
+        </div>
+        <p class="warn">Importar horários substitui a grade e apaga as reservas deste evento.</p>
+        <p class="msg" id="ev-msg-${e.id}"></p>
+        <div class="bar" style="margin:10px 0 0">
+          <p class="finehint" style="margin:0"><b>${(lists[e.id]||[]).length}</b> convidadas</p>
+          <button class="export cta--sm" data-print="${e.id}" ${(lists[e.id]||[]).length?"":"disabled"}>🖨 Imprimir</button>
+        </div>
+        <input class="search" data-search="${e.id}" placeholder="Buscar nesta lista…" style="margin-top:8px" />
+        <div class="tablewrap tablewrap--scroll" style="max-height:220px">
+          <table><thead><tr><th>Nome</th><th>${e.identificacao==="cpf"?"CPF":"E-mail"}</th><th>CIO</th></tr></thead>
+          <tbody id="ev-tbody-${e.id}">${(lists[e.id]||[]).length ? lists[e.id].map((p) => `<tr><td>${esc(p.nome)}</td><td class="mono">${esc(fmtDoc(p.doc, e.identificacao==="cpf"))}</td><td>${esc(p.cio_nome||"")}</td></tr>`).join("") : `<tr><td colspan="3" class="muted" style="text-align:center">Nenhuma convidada.</td></tr>`}</tbody></table>
+        </div>
+      </div>`;
+    }).join("")}
+    <div class="card">
+      <h3>Novo evento</h3>
+      <div class="grid2">
+        <div class="field"><label>Nome<span class="req"> *</span></label><input id="n-nome" placeholder="Nome do evento 2026" /></div>
+        <div class="field"><label>Identificador do link (slug)<span class="req"> *</span></label><input id="n-slug" placeholder="evento2026" /></div>
+        <div class="field"><label>Local</label><input id="n-local" /></div>
+        <div class="field"><label>Identificação</label>
+          <select id="n-ident"><option value="cpf">Por CPF</option><option value="email">Por e-mail</option></select></div>
+        <div class="field"><label>Data início</label><input id="n-ini" type="date" /></div>
+        <div class="field"><label>Data fim</label><input id="n-fim" type="date" /></div>
+        <div class="field"><label>Subtítulo</label><input id="n-sub" placeholder="Agendamento de massagem · Local" /></div>
+        <div class="field"><label>Patrocinador (nome)</label><input id="n-pat" placeholder="DAREDE" /></div>
+      </div>
+      <button id="n-go" class="cta">Criar evento</button>
+      <p id="n-msg" class="msg"></p>
+    </div>`;
+
+  // status
+  content().querySelectorAll("[data-status]").forEach((sel) => sel.onchange = async () => {
+    const id = Number(sel.dataset.status);
+    const { error } = await sb.rpc("admin_set_evento_status", { p_id: id, p_status: sel.value });
+    const m = document.getElementById("ev-msg-"+id);
+    if (error) { m.className="msg msg--err"; m.textContent="Erro ao mudar status."; return; }
+    const e = eventos.find(x=>x.id===id); if (e) e.status = sel.value;
+    m.className="msg msg--ok"; m.textContent="Status atualizado.";
+  });
+  // copiar link
+  content().querySelectorAll("[data-copy]").forEach((b) => b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copy); b.textContent="Copiado"; });
+  // importar
+  content().querySelectorAll('[data-imp]').forEach((inp) => inp.onchange = () => importFile(inp));
+  // criar evento
+  document.getElementById("n-go").onclick = createEvento;
+  // imprimir lista de convidadas de cada evento
+  content().querySelectorAll("[data-print]").forEach((b) => b.onclick = () => {
+    const id = Number(b.dataset.print); const e = eventos.find((x) => x.id === id);
+    printGuests(e, lists[id], e.identificacao === "cpf");
+  });
+  content().querySelectorAll("[data-search]").forEach((inp) => inp.addEventListener("input", () => filterTable("ev-tbody-"+inp.dataset.search, inp.value)));
+}
+
+async function importFile(inp) {
+  const id = Number(inp.dataset.ev), kind = inp.dataset.imp;
+  const m = document.getElementById("ev-msg-"+id);
+  const file = inp.files[0]; if (!file) return;
+  m.className="msg"; m.textContent="Lendo planilha…";
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:"array" });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, raw:false, defval:"" });
+    let rows, fn;
+    if (kind === "slots") {
+      rows = mapRows(aoa, [
+        {key:"data", m:["data"]},{key:"inicio", m:["início","inicio"]},{key:"fim", m:["fim"]},{key:"capacidade", m:["capacidade"]},
+      ]).filter((r) => r.data && r.inicio && !(r.data==="13/08/2026" && r.inicio==="08:30" && r.fim==="09:05"));
+      fn = () => sb.rpc("admin_import_slots", { p_evento_id: id, p_rows: rows });
+    } else {
+      rows = mapRows(aoa, [
+        {key:"cpf", m:["cpf"]},{key:"nome", m:["nome da convidada","nome"]},{key:"empresa", m:["empresa"]},
+        {key:"cio_nome", m:["nome do cio"]},{key:"cio_email", m:["e-mail do cio","email do cio"]},{key:"cio_telefone", m:["telefone do cio"]},
+      ]).filter((r) => r.cpf && r.nome && onlyDigits(r.cpf) !== "00000000000");
+      fn = () => sb.rpc("admin_import_participantes", { p_evento_id: id, p_rows: rows });
+    }
+    if (!rows.length) { m.className="msg msg--err"; m.textContent="Não encontrei linhas válidas. Confira o cabeçalho da planilha."; inp.value=""; return; }
+    m.textContent = `Enviando ${rows.length} linhas…`;
+    const { data, error } = await fn();
+    if (error) { m.className="msg msg--err"; m.textContent="Erro: "+(error.message||""); }
+    else { m.className="msg msg--ok"; m.textContent = `${kind==="slots"?"Horários":"Convidadas"} importados: ${data}.`; }
+  } catch (e) { m.className="msg msg--err"; m.textContent="Erro ao ler o arquivo: "+e.message; }
+  inp.value="";
+}
+function mapRows(aoa, spec) {
+  const norm = (s) => String(s||"").trim().toLowerCase();
+  let hr=-1, cols={};
+  for (let i=0;i<aoa.length;i++){
+    const row=(aoa[i]||[]).map(norm); const found={};
+    spec.forEach((s)=>{ const idx=row.findIndex((c)=>s.m.includes(c)); if(idx>=0) found[s.key]=idx; });
+    if (Object.keys(found).length >= Math.min(2, spec.length)) { hr=i; cols=found; break; }
+  }
+  if (hr<0) return [];
+  const out=[];
+  for (let i=hr+1;i<aoa.length;i++){
+    const row=aoa[i]||[]; const o={}; let any=false;
+    spec.forEach((s)=>{ const v = cols[s.key]!=null ? String(row[cols[s.key]]??"").trim() : ""; o[s.key]=v; if(v) any=true; });
+    if (any) out.push(o);
+  }
+  return out;
+}
+async function createEvento() {
+  const m = document.getElementById("n-msg");
+  const nome = document.getElementById("n-nome").value.trim();
+  const slug = document.getElementById("n-slug").value.trim().toLowerCase().replace(/[^a-z0-9-]/g,"");
+  if (!nome || !slug) { m.className="msg msg--err"; m.textContent="Nome e slug são obrigatórios."; return; }
+  const { error } = await sb.rpc("admin_create_evento", {
+    p_slug: slug, p_nome: nome, p_local: document.getElementById("n-local").value.trim(),
+    p_inicio: document.getElementById("n-ini").value || null, p_fim: document.getElementById("n-fim").value || null,
+    p_identificacao: document.getElementById("n-ident").value,
+    p_subtitulo: document.getElementById("n-sub").value.trim(),
+    p_patrocinador_nome: document.getElementById("n-pat").value.trim(), p_patrocinador_logo: "",
+  });
+  if (error) { m.className="msg msg--err"; m.textContent="Erro: "+(error.message||""); return; }
+  await loadEventos(); view="events"; route();
+}
+
+/* ---------------- ADMINISTRADORES ---------------- */
+async function renderAdmins() {
+  shell("admins", false);
+  const { data: list, error } = await sb.rpc("admin_list_admins");
+  if (error) { content().innerHTML = `<p class="msg msg--err">Não foi possível carregar.</p>`; return; }
+  const checkinUrl = `${location.origin}/checkin.html`;
+  const roleLabel = (r) => r === "checkin" ? "Só check-in" : "Completo";
+  content().innerHTML = `
+    <h2 style="margin-top:6px">Controle de acesso</h2>
+    <p class="finehint"><b>Completo</b>: abre este painel inteiro. <b>Só check-in</b>: abre apenas a página de check-in do resort.</p>
+    <div class="card">${(list||[]).map((e)=>`<div class="adminrow"><span>${esc(e.email)}</span><span style="display:flex;gap:10px;align-items:center"><select data-role="${esc(e.email)}"><option value="admin" ${e.role==="admin"?"selected":""}>Completo</option><option value="checkin" ${e.role==="checkin"?"selected":""}>Só check-in</option></select><button class="rm" data-email="${esc(e.email)}">remover</button></span></div>`).join("") || '<p class="muted">Nenhum.</p>'}</div>
+    <div class="card">
+      <h3>Adicionar acesso</h3>
+      <div class="grid2">
+        <div class="field"><label>E-mail</label><input id="a-email" type="email" placeholder="staff@empresa.com.br" /></div>
+        <div class="field"><label>Tipo de acesso</label>
+          <select id="a-role"><option value="admin">Completo (painel)</option><option value="checkin">Só check-in (resort)</option></select></div>
+      </div>
+      <button id="a-go" class="cta">Adicionar</button><p id="a-msg" class="msg"></p>
+    </div>
+    <div class="card">
+      <h3>Página de check-in do resort</h3>
+      <p class="finehint">Compartilhe este link com quem tem acesso "Só check-in". Eles entram pelo próprio e-mail.</p>
+      <div class="evlink"><input type="text" readonly value="${esc(checkinUrl)}" /><button class="cta cta--sm" data-copy="${esc(checkinUrl)}">Copiar link</button></div>
+    </div>`;
+  content().querySelectorAll(".rm").forEach((b) => b.onclick = async () => {
+    if (!confirm(`Remover ${b.dataset.email}?`)) return;
+    const { error } = await sb.rpc("admin_remove_admin", { p_email: b.dataset.email });
+    if (error) { alert(error.message==="LAST_ADMIN"?"Não é possível remover o último acesso completo.":("Erro: "+error.message)); return; }
+    renderAdmins();
+  });
+  content().querySelectorAll("[data-copy]").forEach((b) => b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copy); b.textContent="Copiado"; });
+  content().querySelectorAll("[data-role]").forEach((sel) => sel.onchange = async () => {
+    const { error } = await sb.rpc("admin_add_admin", { p_email: sel.dataset.role, p_role: sel.value });
+    if (error) alert(error.message==="LAST_ADMIN" ? "Não é possível rebaixar o último acesso completo." : ("Erro: "+error.message));
+    renderAdmins();
+  });
+  document.getElementById("a-go").onclick = async () => {
+    const m = document.getElementById("a-msg"); const email = document.getElementById("a-email").value.trim();
+    const role = document.getElementById("a-role").value;
+    if (!email.includes("@")) { m.className="msg msg--err"; m.textContent="E-mail inválido."; return; }
+    const { error } = await sb.rpc("admin_add_admin", { p_email: email, p_role: role });
+    if (error) { m.className="msg msg--err"; m.textContent="Erro: "+error.message; return; }
+    renderAdmins();
+  };
+}
+
+/* ---------------- BOOT ---------------- */
+async function loadEventos() {
+  const { data, error } = await sb.rpc("admin_list_eventos");
+  if (error) return false;
+  eventos = data || [];
+  if (!selId || !eventos.find((e)=>e.id===selId)) selId = (eventos.find((e)=>e.status==="aberto")||eventos[0]||{}).id || null;
+  return true;
+}
+async function boot() {
+  if (booted) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { renderLogin(); return; }
+  const { data: ok, error } = await sb.rpc("is_admin");
+  if (error || !ok) { await sb.auth.signOut(); renderLogin("Este e-mail não tem permissão de administrador."); return; }
+  booted = true;
+  await loadEventos();
+  route();
+}
+// Só reage à entrada/saída de sessão — ignora refresh de token e foco de aba
+sb.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT") { booted = false; renderLogin(); return; }
+  if (!booted) boot();
+});
+boot();
+</script>
+</body>
+</html>

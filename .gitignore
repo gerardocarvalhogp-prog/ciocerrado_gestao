@@ -1,0 +1,39 @@
+# =====================================================================
+# DADO PESSOAL — NUNCA VERSIONAR
+#
+# participantes_rows.csv tem cpf, nome, empresa, e-mail e telefone de
+# participantes reais. Uma vez commitado, sai do historico so com
+# reescrita — e se for para um remoto publico, vazou.
+#
+# As planilhas de programacao e de participantes carregam os mesmos
+# dados. Os "modelo-*.xlsx" sao gabaritos vazios e sao liberados
+# explicitamente mais abaixo.
+# =====================================================================
+*.csv
+*.xlsx
+!modelo-participantes.xlsx
+!modelo-slots.xlsx
+
+# Segredos. A chave anon nos .html e publica por design e fica
+# versionada; a service_role NUNCA entra aqui.
+.env
+.env.*
+*.key
+*service_role*
+
+# Supabase CLI — estado local da maquina
+**/.temp/
+.branches/
+
+# Preview local das telas apontando para o Supabase de desenvolvimento
+.local-preview/
+
+# Backups e copias de trabalho
+_backup-meus/
+*[Cc]opia*.html
+*.bak
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store

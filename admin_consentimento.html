@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Relatório de consentimento IBM — CIO Cerrado Experience 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --tinta:#101820;--papel:#f5f6f4;--branco:#fff;--verde:#2f7d5b;--verde-claro:#e8f2ed;
+    --linha:#dfe2de;--texto:#1b1f22;--suave:#5d6670;--alerta:#a4342b;--ambar:#8a6d1f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--papel);color:var(--texto);font-family:'IBM Plex Sans',system-ui,sans-serif;line-height:1.5}
+  header.barra{background:var(--tinta);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  header .marca{font-weight:700;letter-spacing:.06em;font-size:14px}
+  header .quem{font-size:13px;color:#b7bfc7}
+  main{max-width:1180px;margin:0 auto;padding:26px 20px 70px}
+  h1{font-size:22px;margin:0 0 4px;font-weight:600}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--suave);font-weight:600}
+  .cartao{background:#fff;border:1px solid var(--linha);border-radius:14px;padding:22px;margin-bottom:18px}
+  input,button,select{font:inherit}
+  input[type=email],input[type=search]{width:100%;padding:11px 13px;border:1px solid var(--linha);border-radius:10px}
+  button{font-weight:600;cursor:pointer;border-radius:10px;padding:11px 18px;border:1px solid transparent}
+  .btn-primario{background:var(--verde);color:#fff}
+  .btn-primario:hover{background:#27684b}
+  .btn-secundario{background:#fff;border:1px solid var(--linha);color:var(--texto)}
+  .btn-secundario:hover{border-color:var(--verde);color:var(--verde)}
+  button:focus-visible,input:focus-visible{outline:3px solid var(--verde);outline-offset:2px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{background:#fff;border:1px solid var(--linha);border-radius:14px;padding:18px}
+  .kpi .n{font-size:30px;font-weight:600;font-family:'IBM Plex Mono',monospace;line-height:1.1}
+  .kpi .r{font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-top:6px}
+  .kpi.aceito .n{color:var(--verde)} .kpi.recusado .n{color:var(--alerta)} .kpi.pendente .n{color:var(--ambar)}
+  .barra-progresso{height:8px;border-radius:99px;background:var(--linha);overflow:hidden;display:flex;margin-top:14px}
+  .barra-progresso i{display:block;height:100%}
+  .acoes{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  .acoes .busca{flex:1;min-width:220px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
+  th{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--suave);background:#fafbfa;position:sticky;top:0}
+  tbody tr:hover{background:#fafbfa}
+  .pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}
+  .pill.aceito{background:var(--verde-claro);color:#1f5a41}
+  .pill.recusado{background:#fbeceb;color:#7d2820}
+  .pill.pendente{background:#fdf4e0;color:#7a5f18}
+  .sim{color:var(--verde);font-weight:600}
+  .nao{color:var(--suave)}
+  .tabela-wrap{max-height:64vh;overflow:auto;border:1px solid var(--linha);border-radius:12px;background:#fff}
+  .oculto{display:none}
+  .erro{background:#fbeceb;border-left:4px solid var(--alerta);color:#7d2820;padding:12px 14px;border-radius:0 8px 8px 0;font-size:14px;margin-bottom:12px}
+  .ok{background:var(--verde-claro);border-left:4px solid var(--verde);color:#1f5a41;padding:12px 14px;border-radius:0 8px 8px 0;font-size:14px;margin-bottom:12px}
+  .suave{color:var(--suave);font-size:13.5px}
+  .mono{font-family:'IBM Plex Mono',monospace;font-size:13px}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <span class="marca">CIO CERRADO · EXPERIENCE 2026</span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<main>
+
+  <!-- LOGIN -->
+  <section id="tela-login" class="cartao" style="max-width:460px;margin:40px auto">
+    <div class="eyebrow">Área restrita</div>
+    <h1>Relatório de consentimento IBM</h1>
+    <p class="suave">Acesso apenas para e-mails administradores. Enviamos um link de acesso por e-mail.</p>
+    <div id="msg-login"></div>
+    <label class="suave" for="email-admin">E-mail administrador</label>
+    <input type="email" id="email-admin" placeholder="voce@ciocerrado.com.br" autocomplete="email">
+    <p></p>
+    <button class="btn-primario" id="btn-login" style="width:100%">Receber link de acesso</button>
+  </section>
+
+  <!-- RELATÓRIO -->
+  <section id="tela-relatorio" class="oculto">
+    <div class="eyebrow">Data Privacy &amp; Notice and Choice</div>
+    <h1>Consentimento IBM — participantes confirmados</h1>
+    <p class="suave" id="carimbo"></p>
+
+    <div class="cards" id="kpis"></div>
+    <div class="barra-progresso" id="progresso"></div>
+    <p class="suave" style="margin-top:8px">Base: participantes com inscrição aprovada. “Recusado” = respondeu e não autorizou. “Pendente” = ainda não respondeu.</p>
+
+    <div class="acoes" style="margin-top:22px">
+      <span class="busca"><input type="search" id="busca" placeholder="Buscar por nome, empresa ou e-mail"></span>
+      <select id="filtro" style="padding:11px 13px;border:1px solid var(--linha);border-radius:10px;background:#fff">
+        <option value="">Todos os status</option>
+        <option value="aceito">Aceitos</option>
+        <option value="recusado">Recusados</option>
+        <option value="pendente">Pendentes</option>
+      </select>
+      <button class="btn-secundario" id="btn-atualizar">Atualizar</button>
+      <button class="btn-secundario" id="btn-export-completo">Baixar relatório completo (.xlsx)</button>
+      <button class="btn-primario" id="btn-export-ibm">Baixar Leads Report IBM (.xlsx)</button>
+      <button class="btn-secundario" id="btn-sair">Sair</button>
+    </div>
+
+    <div id="msg-rel"></div>
+
+    <div class="tabela-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Nome</th><th>Empresa</th><th>Cargo</th><th>E-mail</th>
+          <th>Status</th><th>Opt-in e-mail</th><th>Opt-in telefone</th><th>Respondido em</th><th>Versão do texto</th>
+        </tr></thead>
+        <tbody id="linhas"></tbody>
+      </table>
+    </div>
+    <p class="suave" id="rodape-contagem"></p>
+  </section>
+</main>
+
+<script>
+// ===== CONFIGURAÇÃO — mesmo projeto Supabase do agendamento =====
+const SUPABASE_URL = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_3m3DPfUXoRKR_qNaTKa3_g_Jw2NeA_F";
+// Código de campanha que a IBM informar (coluna "Campaign Code"). Deixe vazio se ainda não houver.
+const CAMPAIGN_CODE = '';
+const ACTIVITY_TYPE = 'Event';
+const ACTIVITY_NAME = 'CIO Cerrado Experience 2026';
+const ATTENDEE_TYPE  = 'Cliente';
+// ================================================================
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+let dados = [];
+
+function msg(el, texto, tipo='ok'){ el.innerHTML = texto ? `<div class="${tipo}">${texto}</div>` : ''; }
+
+// ---------- sessão ----------
+async function iniciar(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){
+    $('quem').textContent = session.user.email;
+    $('tela-login').classList.add('oculto');
+    $('tela-relatorio').classList.remove('oculto');
+    await carregar();
+  }
+}
+sb.auth.onAuthStateChange((_e, s) => { if(s) iniciar(); });
+
+$('btn-login').addEventListener('click', async () => {
+  const email = $('email-admin').value.trim().toLowerCase();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return msg($('msg-login'),'Informe um e-mail válido.','erro');
+  const btn = $('btn-login'); btn.disabled = true; btn.textContent = 'Enviando...';
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href } });
+  btn.disabled = false; btn.textContent = 'Receber link de acesso';
+  msg($('msg-login'), error ? 'Não foi possível enviar o link agora.' : 'Link enviado. Confira sua caixa de entrada.', error ? 'erro' : 'ok');
+});
+
+$('btn-sair').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+
+// ---------- dados ----------
+async function carregar(){
+  msg($('msg-rel'),'');
+  const { data, error } = await sb.from('ibm_consent')
+    .select('nome,sobrenome,empresa,cargo,industria,pais,email,telefone,status,optin_email,optin_telefone,texto_versao,respondido_em')
+    .order('status', { ascending:true }).order('nome', { ascending:true });
+  if(error){ return msg($('msg-rel'),'Sem permissão para ler o relatório com este e-mail, ou falha de conexão.','erro'); }
+  dados = data || [];
+  $('carimbo').textContent = 'Atualizado em ' + new Date().toLocaleString('pt-BR');
+  render();
+  if(!dados.length) await diagnosticar();
+}
+
+// Quando a lista vem vazia, o servidor explica o porque.
+async function diagnosticar(){
+  const { data, error } = await sb.rpc('ibm_diag');
+  if(error){
+    return msg($('msg-rel'), 'A lista voltou vazia e a função de diagnóstico não existe ainda. Rode o 05_diagnostico.sql no SQL Editor e recarregue esta página.', 'erro');
+  }
+  const d = Array.isArray(data) ? data[0] : data;
+  if(!d) return;
+  if(d.total_participantes === 0){
+    return msg($('msg-rel'), 'A tabela de participantes está vazia — o seed do 01_schema_consentimento_ibm.sql não chegou a rodar neste projeto.', 'erro');
+  }
+  if(!d.e_admin){
+    return msg($('msg-rel'),
+      `Você está autenticado como <strong>${esc(d.email_do_login)}</strong>, que não está na lista de administradores. `+
+      `Há ${d.total_participantes} participantes na base, mas a RLS os esconde de quem não é admin.<br><br>`+
+      `Para liberar, rode no SQL Editor:<br>`+
+      `<code>insert into public.ibm_admins (email) values ('${esc(d.email_do_login)}');</code><br><br>`+
+      `Admins de hoje: ${esc(d.admins || '(nenhum)')}`, 'erro');
+  }
+  msg($('msg-rel'), `Você é admin (${esc(d.email_do_login)}) e há ${d.total_participantes} participantes na base, mas nenhum voltou na consulta. Verifique as permissões de leitura no 05_diagnostico.sql.`, 'erro');
+}
+$('btn-atualizar').addEventListener('click', carregar);
+$('busca').addEventListener('input', render);
+$('filtro').addEventListener('change', render);
+
+function filtrados(){
+  const q = $('busca').value.trim().toLowerCase();
+  const f = $('filtro').value;
+  return dados.filter(r => {
+    if(f && r.status !== f) return false;
+    if(!q) return true;
+    return [r.nome,r.sobrenome,r.empresa,r.email,r.cargo].join(' ').toLowerCase().includes(q);
+  });
+}
+
+function render(){
+  const total = dados.length;
+  const c = s => dados.filter(r => r.status === s).length;
+  const a = c('aceito'), rec = c('recusado'), pen = c('pendente');
+  const resp = a + rec;
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="n">${total}</div><div class="r">Participantes</div></div>
+    <div class="kpi"><div class="n">${resp}</div><div class="r">Responderam</div></div>
+    <div class="kpi aceito"><div class="n">${a}</div><div class="r">Aceitaram</div></div>
+    <div class="kpi recusado"><div class="n">${rec}</div><div class="r">Recusaram</div></div>
+    <div class="kpi pendente"><div class="n">${pen}</div><div class="r">Pendentes</div></div>`;
+  const pct = n => total ? (n/total*100).toFixed(1)+'%' : '0%';
+  $('progresso').innerHTML =
+    `<i style="width:${pct(a)};background:var(--verde)" title="Aceitaram"></i>`+
+    `<i style="width:${pct(rec)};background:var(--alerta)" title="Recusaram"></i>`+
+    `<i style="width:${pct(pen)};background:#e6c76a" title="Pendentes"></i>`;
+
+  const lista = filtrados();
+  $('linhas').innerHTML = lista.map((r,i) => `
+    <tr>
+      <td class="mono">${i+1}</td>
+      <td>${esc(r.nome)} ${esc(r.sobrenome||'')}</td>
+      <td>${esc(r.empresa||'')}</td>
+      <td>${esc(r.cargo||'')}</td>
+      <td class="mono">${esc(r.email)}</td>
+      <td><span class="pill ${r.status}">${({aceito:'Aceito',recusado:'Recusado',pendente:'Pendente'})[r.status]}</span></td>
+      <td class="${r.optin_email?'sim':'nao'}">${r.optin_email?'Sim':'Não'}</td>
+      <td class="${r.optin_telefone?'sim':'nao'}">${r.optin_telefone?'Sim':'Não'}</td>
+      <td class="mono">${r.respondido_em ? new Date(r.respondido_em).toLocaleString('pt-BR') : '—'}</td>
+      <td class="mono">${esc(r.texto_versao||'—')}</td>
+    </tr>`).join('');
+  $('rodape-contagem').textContent = `Exibindo ${lista.length} de ${total} participantes.`;
+}
+function esc(s){ return String(s??'').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+// ---------- exportações ----------
+function baixar(aoa, aba, arquivo, larguras){
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = larguras.map(w => ({ wch:w }));
+  ws['!freeze'] = { xSplit:0, ySplit:1 };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, aba);
+  XLSX.writeFile(wb, arquivo);
+}
+const hoje = () => new Date().toISOString().slice(0,10);
+
+$('btn-export-completo').addEventListener('click', () => {
+  const cab = ['Nome','Sobrenome','Empresa','Cargo','Segmento','E-mail','Telefone','Status',
+               'Opt-in e-mail','Opt-in telefone','Respondido em','Versão do texto aceito'];
+  const linhas = dados.map(r => [
+    r.nome, r.sobrenome||'', r.empresa||'', r.cargo||'', r.industria||'', r.email, r.telefone||'',
+    ({aceito:'Aceito',recusado:'Recusado',pendente:'Pendente'})[r.status],
+    r.optin_email?'Sim':'Não', r.optin_telefone?'Sim':'Não',
+    r.respondido_em ? new Date(r.respondido_em).toLocaleString('pt-BR') : '',
+    r.texto_versao||''
+  ]);
+  baixar([cab, ...linhas], 'Consentimento IBM',
+    `Consentimento_IBM_CIOCerrado_${hoje()}.xlsx`, [22,20,26,24,20,34,16,12,13,15,20,16]);
+});
+
+// Somente quem AUTORIZOU entra no arquivo entregue à IBM.
+$('btn-export-ibm').addEventListener('click', () => {
+  const cab = ['Campaign Code (IBM use only)','Attendee Type','First Name','Last Name','Company','Industry',
+               'Country','Job Role','Email','Phone','Opt in Email (Yes/No)','Opt in Phone (Yes/No)',
+               'Activity Type','Activity Name'];
+  const elegiveis = dados.filter(r => r.status === 'aceito');
+  if(!elegiveis.length) return msg($('msg-rel'),'Ainda não há participantes com autorização registrada.','erro');
+  const linhas = elegiveis.map(r => [
+    CAMPAIGN_CODE, ATTENDEE_TYPE, r.nome, r.sobrenome||'', r.empresa||'', r.industria||'',
+    r.pais||'Brazil', r.cargo||'', r.email, r.telefone||'',
+    r.optin_email?'Yes':'No', r.optin_telefone?'Yes':'No', ACTIVITY_TYPE, ACTIVITY_NAME
+  ]);
+  baixar([cab, ...linhas], 'EDIT',
+    `LeadsReport_IBM_CIOCerrado_${hoje()}.xlsx`, [26,14,20,20,26,20,12,24,34,16,20,20,16,30]);
+  msg($('msg-rel'), `Arquivo gerado com ${elegiveis.length} leads autorizados, no layout exigido pela IBM.`,'ok');
+});
+
+iniciar();
+</script>
+</body>
+</html>

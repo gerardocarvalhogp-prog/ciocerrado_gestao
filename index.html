@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agendamento de massagem</title>
+<link rel="icon" type="image/png" href="favicon.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0E2A38;--bg:#EDF1F0;--surface:#FFFFFF;--line:rgba(14,42,56,.12);--muted:#5B7180;
+  --accent:#12925A;--accent-d:#0E7A4A;--accent-l:#3FBE82;--gold:#B8862B;--sageEmpty:#9DB1BC}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:560px;margin:0 auto;padding:0 20px;position:relative;min-height:100vh}
+.brandbar{display:flex;align-items:center;justify-content:space-between;gap:14px 18px;flex-wrap:wrap;margin:0 -20px;padding:15px 20px;background:var(--ink);color:#fff}
+.brandbar__brand{display:flex;flex-direction:column;gap:4px}
+.brandbar__logo{height:44px;width:auto;display:block;margin-bottom:2px}
+.brandbar__evt{font-weight:700;font-size:13.5px;color:#fff;letter-spacing:.01em}
+.brandbar__sub{font-size:11px;color:#9db7c2}
+.brandbar__spon{display:flex;flex-direction:column;align-items:flex-end;gap:6px;line-height:1.15;text-align:right}
+.brandbar__sponlabel{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#7d97a3}
+.brandbar__sponpill{background:#fff;border-radius:10px;padding:8px 14px;display:inline-flex;align-items:center}
+.brandbar__sponpill img{height:26px;width:auto;display:block}
+.brandbar__sponname{font-size:16px;font-weight:700;letter-spacing:.14em;color:#fff}
+.hero{padding:22px 2px 10px}.hero--sm{padding:16px 2px 4px}
+.eyebrow{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+h1{font-family:'Fraunces',serif;font-weight:400;font-size:36px;line-height:1.08;margin:12px 0 0;letter-spacing:-.01em}
+h1 em{font-style:italic;color:var(--accent);font-weight:500}
+.lede{margin-top:14px;color:#41566a;font-size:14.5px;line-height:1.55}
+.banner{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:18px 0 6px;font-size:13.5px;line-height:1.5;display:flex;gap:12px;justify-content:space-between;align-items:flex-start}
+.banner strong{color:var(--gold)}
+.daytabs{display:flex;gap:8px;margin:22px 0 18px;flex-wrap:wrap}
+.daytab{flex:1;min-width:70px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit}
+.daytab__wd{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.daytab__dt{font-family:'Fraunces',serif;font-size:18px;color:var(--ink)}
+.daytab--on{background:var(--ink);border-color:var(--ink)}
+.daytab--on .daytab__wd{color:#9db7c2}.daytab--on .daytab__dt{color:#fff}
+.slots{list-style:none;display:flex;flex-direction:column;gap:10px}
+.slot{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-family:inherit;text-align:left;transition:transform .16s,box-shadow .16s,border-color .16s}
+.slot:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 24px -16px rgba(14,42,56,.55);border-color:var(--accent)}
+.slot:disabled{cursor:not-allowed;opacity:.5}
+.slot__time{font-family:'Fraunces',serif;font-size:21px}
+.slot__dash{color:var(--muted);margin:0 2px}
+.slot__meta{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+.slot__label{font-size:12px;color:var(--accent);font-weight:500}
+.slot--full .slot__label{color:var(--muted)}
+.slot--current{border-color:var(--gold);background:#fffdf7}
+.slot--current .slot__label{color:var(--gold);font-weight:600}
+.seats{display:inline-flex;gap:4px;flex-wrap:wrap;max-width:112px;justify-content:flex-end}
+.seat{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--sageEmpty)}
+.seat--full{background:var(--accent);border-color:var(--accent)}
+.footlinks{margin:22px 0;text-align:center;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
+.link{background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;font-family:inherit}
+.link--danger{color:#a5453a}.link--muted{color:var(--muted)}.dot{color:var(--muted)}
+.back{background:none;border:none;color:var(--accent);font-size:13.5px;cursor:pointer;padding:14px 0 2px;font-family:inherit}
+.chosen{background:var(--ink);color:#fff;border-radius:16px;padding:16px 18px;margin:14px 0 12px;display:flex;flex-direction:column;gap:2px}
+.chosen__label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9db7c2}
+.chosen__time{font-family:'Fraunces',serif;font-size:24px;margin-top:4px}
+.chosen__date{font-size:13px;color:#c3d3da}
+.forwho{font-size:13px;color:#41566a;margin:0 0 18px;line-height:1.5}
+.forwho b{color:var(--ink)}
+.field{margin-bottom:18px;display:flex;flex-direction:column;gap:7px}
+.field label{font-size:13.5px;font-weight:500}
+.req{color:#a5453a}
+.field input{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font-size:15px;font-family:inherit;color:var(--ink)}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(18,146,90,.15)}
+.field input.invalid{border-color:#c06a5c}
+.radios{display:flex;gap:8px;flex-wrap:wrap}
+.radio{flex:1;min-width:80px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px;font-size:14px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.radio--on{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+.hint{font-size:12.5px;color:#a5453a;line-height:1.4}
+.cta{width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;padding:16px;font-size:15.5px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:6px;transition:background .16s,transform .16s}
+.cta:hover:not(:disabled){background:var(--accent-d);transform:translateY(-1px)}
+.cta:disabled{opacity:.45;cursor:not-allowed}
+.cta--ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.finehint{font-size:12.5px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5}
+.center{text-align:center;padding-top:30px}
+.check{width:64px;height:64px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 6px}
+.doneh{font-family:'Fraunces',serif;font-weight:400;font-size:28px;margin-top:16px}
+.donep{color:#41566a;font-size:14.5px;line-height:1.55;margin:12px auto 0;max-width:38ch}
+.ticket{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;margin:24px 0;display:flex;flex-direction:column;gap:4px;align-items:center}
+.ticket__time{font-family:'Fraunces',serif;font-size:28px}
+.ticket__date{font-size:13px;letter-spacing:.06em;color:var(--accent);text-transform:uppercase}
+.linkbox{display:flex;gap:8px;margin:8px 0 4px}
+.linkbox input{flex:1;font-size:12.5px;color:var(--muted)}
+.actions{display:flex;flex-direction:column;gap:14px;align-items:center;margin-top:8px}
+.actions .cta--ghost{max-width:280px}
+.sponsor{margin:34px -20px 0;padding:24px 20px 30px;background:var(--surface);border-top:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:10px}
+.sponsor__label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.sponsor__logo{height:34px;width:auto}
+.sponsor__name{font-size:24px;font-weight:700;letter-spacing:.16em;color:var(--ink)}
+.loading{text-align:center;color:var(--muted);padding:40px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:380px){h1{font-size:30px}.brandbar__evt{font-size:15px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brandbar" id="brandbar">
+    <div class="brandbar__brand">
+      <img src="logo-cio-cerrado.webp" alt="CIO Cerrado" class="brandbar__logo" />
+      <div class="brandbar__evt" id="bb-evt">CIO Cerrado</div>
+      <div class="brandbar__sub" id="bb-sub">Agendamento de massagem</div>
+    </div>
+    <div class="brandbar__spon" id="bb-spon"></div>
+  </header>
+  <div id="app"><div class="loading">Carregando…</div></div>
+  <footer class="sponsor" id="footer" style="display:none">
+    <span class="sponsor__label">Uma ação patrocinada por</span>
+    <span id="foot-spon"></span>
+  </footer>
+</div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+/* ===================== CONFIGURE AQUI ===================== */
+const SUPABASE_URL = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_3m3DPfUXoRKR_qNaTKa3_g_Jw2NeA_F";  // cole aqui a chave sb_publishable_...
+/* ========================================================= */
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById("app");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+const isEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((e||"").trim());
+const onlyDigits = (s) => (s||"").replace(/\D/g,"");
+const firstName = (n) => (n||"").trim().split(/\s+/)[0] || "";
+function maskCpf(v){ const d=onlyDigits(v).slice(0,11); let o=d.slice(0,3); if(d.length>3)o+="."+d.slice(3,6); if(d.length>6)o+="."+d.slice(6,9); if(d.length>9)o+="-"+d.slice(9,11); return o; }
+function maskPhone(v){ const d=onlyDigits(v).slice(0,11); if(!d) return ""; if(d.length<=2) return "("+d; if(d.length<=6) return "("+d.slice(0,2)+") "+d.slice(2); if(d.length<=10) return "("+d.slice(0,2)+") "+d.slice(2,6)+"-"+d.slice(6); return "("+d.slice(0,2)+") "+d.slice(2,7)+"-"+d.slice(7); }
+
+let ev = null; // evento atual
+let state = { doc:"", participante:null, slots:[], activeDay:"", form:{}, reschedToken:null, current:null };
+
+const isCpf = () => (ev?.identificacao || "cpf") === "cpf";
+const docOk = (v) => isCpf() ? onlyDigits(v).length === 11 : isEmail(v);
+
+function applyBranding() {
+  document.getElementById("bb-evt").textContent = ev.nome || "Evento";
+  document.getElementById("bb-sub").textContent = ev.subtitulo || "Agendamento de massagem";
+  document.title = ev.nome || "Agendamento de massagem";
+  const spon = document.getElementById("bb-spon");
+  const foot = document.getElementById("foot-spon");
+  if (ev.patrocinador_logo) {
+    spon.innerHTML = `<span class="brandbar__sponlabel">Patrocínio</span><span class="brandbar__sponpill"><img src="${esc(ev.patrocinador_logo)}" alt="${esc(ev.patrocinador_nome||'Patrocinador')}" /></span>`;
+    foot.innerHTML = `<img src="${esc(ev.patrocinador_logo)}" alt="${esc(ev.patrocinador_nome||'Patrocinador')}" class="sponsor__logo" />`;
+    document.getElementById("footer").style.display = "flex";
+  } else if (ev.patrocinador_nome) {
+    spon.innerHTML = `<span class="brandbar__sponlabel">Patrocínio</span><span class="brandbar__sponname">${esc(ev.patrocinador_nome)}</span>`;
+    foot.innerHTML = `<span class="sponsor__name">${esc(ev.patrocinador_nome)}</span>`;
+    document.getElementById("footer").style.display = "flex";
+  }
+}
+
+const groupByDay = (rows) => {
+  const days = [];
+  for (const s of rows) {
+    let d = days.find((x) => x.id === s.day_id);
+    if (!d) { d = { id:s.day_id, dateLabel:s.date_label, weekday:s.weekday, slots:[] }; days.push(d); }
+    d.slots.push(s);
+  }
+  return days;
+};
+async function loadAvailability() {
+  const { data, error } = await sb.rpc("list_availability", { p_evento_id: ev.id });
+  if (error) { app.innerHTML = `<div class="loading">Não foi possível carregar os horários. Recarregue a página.</div>`; return null; }
+  state.slots = data;
+  if (!state.activeDay && data.length) state.activeDay = data[0].day_id;
+  return data;
+}
+
+/* --------------------------- TELAS --------------------------- */
+function renderGate() {
+  const cpf = isCpf();
+  const titulo = ev.titulo || "Reserve seu momento de massagem";
+  app.innerHTML = `
+    <section class="hero">
+      <div class="eyebrow">Bem-estar no evento</div>
+      <h1>${esc(titulo)}</h1>
+      <p class="lede">Para começar, informe seu ${cpf ? "CPF" : "e-mail"}.</p>
+    </section>
+    <div class="field" style="margin-top:8px">
+      <label>${cpf ? "CPF" : "E-mail"}</label>
+      <input id="g-doc" type="${cpf ? "text" : "email"}" inputmode="${cpf ? "numeric" : "email"}" placeholder="${cpf ? "000.000.000-00" : "seu@email.com"}" />
+      <span id="g-hint" class="hint" style="display:none"></span>
+    </div>
+    <button id="g-go" class="cta">Continuar</button>
+    <div class="footlinks"><button id="g-have" class="link">Já tenho reserva</button></div>`;
+  const input = document.getElementById("g-doc");
+  const hint = document.getElementById("g-hint");
+  const btn = document.getElementById("g-go");
+  const go = async () => {
+    const val = input.value.trim();
+    hint.style.display = "none";
+    if (!docOk(val)) { hint.textContent = cpf ? "Informe um CPF válido (11 dígitos)." : "Informe um e-mail válido."; hint.style.display="block"; return; }
+    btn.disabled = true; btn.textContent = "Verificando…";
+    const { data, error } = await sb.rpc("get_participante", { p_evento_id: ev.id, p_doc: val });
+    btn.disabled = false; btn.textContent = "Continuar";
+    if (error) { hint.textContent = "Erro ao verificar. Tente novamente."; hint.style.display="block"; return; }
+    if (!data || !data.length) { hint.textContent = `${cpf ? "CPF" : "E-mail"} não encontrado na lista de participantes.`; hint.style.display="block"; return; }
+    state.doc = val; state.participante = data[0];
+    await loadAvailability();
+    renderSlots();
+  };
+  if (cpf) input.addEventListener("input", () => { input.value = maskCpf(input.value); });
+  btn.onclick = go;
+  input.onkeydown = (e) => { if (e.key === "Enter") go(); };
+  document.getElementById("g-have").onclick = renderHave;
+}
+
+function slotHtml(s, currentSlotId) {
+  const full = s.free <= 0;
+  const isCurrent = currentSlotId && s.id === currentSlotId;
+  const dots = Array.from({ length: s.capacity }).map((_, i) =>
+    `<span class="seat ${i < (s.capacity - s.free) ? "seat--full" : ""}"></span>`).join("");
+  const label = isCurrent ? "sua reserva" : full ? "esgotado" : `${s.free} ${s.free === 1 ? "vaga" : "vagas"}`;
+  return `<li><button class="slot ${full ? "slot--full" : ""} ${isCurrent ? "slot--current" : ""}"
+    data-id="${s.id}" ${full && !isCurrent ? "disabled" : ""}>
+    <span class="slot__time">${s.starts}<span class="slot__dash">–</span>${s.ends}</span>
+    <span class="slot__meta"><span class="seats">${dots}</span><span class="slot__label">${label}</span></span>
+  </button></li>`;
+}
+
+function renderSlots() {
+  const days = groupByDay(state.slots);
+  const day = days.find((d) => d.id === state.activeDay) || days[0];
+  const resched = !!state.reschedToken;
+  const currentSlotId = state.current ? state.current.slot_id : null;
+  const saud = (ev.saudacao || "Bem-vindo(a)");
+  const nome = state.participante ? esc(firstName(state.participante.nome)) : "";
+  app.innerHTML = `
+    <section class="hero">
+      <div class="eyebrow">${nome ? saud + ", " + nome : "Bem-estar no evento"}</div>
+      <h1>Escolha seu<br><em>horário</em></h1>
+      <p class="lede">Selecione um horário livre.</p>
+    </section>
+    ${resched && state.current ? `<div class="banner"><div><strong>Remarcando</strong> — você tem
+      <b>${state.current.starts}–${state.current.ends}</b>, ${state.current.date_label}. Escolha um novo horário.</div>
+      <button id="keep" class="link">Manter o atual</button></div>` : ""}
+    <div class="daytabs">
+      ${days.map((d) => `<button class="daytab ${d.id === day.id ? "daytab--on" : ""}" data-day="${d.id}">
+        <span class="daytab__wd">${d.weekday}</span><span class="daytab__dt">${d.dateLabel}</span></button>`).join("")}
+    </div>
+    <ul class="slots">${day.slots.map((s) => slotHtml(s, currentSlotId)).join("")}</ul>
+    ${resched ? "" : `<div class="footlinks"><button id="have" class="link">Já tenho reserva</button></div>`}`;
+  app.querySelectorAll("[data-day]").forEach((b) => b.onclick = () => { state.activeDay = b.dataset.day; renderSlots(); });
+  app.querySelectorAll(".slot[data-id]").forEach((b) => b.onclick = () => onPickSlot(Number(b.dataset.id)));
+  const keep = document.getElementById("keep"); if (keep) keep.onclick = () => renderManage(state.current);
+  const have = document.getElementById("have"); if (have) have.onclick = renderHave;
+}
+
+async function onPickSlot(slotId) {
+  const s = state.slots.find((x) => x.id === slotId);
+  if (state.reschedToken) {
+    const { data, error } = await sb.rpc("reschedule", { p_token: state.reschedToken, p_slot_id: slotId });
+    if (error) { await loadAvailability(); alert(errMsg(error)); renderSlots(); return; }
+    const moved = { ...data, starts: s.starts, ends: s.ends, date_label: s.date_label, weekday: s.weekday, day_id: s.day_id };
+    state.reschedToken = null; state.current = moved; renderConfirmation(moved, true); return;
+  }
+  renderForm(s);
+}
+
+function renderForm(slot) {
+  state.form = { pregnant:"", surgery:"", surgeryDetail:"", medium:"", intensity:"" };
+  const p = state.participante || {};
+  app.innerHTML = `
+    <button class="back" id="back">← voltar aos horários</button>
+    <div class="chosen">
+      <span class="chosen__label">Horário escolhido</span>
+      <span class="chosen__time">${slot.starts}–${slot.ends}</span>
+      <span class="chosen__date">${slot.weekday} · ${slot.date_label}</span>
+    </div>
+    <p class="forwho">Agendando para <b>${esc(p.nome || "")}</b>${p.empresa ? " · " + esc(p.empresa) : ""}${p.cio_nome ? "<br>Acompanhante de " + esc(p.cio_nome) : ""}</p>
+    <div class="field"><label>E-mail<span class="req"> *</span></label>
+      <input id="f-email" type="email" inputmode="email" placeholder="seu@email.com" ${isCpf() ? "" : `value="${esc(state.doc)}"`} /></div>
+    <div class="field"><label>Telefone (com DDD)<span class="req"> *</span></label>
+      <input id="f-phone" type="tel" inputmode="tel" placeholder="(00) 00000-0000" /></div>
+    <div class="field"><label>Data de nascimento<span class="req"> *</span></label>
+      <input id="f-birth" type="date" /></div>
+    ${radio("Está gestante?", "pregnant", ["Sim","Não"])}
+    ${radio("Realizou alguma cirurgia nos últimos 3 meses?", "surgery", ["Sim","Não"])}
+    <div id="surgery-detail" style="display:none" class="field">
+      <label>Se sim, qual?<span class="req"> *</span></label>
+      <input id="f-surgdetail" type="text" placeholder="Descreva brevemente" /></div>
+    ${radio("Preferência para o procedimento", "medium", ["Óleo","Creme"])}
+    ${radio("Intensidade da massagem", "intensity", ["Leve","Moderada","Intensa"])}
+    <button id="f-go" class="cta" disabled>Confirmar reserva</button>
+    <p class="finehint">Usaremos seu e-mail e telefone para enviar a confirmação e, se necessário, entrar em contato.</p>`;
+  document.getElementById("back").onclick = renderSlots;
+  bindRadios();
+  const fphone = document.getElementById("f-phone");
+  fphone.addEventListener("input", () => { fphone.value = maskPhone(fphone.value); });
+  ["f-email","f-phone","f-birth","f-surgdetail"].forEach((id) =>
+    document.getElementById(id).addEventListener("input", validateForm));
+  document.getElementById("f-go").onclick = () => submitForm(slot);
+}
+function radio(label, key, opts) {
+  return `<div class="field"><label>${label}<span class="req"> *</span></label>
+    <div class="radios" data-key="${key}">
+      ${opts.map((o) => `<button type="button" class="radio" data-val="${esc(o)}">${esc(o)}</button>`).join("")}
+    </div></div>`;
+}
+function bindRadios() {
+  app.querySelectorAll(".radios").forEach((group) => {
+    const key = group.dataset.key;
+    group.querySelectorAll(".radio").forEach((b) => b.onclick = () => {
+      group.querySelectorAll(".radio").forEach((x) => x.classList.remove("radio--on"));
+      b.classList.add("radio--on");
+      state.form[key] = b.dataset.val;
+      if (key === "surgery") document.getElementById("surgery-detail").style.display = b.dataset.val === "Sim" ? "flex" : "none";
+      validateForm();
+    });
+  });
+}
+function validateForm() {
+  const email = document.getElementById("f-email").value.trim();
+  const phone = onlyDigits(document.getElementById("f-phone").value);
+  const birth = document.getElementById("f-birth").value;
+  const f = state.form;
+  const detailOk = f.surgery !== "Sim" || (document.getElementById("f-surgdetail")?.value.trim());
+  const ok = isEmail(email) && phone.length >= 10 && birth && f.pregnant && f.surgery && detailOk && f.medium && f.intensity;
+  document.getElementById("f-go").disabled = !ok;
+}
+async function submitForm(slot) {
+  const btn = document.getElementById("f-go");
+  btn.disabled = true; btn.textContent = "Confirmando…";
+  const f = state.form;
+  const { data, error } = await sb.rpc("reserve", {
+    p_evento_id: ev.id, p_doc: state.doc,
+    p_email: document.getElementById("f-email").value.trim(),
+    p_phone: document.getElementById("f-phone").value.trim(),
+    p_birth: document.getElementById("f-birth").value,
+    p_pregnant: f.pregnant, p_surgery: f.surgery,
+    p_surgery_detail: f.surgery === "Sim" ? document.getElementById("f-surgdetail").value.trim() : "",
+    p_medium: f.medium, p_intensity: f.intensity, p_slot_id: slot.id });
+  if (error) {
+    btn.disabled = false; btn.textContent = "Confirmar reserva";
+    if ((error.message||"").includes("ALREADY_BOOKED")) alert("Você já tem uma reserva. Use 'Já tenho reserva' para remarcar ou cancelar.");
+    else if ((error.message||"").includes("EMAIL_EM_USO")) alert("Este e-mail já está em uso por outra convidada. Por favor, informe outro e-mail.");
+    else if ((error.message||"").includes("SLOT_FULL")) { alert("Esse horário acabou de esgotar. Escolha outro."); await loadAvailability(); renderSlots(); }
+    else alert(errMsg(error));
+    return;
+  }
+  state.current = { ...data, starts: slot.starts, ends: slot.ends, date_label: slot.date_label, weekday: slot.weekday };
+  renderConfirmation(state.current, false);
+}
+
+function renderConfirmation(res, moved) {
+  const url = `${location.origin}${location.pathname}?evento=${encodeURIComponent(ev.slug)}&token=${res.manage_token}`;
+  app.innerHTML = `
+    <section class="center">
+      <div class="check">✓</div>
+      <h2 class="doneh">${moved ? "Reserva remarcada" : "Reserva confirmada"}</h2>
+      <p class="donep">Enviamos um e-mail para <b>${esc(res.email)}</b> com o comprovante e o link para gerenciar sua reserva.</p>
+      <div class="ticket">
+        <span class="ticket__time">${res.starts}–${res.ends}</span>
+        <span class="ticket__date">${res.weekday} · ${res.date_label}</span>
+      </div>
+      <p class="finehint" style="margin-top:0">Guarde seu link de gerenciamento:</p>
+      <div class="linkbox"><input id="mlink" type="text" readonly value="${esc(url)}" /><button id="copy" class="cta cta--ghost" style="width:auto;padding:12px 16px;margin:0">Copiar</button></div>
+      <div class="actions" style="margin-top:18px"><button id="go-manage" class="cta cta--ghost">Gerenciar minha reserva</button></div>
+    </section>`;
+  document.getElementById("copy").onclick = () => { const el = document.getElementById("mlink"); el.select(); navigator.clipboard?.writeText(el.value); document.getElementById("copy").textContent = "Copiado"; };
+  document.getElementById("go-manage").onclick = () => renderManage(res);
+}
+
+async function renderManage(res) {
+  state.current = res;
+  await loadAvailability();
+  app.innerHTML = `
+    <section class="hero hero--sm"><div class="eyebrow">Sua reserva</div></section>
+    <div class="ticket">
+      <span class="ticket__time">${res.starts}–${res.ends}</span>
+      <span class="ticket__date">${res.weekday} · ${res.date_label}</span>
+    </div>
+    <div class="actions">
+      <button id="resched" class="cta cta--ghost">Remarcar horário</button>
+      <button id="cancel" class="link link--danger">Cancelar reserva</button>
+    </div>`;
+  document.getElementById("resched").onclick = () => { state.reschedToken = res.manage_token; state.activeDay = res.day_id || ""; renderSlots(); };
+  document.getElementById("cancel").onclick = async () => {
+    if (!confirm("Tem certeza que deseja cancelar sua reserva?")) return;
+    const { error } = await sb.rpc("cancel", { p_token: res.manage_token });
+    if (error) { alert(errMsg(error)); return; }
+    app.innerHTML = `<section class="center"><h2 class="doneh">Reserva cancelada</h2>
+      <p class="donep">Sua vaga foi liberada. Você pode agendar de novo quando quiser.</p>
+      <div class="actions" style="margin-top:18px"><button id="again" class="cta cta--ghost">Fazer novo agendamento</button></div></section>`;
+    document.getElementById("again").onclick = () => { history.replaceState(null,"",location.pathname + "?evento=" + encodeURIComponent(ev.slug)); state.doc ? (loadAvailability().then(renderSlots)) : renderGate(); };
+  };
+}
+
+function renderHave() {
+  const cpf = isCpf();
+  app.innerHTML = `
+    <button class="back" id="back">← voltar</button>
+    <section class="hero hero--sm"><div class="eyebrow">Já tenho reserva</div></section>
+    <p class="lede" style="margin-top:4px">Informe seu ${cpf ? "CPF" : "e-mail"} e reenviaremos o link de gerenciamento para o e-mail cadastrado.</p>
+    <div class="field" style="margin-top:16px"><label>${cpf ? "CPF" : "E-mail"}</label>
+      <input id="h-doc" type="${cpf ? "text" : "email"}" inputmode="${cpf ? "numeric" : "email"}" placeholder="${cpf ? "000.000.000-00" : "seu@email.com"}" /><span id="h-hint" class="hint" style="display:none"></span></div>
+    <button id="h-go" class="cta">Reenviar link</button>`;
+  document.getElementById("back").onclick = () => state.doc ? renderSlots() : renderGate();
+  if (cpf) { const hd = document.getElementById("h-doc"); hd.addEventListener("input", () => { hd.value = maskCpf(hd.value); }); }
+  document.getElementById("h-go").onclick = async () => {
+    const val = document.getElementById("h-doc").value.trim();
+    const hint = document.getElementById("h-hint");
+    if (!docOk(val)) { hint.textContent = cpf ? "Informe um CPF válido." : "Informe um e-mail válido."; hint.style.display = "block"; return; }
+    try { await sb.rpc("resend_link", { p_evento_id: ev.id, p_doc: val }); } catch (e) {}
+    app.innerHTML = `<section class="center"><h2 class="doneh">Pronto</h2>
+      <p class="donep">Se houver uma reserva, reenviamos o link para o e-mail cadastrado.</p></section>`;
+  };
+}
+
+function errMsg(error) {
+  const m = error?.message || "";
+  if (m.includes("NOT_ALLOWED")) return "Este cadastro não está autorizado a agendar.";
+  if (m.includes("ALREADY_BOOKED")) return "Você já tem uma reserva ativa.";
+  if (m.includes("EMAIL_EM_USO")) return "Este e-mail já está em uso por outra convidada.";
+  if (m.includes("SLOT_FULL")) return "Horário esgotado.";
+  if (m.includes("EVENTO_FECHADO") || m.includes("EVENTO_INVALIDO")) return "Os agendamentos deste evento não estão abertos.";
+  if (m.includes("NOT_FOUND")) return "Reserva não encontrada.";
+  return "Ocorreu um erro. Tente novamente.";
+}
+
+/* --------------------------- INÍCIO --------------------------- */
+(async function init() {
+  const params = new URLSearchParams(location.search);
+  const slug = params.get("evento") || "cio2026";
+  const token = params.get("token");
+
+  const { data: evento, error } = await sb.from("eventos").select("*").eq("slug", slug).maybeSingle();
+  if (error || !evento) { app.innerHTML = `<div class="loading">Evento não encontrado. Verifique o link.</div>`; return; }
+  ev = evento;
+  applyBranding();
+
+  if (token) {
+    const { data, error: e2 } = await sb.rpc("get_reservation", { p_token: token });
+    if (e2 || !data) { app.innerHTML = `<div class="loading">Link inválido ou reserva já cancelada.</div>`; return; }
+    await loadAvailability();
+    const s = state.slots.find((x) => x.id === data.slot_id) || {};
+    renderManage({ ...data, starts:s.starts, ends:s.ends, date_label:s.date_label, weekday:s.weekday, day_id:s.day_id });
+    return;
+  }
+  if (ev.status !== "aberto") { app.innerHTML = `<div class="loading">Os agendamentos deste evento ainda não estão abertos.</div>`; return; }
+  renderGate();
+})();
+</script>
+</body>
+</html>

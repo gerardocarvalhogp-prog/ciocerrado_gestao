@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Autorização de contato — CIO Cerrado Experience 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --tinta:#101820;--papel:#f5f6f4;--branco:#ffffff;--verde:#2f7d5b;--verde-claro:#e8f2ed;
+    --linha:#dfe2de;--texto:#1b1f22;--suave:#5d6670;--alerta:#a4342b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--papel);color:var(--texto);font-family:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.55}
+  header.barra{background:var(--tinta);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  header.barra img{height:34px;display:block}
+  .marca-txt{font-weight:700;letter-spacing:.06em;font-size:14px}
+  main{max-width:720px;margin:0 auto;padding:28px 20px 64px}
+  .cartao{background:var(--branco);border:1px solid var(--linha);border-radius:14px;padding:26px 24px;margin-bottom:18px}
+  h1{font-size:24px;line-height:1.25;margin:0 0 8px;font-weight:600}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--suave);font-weight:600;margin-bottom:10px}
+  p{margin:0 0 14px}
+  .suave{color:var(--suave);font-size:14px}
+  label.campo{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+  input[type=email],input[type=tel],input[type=text],input[type=date]{
+    width:100%;padding:12px 14px;border:1px solid var(--linha);border-radius:10px;font:inherit;background:#fff;
+  }
+  input:focus-visible,button:focus-visible,input[type=checkbox]:focus-visible{outline:3px solid var(--verde);outline-offset:2px}
+  button{font:inherit;font-weight:600;cursor:pointer;border-radius:10px;padding:13px 22px;border:1px solid transparent}
+  .btn-primario{background:var(--verde);color:#fff;width:100%}
+  .btn-primario:hover{background:#27684b}
+  .btn-primario:disabled{background:#9db3a8;cursor:not-allowed}
+  .btn-texto{background:none;border:1px solid var(--linha);color:var(--texto);padding:10px 16px}
+  .alternador{display:flex;gap:8px;margin-bottom:12px}
+  .alternador button{
+    flex:1;background:#fff;border:1px solid var(--linha);color:var(--suave);
+    padding:10px 12px;font-size:14px;border-radius:10px;
+  }
+  .alternador button.on{background:var(--verde-claro);border-color:var(--verde);color:#1f5a41}
+  .ficha{border:1px solid var(--linha);border-radius:12px;background:#fbfcfb;padding:16px 18px;margin-bottom:22px;font-size:14.5px}
+  .ficha .linha{display:flex;justify-content:space-between;gap:14px;padding:6px 0;border-bottom:1px dashed var(--linha)}
+  .ficha .linha:last-child{border:0}
+  .ficha .rot{color:var(--suave);white-space:nowrap}
+  .ficha .val{font-weight:500;text-align:right}
+  .aviso-dp{background:var(--verde-claro);border-left:4px solid var(--verde);padding:16px 18px;border-radius:0 10px 10px 0;font-size:14.5px;margin:4px 0 22px}
+  .aviso-dp strong{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#1f5a41;margin-bottom:8px}
+  .opcao{display:flex;gap:13px;align-items:flex-start;border:1px solid var(--linha);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;background:#fff}
+  .opcao:hover{border-color:var(--verde)}
+  .opcao input{margin-top:3px;width:20px;height:20px;flex:none;accent-color:var(--verde)}
+  .opcao span{font-size:14.5px}
+  a{color:var(--verde);text-underline-offset:2px}
+  .erro{background:#fbeceb;border-left:4px solid var(--alerta);color:#7d2820;padding:12px 14px;border-radius:0 8px 8px 0;font-size:14px;margin-bottom:14px}
+  .oculto{display:none}
+  .resumo{border:1px solid var(--linha);border-radius:12px;padding:16px;background:#fbfcfb;font-size:14.5px}
+  .resumo div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--linha)}
+  .resumo div:last-child{border:0}
+  .tag{font-weight:600}.tag.sim{color:var(--verde)}.tag.nao{color:var(--suave)}
+  .mono{font-family:'IBM Plex Mono',monospace;font-size:13.5px}
+  footer{border-top:1px solid var(--linha);background:#fff;padding:20px;text-align:center}
+  footer img{height:22px;vertical-align:middle}
+  @media (prefers-reduced-motion:no-preference){.cartao{animation:sobe .35s ease both}}
+  @keyframes sobe{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <img src="logo-cio-cerrado.webp" alt="CIO Cerrado" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'marca-txt',textContent:'CIO CERRADO'}))">
+  <span class="marca-txt">EXPERIENCE 2026</span>
+</header>
+
+<main>
+
+  <!-- ETAPA 1 — IDENTIFICAÇÃO -->
+  <section id="etapa-acesso" class="cartao">
+    <div class="eyebrow">Autorização de contato</div>
+    <h1>Uma pergunta rápida antes do evento</h1>
+    <p>Um dos patrocinadores do CIO Cerrado Experience 2026 é a <strong>IBM</strong>. Para que possamos compartilhar contatos com ela dentro das regras de privacidade, precisamos da sua resposta — leva menos de um minuto.</p>
+    <p class="suave">Para confirmar que é você, pedimos o e-mail da sua inscrição e um dado de verificação.</p>
+
+    <div id="erro-acesso" class="erro oculto"></div>
+
+    <label class="campo" for="email">E-mail corporativo</label>
+    <input type="email" id="email" autocomplete="email" placeholder="voce@suaempresa.com.br" inputmode="email">
+    <p></p>
+
+    <label class="campo">Confirme com um destes dados</label>
+    <div class="alternador">
+      <button type="button" id="modo-nasc" class="on">Data de nascimento</button>
+      <button type="button" id="modo-cpf">CPF</button>
+    </div>
+
+    <div id="campo-nasc">
+      <input type="date" id="nascimento" min="1930-01-01" max="2010-12-31">
+    </div>
+    <div id="campo-cpf" class="oculto">
+      <input type="text" id="cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" autocomplete="off">
+    </div>
+    <p class="suave" style="margin-top:8px">Usamos esse dado apenas para conferir sua identidade. Ele não é armazenado nem compartilhado com a IBM.</p>
+
+    <button class="btn-primario" id="btn-entrar">Continuar</button>
+  </section>
+
+  <!-- ETAPA 2 — DADOS + PERGUNTAS -->
+  <section id="etapa-form" class="cartao oculto">
+    <div class="eyebrow">Autorização de contato</div>
+    <h1 id="saudacao">Olá</h1>
+    <p class="suave">Estes são os dados da sua inscrição. São eles que serão compartilhados, caso você autorize:</p>
+
+    <div class="ficha" id="ficha"></div>
+
+    <div class="aviso-dp">
+      <strong>Aviso de privacidade</strong>
+      Ao interagir com a IBM, você autoriza que a CIO Cerrado ou seu fornecedor forneça suas informações de contato à IBM, para que a IBM possa dar continuidade à sua interação. O uso das suas informações de contato pela IBM é regido pela
+      <a href="https://www.ibm.com/us-en/privacy" target="_blank" rel="noopener">Declaração de Privacidade da IBM</a>.
+    </div>
+
+    <p class="suave">As opções abaixo são opcionais. Marque apenas o que você autoriza:</p>
+
+    <label class="opcao">
+      <input type="checkbox" id="optin-email">
+      <span>Gostaria que meus dados de contato fossem compartilhados com a IBM para que ela possa me manter informado(a) sobre produtos, serviços e ofertas. Mais informações sobre como a IBM utiliza dados e as formas de
+        <a href="https://www.ibm.com/account/reg/us-en/signup?formid=urx-42537" target="_blank" rel="noopener">cancelar</a>
+        o recebimento dessas comunicações podem ser encontradas na
+        <a href="https://www.ibm.com/us-en/privacy" target="_blank" rel="noopener">Declaração de Privacidade da IBM</a>.
+        Caso seja um residente da Califórnia nos Estados Unidos, deve consultar a
+        <a href="https://www.ibm.com/us-en/privacy/ccpa" target="_blank" rel="noopener">Declaração de Privacidade Suplementar da Califórnia</a>.
+      </span>
+    </label>
+
+    <label class="opcao">
+      <input type="checkbox" id="optin-telefone">
+      <span>Autorizo também o contato por <strong>telefone ou WhatsApp</strong>, nas mesmas condições descritas acima.</span>
+    </label>
+
+    <div id="bloco-telefone" class="oculto">
+      <label class="campo" for="telefone">Telefone para contato</label>
+      <input type="tel" id="telefone" placeholder="(62) 90000-0000" autocomplete="tel">
+      <p class="suave" style="margin-top:6px">Corrija aqui se o número acima estiver desatualizado.</p>
+    </div>
+
+    <div id="erro-form" class="erro oculto"></div>
+    <button class="btn-primario" id="btn-registrar">Registrar minha resposta</button>
+    <p class="suave" style="margin-top:12px">Se você não marcar nenhuma opção, registramos que <strong>não</strong> autoriza o compartilhamento para marketing — e isso não afeta em nada a sua participação no evento.</p>
+  </section>
+
+  <!-- ETAPA 3 — CONFIRMAÇÃO -->
+  <section id="etapa-fim" class="cartao oculto">
+    <div class="eyebrow">Resposta registrada</div>
+    <h1 id="titulo-fim">Obrigado!</h1>
+    <p id="texto-fim"></p>
+    <div class="resumo">
+      <div><span>Comunicações por e-mail</span><span id="r-email" class="tag"></span></div>
+      <div><span>Comunicações por telefone/WhatsApp</span><span id="r-fone" class="tag"></span></div>
+      <div><span>Registrado em</span><span id="r-data" class="mono"></span></div>
+    </div>
+    <p style="margin-top:18px"><button class="btn-texto" id="btn-alterar">Alterar minha resposta</button></p>
+  </section>
+
+  <p class="suave" style="text-align:center">Algum dado errado ou dificuldade para entrar? Escreva para <a href="mailto:comunicacao@ciocerrado.com.br">comunicacao@ciocerrado.com.br</a></p>
+</main>
+
+<footer>
+  <img src="logo-darede.png" alt="" onerror="this.remove()">
+  <div class="suave">CIO Cerrado Experience 2026 · Tauá Resort, Alexânia · 12 a 16 de agosto de 2026</div>
+</footer>
+
+<script>
+// ===== CONFIGURAÇÃO — use o MESMO projeto Supabase do agendamento =====
+const SUPABASE_URL = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_3m3DPfUXoRKR_qNaTKa3_g_Jw2NeA_F";
+// =====================================================================
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+let emailAtual = '', chaveAtual = '', modo = 'nasc';
+
+function etapa(qual){
+  ['etapa-acesso','etapa-form','etapa-fim'].forEach(e => $(e).classList.toggle('oculto', e !== qual));
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function erro(el, msg){ el.textContent = msg; el.classList.remove('oculto'); }
+function limpa(el){ el.classList.add('oculto'); }
+function esc(s){ return String(s??'').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+// alternador do dado de verificação
+$('modo-nasc').onclick = () => {
+  modo = 'nasc';
+  $('modo-nasc').classList.add('on'); $('modo-cpf').classList.remove('on');
+  $('campo-nasc').classList.remove('oculto'); $('campo-cpf').classList.add('oculto');
+};
+$('modo-cpf').onclick = () => {
+  modo = 'cpf';
+  $('modo-cpf').classList.add('on'); $('modo-nasc').classList.remove('on');
+  $('campo-cpf').classList.remove('oculto'); $('campo-nasc').classList.add('oculto');
+};
+
+// máscara simples de CPF
+$('cpf').addEventListener('input', e => {
+  const d = e.target.value.replace(/\D/g,'').slice(0,11);
+  e.target.value = d
+    .replace(/^(\d{3})(\d)/,'$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/,'$1.$2.$3')
+    .replace(/\.(\d{3})(\d{1,2})$/,'.$1-$2');
+});
+
+function montarChave(){
+  if(modo === 'cpf'){
+    const d = $('cpf').value.replace(/\D/g,'');
+    return d.length === 11 ? d : null;               // 11 dígitos
+  }
+  const v = $('nascimento').value;                    // aaaa-mm-dd
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [a,m,dd] = v.split('-');
+  return dd + m + a;                                  // ddmmaaaa
+}
+
+$('optin-telefone').addEventListener('change', e => {
+  $('bloco-telefone').classList.toggle('oculto', !e.target.checked);
+});
+
+// ---------- entrar ----------
+$('btn-entrar').addEventListener('click', async () => {
+  limpa($('erro-acesso'));
+  const email = $('email').value.trim().toLowerCase();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return erro($('erro-acesso'),'Informe um e-mail válido.');
+  const chave = montarChave();
+  if(!chave) return erro($('erro-acesso'), modo === 'cpf'
+      ? 'Informe os 11 dígitos do CPF.' : 'Informe sua data de nascimento completa.');
+
+  const btn = $('btn-entrar'); btn.disabled = true; btn.textContent = 'Verificando...';
+  try{
+    const { data, error } = await sb.rpc('ibm_autenticar', { p_email: email, p_chave: chave });
+    if(error) throw error;
+    const r = Array.isArray(data) ? data[0] : data;
+
+    if(!r || !r.ok){
+      if(r && r.motivo === 'bloqueado'){
+        return erro($('erro-acesso'),'Muitas tentativas seguidas. Aguarde 15 minutos ou escreva para comunicacao@ciocerrado.com.br.');
+      }
+      return erro($('erro-acesso'),'Os dados não conferem com a nossa lista de participantes confirmados. Confira o e-mail usado na inscrição — pode ser o corporativo ou o pessoal — e tente o outro dado de verificação.');
+    }
+
+    emailAtual = email; chaveAtual = chave;
+    $('saudacao').textContent = 'Olá, ' + (r.nome || '').split(' ')[0] + '!';
+    $('ficha').innerHTML = [
+      ['Nome', esc(((r.nome||'') + ' ' + (r.sobrenome||'')).trim())],
+      ['Empresa', esc(r.empresa || '—')],
+      ['Cargo', esc(r.cargo || '—')],
+      ['E-mail', esc(r.email)],
+      ['Telefone', esc(formataFone(r.telefone) || '—')]
+    ].map(([k,v]) => `<div class="linha"><span class="rot">${k}</span><span class="val">${v}</span></div>`).join('');
+
+    $('optin-email').checked = !!r.optin_email;
+    $('optin-telefone').checked = !!r.optin_telefone;
+    $('bloco-telefone').classList.toggle('oculto', !r.optin_telefone);
+    $('telefone').value = formataFone(r.telefone) || '';
+    etapa('etapa-form');
+  }catch(e){
+    erro($('erro-acesso'),'Não conseguimos verificar agora. Tente novamente em instantes.');
+    console.error(e);
+  }finally{ btn.disabled = false; btn.textContent = 'Continuar'; }
+});
+
+function formataFone(t){
+  const d = String(t||'').replace(/\D/g,'');
+  if(d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if(d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return d;
+}
+
+// ---------- registrar ----------
+$('btn-registrar').addEventListener('click', async () => {
+  limpa($('erro-form'));
+  const btn = $('btn-registrar'); btn.disabled = true; btn.textContent = 'Registrando...';
+  try{
+    const { data, error } = await sb.rpc('ibm_registrar', {
+      p_email: emailAtual,
+      p_chave: chaveAtual,
+      p_optin_email: $('optin-email').checked,
+      p_optin_telefone: $('optin-telefone').checked,
+      p_telefone: $('telefone').value || null,
+      p_user_agent: navigator.userAgent
+    });
+    if(error) throw error;
+    const r = Array.isArray(data) ? data[0] : data;
+    if(!r || !r.ok) return erro($('erro-form'), r ? r.mensagem : 'Não foi possível registrar.');
+
+    const oe = $('optin-email').checked, ot = $('optin-telefone').checked, sim = oe || ot;
+    $('titulo-fim').textContent = sim ? 'Obrigado! Sua autorização foi registrada.' : 'Pronto — sua resposta foi registrada.';
+    $('texto-fim').textContent = sim
+      ? 'Seus dados de contato serão compartilhados com a IBM conforme as opções abaixo. Você pode cancelar o recebimento a qualquer momento pelo link da Declaração de Privacidade da IBM.'
+      : 'Registramos que você não autoriza o uso dos seus dados para comunicações de marketing da IBM. Nos vemos no evento.';
+    $('r-email').textContent = oe ? 'Autorizado' : 'Não autorizado';
+    $('r-email').className = 'tag ' + (oe ? 'sim' : 'nao');
+    $('r-fone').textContent = ot ? 'Autorizado' : 'Não autorizado';
+    $('r-fone').className = 'tag ' + (ot ? 'sim' : 'nao');
+    $('r-data').textContent = new Date().toLocaleString('pt-BR');
+    etapa('etapa-fim');
+  }catch(e){
+    erro($('erro-form'),'Não conseguimos registrar agora. Tente novamente em instantes.');
+    console.error(e);
+  }finally{ btn.disabled = false; btn.textContent = 'Registrar minha resposta'; }
+});
+
+$('btn-alterar').addEventListener('click', () => etapa('etapa-form'));
+</script>
+</body>
+</html>

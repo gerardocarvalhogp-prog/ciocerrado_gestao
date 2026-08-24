@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Check-in de massagens · CIO Cerrado Experience 2026</title>
+<link rel="icon" type="image/png" href="favicon.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600&family=Inter:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0E2A38;--bg:#EDF1F0;--surface:#FFFFFF;--line:rgba(14,42,56,.12);--muted:#5B7180;--accent:#12925A;--accent-d:#0E7A4A;--gold:#B8862B}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 40px}
+.brandbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 -16px;padding:15px 16px;background:var(--ink);color:#fff}
+.brandbar__logo{height:38px;width:auto;display:block}
+.brandbar__evt{font-weight:700;font-size:13px;color:#fff}
+.brandbar__sub{font-size:11px;color:#9db7c2}
+.eyebrow{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+h2{font-family:'Fraunces',serif;font-weight:400;font-size:26px;margin-top:6px}
+.field{margin:0 0 14px;display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:500}
+.field input,select{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 13px;font-size:15px;font-family:inherit;color:var(--ink)}
+.field input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(18,146,90,.15)}
+.cta{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px 20px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.cta:hover:not(:disabled){background:var(--accent-d)}.cta:disabled{opacity:.45;cursor:not-allowed}
+.signout{margin-left:auto;background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;text-decoration:underline;font-family:inherit}
+.topbar{display:flex;align-items:center;gap:10px;margin:16px 0 6px;flex-wrap:wrap}
+.topbar label{font-size:12.5px;color:var(--muted)}
+.stats{display:flex;gap:10px;margin:12px 0}
+.stat{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 8px;text-align:center;display:flex;flex-direction:column;gap:3px}
+.stat__n{font-family:'Fraunces',serif;font-size:26px;color:var(--accent)}
+.stat__l{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.search{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:15px;font-family:inherit;color:var(--ink);margin:6px 0 10px}
+.search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(18,146,90,.15)}
+.daychips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.chip--on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.row--done{background:#eef7f1;border-color:#bfe0cd}
+.row__info{min-width:0}
+.row__name{font-weight:600;font-size:15px}
+.row__meta{font-size:12.5px;color:var(--muted);margin-top:2px}
+.row__time{font-family:'Fraunces',serif;font-size:15px;color:var(--ink)}
+.row__right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.btn-done{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-done:hover{background:var(--accent-d)}
+.done-tag{color:var(--accent-d);font-weight:700;font-size:14px}
+.undo{background:none;border:none;color:var(--muted);text-decoration:underline;font-size:12px;cursor:pointer;font-family:inherit}
+.muted{color:var(--muted)}
+.loading{text-align:center;color:var(--muted);padding:40px 0}
+.finehint{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+.msg{font-size:13.5px;margin-top:10px}.msg--err{color:#a5453a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brandbar">
+    <img src="logo-cio-cerrado.webp" alt="CIO Cerrado" class="brandbar__logo" />
+    <div><div class="brandbar__evt">CIO Cerrado Experience 2026</div>
+      <div class="brandbar__sub">Check-in de massagens</div></div>
+  </header>
+  <div id="app"><div class="loading">Carregando…</div></div>
+</div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+/* ===================== CONFIGURE AQUI ===================== */
+const SUPABASE_URL = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_3m3DPfUXoRKR_qNaTKa3_g_Jw2NeA_F";  // cole aqui a chave sb_publishable_...
+/* ========================================================= */
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById("app");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+const normTxt = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+
+let booted = false;
+let eventos = [], selId = null, rows = [], dayFilter = "all", query = "";
+const selEvento = () => eventos.find((e) => e.id === selId) || eventos[0];
+
+/* ---------------- LOGIN ---------------- */
+function renderLogin(msg) {
+  app.innerHTML = `
+    <div class="eyebrow" style="margin-top:22px">Acesso do resort</div>
+    <h2>Check-in de massagens</h2>
+    <p class="finehint">Entre com o e-mail autorizado. Enviaremos um link de acesso.</p>
+    <div class="field" style="max-width:360px;margin-top:14px"><label>E-mail</label>
+      <input id="email" type="email" placeholder="voce@empresa.com.br" /></div>
+    <button id="go" class="cta">Enviar link de acesso</button>
+    ${msg ? `<p class="msg ${msg.startsWith("Erro")||msg.includes("permiss")||msg.includes("autoriz")?"msg--err":""}">${esc(msg)}</p>` : ""}`;
+  document.getElementById("go").onclick = async () => {
+    const email = document.getElementById("email").value.trim();
+    if (!email) return;
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+    renderLogin(error ? ("Erro ao enviar: " + (error.message || "tente de novo.")) : "Link enviado! Verifique a caixa de entrada (e o spam) e abra o link neste mesmo aparelho.");
+  };
+}
+
+/* ---------------- APP ---------------- */
+function shell(body) {
+  const evOpts = eventos.map((e) => `<option value="${e.id}" ${e.id===selId?"selected":""}>${esc(e.nome)}</option>`).join("");
+  app.innerHTML = `
+    <div class="topbar">
+      <label>Evento:</label>
+      <select id="evsel">${evOpts}</select>
+      <button id="out" class="signout">sair</button>
+    </div>
+    <div id="body">${body || '<div class="loading">Carregando…</div>'}</div>`;
+  const es = document.getElementById("evsel");
+  if (es) es.onchange = () => { selId = Number(es.value); dayFilter="all"; query=""; load(); };
+  document.getElementById("out").onclick = async () => { await sb.auth.signOut(); renderLogin(); };
+}
+const body = () => document.getElementById("body");
+
+async function load() {
+  shell();
+  const ev = selEvento(); if (!ev) { body().innerHTML = `<p class="finehint">Nenhum evento.</p>`; return; }
+  const { data, error } = await sb.rpc("checkin_list", { p_evento_id: ev.id });
+  if (error) { body().innerHTML = `<p class="msg msg--err">Não foi possível carregar (${esc(error.message||"")}).</p>`; return; }
+  rows = data || [];
+  paint();
+}
+
+function paint() {
+  const total = rows.length;
+  const feitos = rows.filter((r) => r.checado).length;
+  const pend = total - feitos;
+  const days = [...new Map(rows.map((r) => [r.dia, r.dia])).keys()];
+  const nq = normTxt(query).trim(); const qd = query.replace(/\D/g,"");
+  const filtered = rows.filter((r) => {
+    if (dayFilter !== "all" && r.dia !== dayFilter) return false;
+    if (!nq && !qd) return true;
+    const t = normTxt([r.nome, r.empresa, r.cio_nome].join(" "));
+    const d = String(r.doc||"").replace(/\D/g,"");
+    return (nq && t.includes(nq)) || (qd && d.includes(qd));
+  });
+  filtered.sort((a, b) => (a.nome||"").localeCompare(b.nome||"", "pt", { sensitivity: "base" }));
+  body().innerHTML = `
+    <div class="stats">
+      <div class="stat"><span class="stat__n">${total}</span><span class="stat__l">reservas</span></div>
+      <div class="stat"><span class="stat__n">${feitos}</span><span class="stat__l">feitas</span></div>
+      <div class="stat"><span class="stat__n">${pend}</span><span class="stat__l">pendentes</span></div>
+    </div>
+    <div class="daychips">
+      <button class="chip ${dayFilter==="all"?"chip--on":""}" data-d="all">Todos os dias</button>
+      ${days.map((d) => `<button class="chip ${dayFilter===d?"chip--on":""}" data-d="${esc(d)}">${esc(d)}</button>`).join("")}
+    </div>
+    <input id="q" class="search" placeholder="Buscar por nome, CPF, empresa ou CIO…" value="${esc(query)}" />
+    <div id="list">${filtered.length ? filtered.map(rowHtml).join("") : `<p class="muted" style="text-align:center;padding:20px 0">Nenhuma reserva encontrada.</p>`}</div>`;
+  body().querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { dayFilter = b.dataset.d; paint(); });
+  const q = document.getElementById("q");
+  q.oninput = () => { query = q.value; const pos = q.selectionStart; paint(); const nq2=document.getElementById("q"); nq2.focus(); try{nq2.setSelectionRange(pos,pos);}catch(e){} };
+  bindRows();
+}
+
+function rowHtml(r) {
+  return `<div class="row ${r.checado?"row--done":""}" data-id="${r.reserva_id}">
+    <div class="row__info">
+      <div class="row__name">${esc(r.nome)}</div>
+      <div class="row__meta">${esc([r.empresa, r.cio_nome?("CIO: "+r.cio_nome):""].filter(Boolean).join(" · "))}</div>
+      <div class="row__time">${esc(r.dia)} · ${esc(r.inicio)}–${esc(r.fim)}</div>
+    </div>
+    <div class="row__right">
+      ${r.checado
+        ? `<span class="done-tag">✓ Feita</span><button class="undo" data-undo="${r.reserva_id}">desfazer</button>`
+        : `<button class="btn-done" data-done="${r.reserva_id}">Confirmar</button>`}
+    </div>
+  </div>`;
+}
+
+function bindRows() {
+  body().querySelectorAll("[data-done]").forEach((b) => b.onclick = () => setCheck(b.dataset.done, true));
+  body().querySelectorAll("[data-undo]").forEach((b) => b.onclick = () => {
+    if (!confirm("Desfazer o check-in desta pessoa?")) return;
+    setCheck(b.dataset.undo, false);
+  });
+}
+
+async function setCheck(id, done) {
+  const r = rows.find((x) => x.reserva_id === id);
+  if (r) { r.checado = done; r.checado_em = done ? new Date().toISOString() : null; }
+  paint();
+  const { error } = await sb.rpc("checkin_set", { p_reserva_id: id, p_done: done });
+  if (error) { alert("Não foi possível salvar. Tente de novo."); if (r) r.checado = !done; paint(); }
+}
+
+/* ---------------- BOOT ---------------- */
+async function boot() {
+  if (booted) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { renderLogin(); return; }
+  const { data: ok, error } = await sb.rpc("can_checkin");
+  if (error || !ok) { await sb.auth.signOut(); renderLogin("Este e-mail não tem acesso ao check-in."); return; }
+  const { data: evs } = await sb.rpc("checkin_eventos");
+  eventos = evs || [];
+  selId = (eventos.find((e) => e.status === "aberto") || eventos[0] || {}).id || null;
+  booted = true;
+  if (!selId) { shell(); body().innerHTML = `<p class="finehint">Nenhum evento disponível.</p>`; return; }
+  load();
+}
+sb.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT") { booted = false; renderLogin(); return; }
+  if (!booted) boot();
+});
+boot();
+</script>
+</body>
+</html>
