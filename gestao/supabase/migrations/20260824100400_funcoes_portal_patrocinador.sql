@@ -377,7 +377,10 @@ begin
   return query
   select
     pa.id, g.nome, g.empresa, g.cargo,
-    (pa.indicado_por_patrocinador_id = s.patrocinador_id) as indicado_por_mim
+    -- coalesce e obrigatorio: indicado_por_patrocinador_id e nulo para
+    -- quem ninguem indicou, e "null = uuid" da NULL, nao false.
+    coalesce(pa.indicado_por_patrocinador_id = s.patrocinador_id, false)
+      as indicado_por_mim
   from participantes pa
   join gestores g on g.id = pa.gestor_id
   left join participante_perfil pp on pp.participante_id = pa.id
@@ -392,7 +395,10 @@ begin
         and s2.tipo = s.tipo
     )
   order by
-    (pa.indicado_por_patrocinador_id = s.patrocinador_id) desc,
+    -- Sem o coalesce, "desc" traz NULL primeiro (a ordem do Postgres e
+    -- NULL, true, false) e os NAO indicados subiriam acima dos
+    -- indicados - invertendo a primeira camada da regra de alocacao.
+    coalesce(pa.indicado_por_patrocinador_id = s.patrocinador_id, false) desc,
     pp.faturamento desc nulls last,
     g.nome;
 end;
