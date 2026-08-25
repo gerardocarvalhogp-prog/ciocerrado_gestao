@@ -58,8 +58,15 @@ const versionados = execFileSync("git", ["ls-files", "-z"], {
   .split("\0")
   .filter(Boolean);
 
-const publicaveis = versionados.filter((rel) =>
-  EXTENSOES_WEB.has(path.extname(rel).toLowerCase())
+// Este arquivo tambem e .js e tambem esta versionado — sem a excecao,
+// ele se publica junto. Aconteceu no deploy de 24/08: /preparar-site.js
+// respondeu 200. E ferramenta, nao pagina.
+const FERRAMENTAS = new Set([path.basename(__filename)]);
+
+const publicaveis = versionados.filter(
+  (rel) =>
+    EXTENSOES_WEB.has(path.extname(rel).toLowerCase()) &&
+    !FERRAMENTAS.has(path.basename(rel))
 );
 
 // Recomeca do zero: arquivo removido do repositorio tem que sumir do
