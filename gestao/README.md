@@ -201,13 +201,22 @@ rooming antes. Quem não quer todas as vagas usa "passar a vez" e libera
 a fila.
 
 **Indicação no PERFIL é reserva, não sugestão.** Quem a empresa indicou
-não aparece para nenhuma outra enquanto a cota dela estiver no prazo
-(`cotas.prazo_indicacao`, uma data por cota, na aba Estrutura). A vez
-passa para a cota seguinte quando a anterior termina de escolher **ou**
-quando o prazo vence — o que vier primeiro. Vencido o prazo sem escolha,
-a reserva cai e o convidado volta para a lista geral; a empresa perde a
-fila e as reservas, mas continua podendo escolher entre quem estiver
-livre. Cota sem prazo segura a vez até encerrar ou passar.
+não aparece para nenhuma outra enquanto a cota dela estiver dentro da
+janela. A vez passa para a cota seguinte quando a anterior termina de
+escolher **ou** quando a janela vence — o que vier primeiro. Vencida sem
+escolha, a reserva cai, o convidado volta para a lista geral e a empresa
+fica **fora daquela sessão**: não escolhe nem quem sobrou.
+
+**A janela é relativa, não uma data.** Cada cota tem `janela_horas`
+("48h"), contadas do fim da cota anterior — o relógio anda no ritmo do
+evento, e não de datas escolhidas no chute meses antes. A primeira cota
+começa em `eventos.escolha_abre_em` (aba Estrutura, "Escolha das mesas
+abre em"). Enquanto esse campo estiver vazio, **nada expira**: o relógio
+só começa quando alguém diz que começou. Há um teto absoluto opcional por
+cota (`prazo_indicacao`) para o caso de precisar de uma data-limite dura;
+vale o que vier primeiro entre os três.
+
+Cota sem mesa daquele tipo não segura a fila.
 
 A reserva vale de baixo para cima também: o indicado pela Prata resiste
 à Esmeralda. Se valesse só de cima para baixo não valeria nada, porque a

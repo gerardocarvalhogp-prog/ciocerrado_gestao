@@ -118,29 +118,72 @@ reset request.jwt.claims;
 
 \echo ''
 \echo '#############################################'
-\echo '# 4 · perder o prazo custa a fila, nao a mesa'
+\echo '# 4 · quem perdeu o prazo esta FORA da escolha'
 \echo '#############################################'
 set role authenticated;
 set request.jwt.claims = '{"email":"ana@alfa.test","role":"authenticated"}';
 
-\echo '-- prazo_vencido deve ser true:'
-select patro_minha_vez(:'s_alfa'::uuid) -> 'prazo_vencido' as prazo_vencido;
+\echo '-- prazo_vencido true e minha_vez false, mesmo sem ninguem na frente:'
+select patro_minha_vez(:'s_alfa'::uuid);
 
-\echo '-- e ela ainda escolhe quem estiver livre (CIO Um deve entrar):'
+\echo '-- e escolher deve FALHAR, mesmo com o CIO Um livre:'
 select patro_escolher_convidados(:'s_alfa'::uuid, array[:'p_um'::uuid]);
-
-\echo '-- mas o CIO Tres continua barrado: a Ouro nao tem prazo e segue no dela'
-select patro_escolher_convidados(:'s_alfa'::uuid, array[:'p_tres'::uuid]);
 reset role;
 reset request.jwt.claims;
 
 \echo ''
 \echo '#############################################'
-\echo '# 5 · escolhido fica preso: some da lista dos outros'
+\echo '# 5 · a Beta escolhe, e o escolhido fica preso'
 \echo '#############################################'
 set role authenticated;
 set request.jwt.claims = '{"email":"bruno@beta.test","role":"authenticated"}';
-\echo '-- CIO Um nao pode mais aparecer para a Beta:'
+select patro_escolher_convidados(:'s_beta'::uuid, array[:'p_um'::uuid]);
+reset role;
+reset request.jwt.claims;
+
+\echo '-- CIO Um nao pode mais aparecer para ninguem (lista da Beta):'
+set role authenticated;
+set request.jwt.claims = '{"email":"bruno@beta.test","role":"authenticated"}';
 select nome from patro_convidados_disponiveis(:'s_beta'::uuid) order by nome;
 reset role;
 reset request.jwt.claims;
+
+\echo ''
+\echo '#############################################'
+\echo '# 6 · janela relativa: o fim de uma e o inicio'
+\echo '#     da proxima'
+\echo '#############################################'
+-- limpa o teto absoluto e usa so a janela em horas
+update cotas set prazo_indicacao = null, janela_horas = 48
+ where evento_id = :'ev'::uuid;
+update eventos set escolha_abre_em = timestamptz '2027-07-01 09:00-03'
+ where id = :'ev'::uuid;
+
+-- as duas mesas voltam a ficar abertas para a cadeia aparecer inteira
+update sessoes set escolha_encerrada_em = null, passou_em = null
+ where evento_id = :'ev'::uuid and tipo = 'mesa_redonda';
+delete from sessao_convidados sc
+ using sessoes s where s.id = sc.sessao_id and s.evento_id = :'ev'::uuid;
+
+\echo '-- Esmeralda 01/07 09:00 -> 03/07 09:00, e a Diamante comeca ai:'
+select c.nome, j.inicio, j.fim
+from _janelas_da_fila(:'ev'::uuid, 'mesa_redonda') j
+join cotas c on c.id = j.cota_id
+order by j.ordem;
+
+\echo ''
+\echo '-- 24h na Esmeralda encurtam tudo que vem depois:'
+update cotas set janela_horas = 24
+ where evento_id = :'ev'::uuid and nome = 'Esmeralda';
+select c.nome, j.inicio, j.fim
+from _janelas_da_fila(:'ev'::uuid, 'mesa_redonda') j
+join cotas c on c.id = j.cota_id
+order by j.ordem;
+
+\echo ''
+\echo '-- sem ancora no evento, nada expira (estado de hoje):'
+update eventos set escolha_abre_em = null where id = :'ev'::uuid;
+select c.nome, j.inicio, j.fim
+from _janelas_da_fila(:'ev'::uuid, 'mesa_redonda') j
+join cotas c on c.id = j.cota_id
+order by j.ordem;

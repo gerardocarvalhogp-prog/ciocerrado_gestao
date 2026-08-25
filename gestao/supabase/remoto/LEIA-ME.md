@@ -70,11 +70,15 @@ que o cabeçalho diz.
 | `01-fechar-anon.sql` | tira `execute` de 101 funções admin do papel `anon` | **sim** — conferido em 24/08: anon executa só `is_staff`, `meus_patrocinadores` e `part_autocadastro`, e o default privilege de funções não tem mais `anon` nem `public` |
 | `02-fatura-complementar.sql` | fatura nova cobra a diferença, não o valor cheio | **sim** — 24/08 |
 | `03-indicacao-e-porte.sql` | indicação no PERFIL ordena a lista; porte deixa de ser ordem alfabética | **sim** — 24/08; retorno conferido com as 6 colunas, `anon` sem execute, e o porte lido dos 4 perfis reais na ordem certa |
-| `04-prazo-de-indicacao.sql` | indicação vira reserva; prazo por cota faz a fila andar sozinha | **sim** — 24/08; `cotas.prazo_indicacao` criada, `admin_salvar_cota` com 8 parâmetros e sem sobrecarga da versão de 7, `anon` sem execute nas quatro |
+| `04-prazo-de-indicacao.sql` | indicação vira reserva; prazo por cota faz a fila andar sozinha | **sim** — 24/08 |
+| `05-janela-por-cota.sql` | a janela vira relativa ("48h depois que a anterior encerrar") e prazo vencido passa a tirar da escolha | **sim** — 24/08; as seis funções com assinatura nova, uma versão de cada, `anon` sem execute |
 
-As 6 cotas do hospedado estão **sem prazo preenchido**, então a fila se
-comporta como antes até alguém preencher as datas na aba Estrutura. É o
-padrão seguro: cota sem prazo segura a vez até encerrar ou passar.
+O hospedado está com `eventos.escolha_abre_em` **vazio** e as 6 cotas sem
+janela, então nada expira — a fila se comporta como antes. O relógio só
+começa quando alguém preencher "Escolha das mesas abre em" na aba
+Estrutura. É o padrão seguro e proposital: se o relógio começasse sozinho
+quando as mesas são criadas, a janela da Esmeralda queimaria semanas
+antes de alguém ser avisado.
 
 Cada um tem um par versionado em `supabase/migrations/` com o mesmo
 corpo, para as duas linhagens não divergirem mais:
@@ -94,18 +98,25 @@ O `03` implementou a indicação como **ordem** — o indicado subia ao topo
 da lista de quem indicou, mas continuava visível para as outras empresas.
 O `04` fecha a regra: indicação é **reserva**, e o que a solta é o prazo.
 
-1. Enquanto a cota de quem indicou está no prazo, o convidado indicado
-   **não aparece** para mais ninguém.
+1. Enquanto a cota de quem indicou está na janela dela, o convidado
+   indicado **não aparece** para mais ninguém.
 2. A vez passa para a cota seguinte quando a anterior termina de escolher
-   (encerra, passa a vez, enche a mesa) **ou** quando o prazo dela vence
+   (encerra, passa a vez, enche a mesa) **ou** quando a janela dela vence
    — o que vier primeiro.
 3. Escolhido, o convidado fica preso naquela mesa: some da lista de
    todos. Isso já funcionava.
-4. Prazo vencido sem escolha: a reserva cai e ele volta para a lista
+4. Janela vencida sem escolha: a reserva cai e ele volta para a lista
    geral.
+5. Quem perdeu a janela está **fora daquela sessão** — não escolhe nem
+   quem sobrou.
 
-Vencer o prazo custa a fila e as reservas, **não** o direito de escolher
-entre quem estiver livre.
+A janela é relativa: cada cota tem `janela_horas`, contadas do fim da
+anterior. A primeira começa em `eventos.escolha_abre_em`. Há ainda um
+teto absoluto opcional por cota (`prazo_indicacao`); vale o que vier
+primeiro entre os três.
+
+Cota sem mesa daquele tipo não segura a fila: fecha no mesmo instante em
+que abre.
 
 A reserva vale nos dois sentidos da fila: o convidado indicado pela Ouro
 resiste à Esmeralda, que escolhe antes de todo mundo. Se valesse só de

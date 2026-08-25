@@ -852,14 +852,17 @@ async function carregarCotas(){
 // cota entra e os convidados que esta empresa indicou voltam para a
 // lista geral. Quem esta na tela precisa saber disso antes, nao depois.
 function notaPrazo(vez){
-  if(!vez.prazo) return "";
+  if(!vez.janela_fim) return "";
+  const quando = new Date(vez.janela_fim).toLocaleString("pt-BR",
+    { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+
   return vez.prazo_vencido
-    ? `<p class="fila-nota"><strong>O prazo da sua cota venceu em ${dataBR(vez.prazo)}.</strong>
-       As próximas empresas já entraram e quem você indicou voltou para a lista geral.
-       Você ainda pode escolher entre quem estiver disponível.</p>`
-    : `<p class="fila-nota">Você escolhe até <strong>${dataBR(vez.prazo)}</strong>.
-       Depois dessa data a vez passa para a próxima cota e quem você indicou
-       deixa de ficar reservado para você.</p>`;
+    ? `<p class="fila-nota"><strong>A janela da sua cota terminou em ${quando}.</strong>
+       A escolha passou para as próximas cotas e quem você indicou voltou para a
+       lista geral.</p>`
+    : `<p class="fila-nota">Você escolhe até <strong>${quando}</strong>.
+       Depois disso a vez passa para a próxima cota, quem você indicou deixa de
+       ficar reservado e esta sessão sai da sua mão.</p>`;
 }
 
 function trilhoFila(vez, minhaCota){

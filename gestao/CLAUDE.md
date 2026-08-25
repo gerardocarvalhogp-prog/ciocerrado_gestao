@@ -51,10 +51,12 @@ A alocação de convidados a mesas/jantares combina três camadas, nesta ordem:
 
 1. **Indicação direta** — se o patrocinador indicou a pessoa no PERFIL, ela vai para a
    mesa dele. Patrocinador também pode escolher os próprios convidados.
-   A indicação é **reserva com prazo**: o indicado some da lista das outras empresas
-   enquanto a cota de quem indicou estiver dentro de `cotas.prazo_indicacao`. Vencido o
-   prazo, a fila anda e a reserva cai. Vale nos dois sentidos da fila — o indicado pela
-   Prata resiste à Esmeralda.
+   A indicação é **reserva com janela**: o indicado some da lista das outras empresas
+   enquanto a cota de quem indicou estiver na janela dela. Vencida, a fila anda, a reserva
+   cai e a cota atrasada sai daquela sessão. Vale nos dois sentidos da fila — o indicado
+   pela Prata resiste à Esmeralda.
+   A janela é relativa (`cotas.janela_horas`, contadas do fim da cota anterior), ancorada
+   em `eventos.escolha_abre_em`. Âncora vazia = nada expira.
 2. **Porte** — empresas de maior faturamento vão para as cotas mais altas, na ordem
    Esmeralda → Diamante → Platina → Ouro → Prata. Faturamento vem do export "Lista de
    participantes" do Sympla.
