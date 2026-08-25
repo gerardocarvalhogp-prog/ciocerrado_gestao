@@ -90,6 +90,21 @@ set request.jwt.claims = '{"email":"gerardocarvalhogp@gmail.com","role":"authent
 select admin_gerar_quartos_todos('cerrado2027');
 reset role;
 
+-- =====================================================================
+-- Ids capturados AQUI, como postgres, antes de qualquer `set role`.
+--
+-- Nao e estilo: desde 25/08 o papel `authenticated` nao le tabela
+-- nenhuma do schema (so RPC). Um `(select id from patrocinadores ...)`
+-- dentro de um bloco com `set role authenticated` morre com
+-- "permission denied for table patrocinadores" — que foi exatamente o
+-- que aconteceu quando o acesso direto foi fechado.
+-- =====================================================================
+select id as alfa from patrocinadores where empresa='Alfa Cloud' \gset
+select id as beta from patrocinadores where empresa='Beta Seguranca' \gset
+select r.id as res_alfa from reservas r
+  join patrocinadores p on p.id = r.patrocinador_id
+ where p.empresa='Alfa Cloud' order by r.created_at limit 1 \gset
+
 \echo ''
 \echo '#############################################'
 \echo '# TESTE 1 · Ana (Alfa Cloud) ve so a Alfa'
@@ -102,11 +117,11 @@ select empresa, cota, quartos_total, quartos_preenchidos from patro_meu_painel('
 
 \echo '-- quartos dela:'
 select rotulo, tipo, capacidade, ocupantes, status, origem
-from patro_listar_quartos((select id from patrocinadores where empresa='Alfa Cloud'));
+from patro_listar_quartos(:'alfa'::uuid);
 
 \echo ''
 \echo '=== TESTE 2 · Ana tenta ler os quartos da Beta (deve FALHAR) ==='
-select rotulo from patro_listar_quartos((select id from patrocinadores where empresa='Beta Seguranca'));
+select rotulo from patro_listar_quartos(:'beta'::uuid);
 
 \echo ''
 \echo '=== TESTE 3 · Ana tenta funcao de admin (deve FALHAR) ==='
@@ -115,11 +130,7 @@ select * from admin_listar_equipe();
 \echo ''
 \echo '=== TESTE 4 · Ana preenche um quarto ==='
 select patro_salvar_quarto(
-  -- r.id qualificado: reservas e patrocinadores tem id, e o `id` solto
-  -- que estava aqui fazia o teste morrer com "column reference id is
-  -- ambiguous" — erro do teste, que passava por erro do sistema
-  (select r.id from reservas r join patrocinadores p on p.id=r.patrocinador_id
-    where p.empresa='Alfa Cloud' order by r.created_at limit 1),
+  :'res_alfa'::uuid,
   '[{"nome":"Ana Souza","cpf":"11122233344","tipo":"adulto","usa_transfer":true},
     {"nome":"Rui Lima","cpf":"55566677788","tipo":"adulto","usa_transfer":false}]'::jsonb,
   true, 'GYN', true, 'Kit cafe'
@@ -127,11 +138,11 @@ select patro_salvar_quarto(
 
 \echo '-- o quarto virou completo e o brinde entrou?'
 select rotulo, status, ocupantes, usa_transfer, transfer_origem, brinde_vai_enviar, brinde_descricao
-from patro_listar_quartos((select id from patrocinadores where empresa='Alfa Cloud'));
+from patro_listar_quartos(:'alfa'::uuid);
 
 \echo ''
 \echo '=== TESTE 5 · Ana compra quarto extra e a fatura recalcula ==='
-select patro_comprar_quarto((select id from patrocinadores where empresa='Alfa Cloud'), 'duplo');
+select patro_comprar_quarto(:'alfa'::uuid, 'duplo');
 reset role;
 
 \echo '-- fatura da Alfa (1 quarto extra 1200 + 1 transfer 150):'
@@ -150,8 +161,7 @@ set request.jwt.claims = '{"email":"bruno@beta.test","role":"authenticated"}';
 select empresa, cota, quartos_total from patro_meu_painel('cerrado2027');
 \echo '-- Bruno tenta salvar no quarto da Alfa (deve FALHAR):'
 select patro_salvar_quarto(
-  (select r.id from reservas r join patrocinadores p on p.id=r.patrocinador_id
-    where p.empresa='Alfa Cloud' order by r.created_at limit 1),
+  :'res_alfa'::uuid,
   '[{"nome":"Invasor","tipo":"adulto"}]'::jsonb, false, null, false, null);
 reset role;
 

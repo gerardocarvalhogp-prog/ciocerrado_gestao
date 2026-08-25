@@ -301,22 +301,47 @@ Também conferido, com consulta direta ao catálogo:
   `patro_disponibilidade`)
 - nenhuma função `SECURITY DEFINER` está sem `search_path` fixo
 
-### O que fica de recomendação
+### O acesso direto a tabela acabou
 
-**`authenticated` ainda tem acesso de tabela.** Qualquer pessoa com um
-magic link é `authenticated`, e as 29 tabelas estão abertas para esse
-papel — sob RLS, que é escopada e foi conferida. Fechar também esse
-acesso seria defesa em profundidade, já que as telas só falam por RPC
-(não há um `.from(` nos cinco `.html`). Não fiz porque mexe no que já
-funciona e pede um teste de tela antes.
+Em 25/08 o `authenticated` também perdeu o acesso às tabelas do schema
+`gestao` (`20260825090000`). Magic link não filtra ninguém: quem digita
+um e-mail e clica no link vira `authenticated`. Não vira admin nem
+patrocinador, mas o papel tinha `GRANT ALL` nas 29 tabelas, e o que
+segurava era só a RLS — uma camada só.
+
+Agora ler dado do `gestao` exige passar por função, e toda função checa
+papel na primeira linha. As telas não perderam nada: não há um único
+`.from(` nas cinco, tudo é RPC.
+
+Se alguma tela quebrar, o sintoma será `permission denied for table X`
+numa chamada `.from("X")` que passou despercebida. O conserto é trocar
+por RPC, **não** devolver o grant.
+
+> As telas do sistema de massagem (`/admin.html`,
+> `/admin_consentimento.html`) **usam** `.from()` em `reservations`,
+> `slots` e `ibm_consent`. Isso é no schema `public`, que este
+> endurecimento não toca.
+
+### `public.ibm_fila_convite`
+
+Corrigida em `20260825090100`, e é a única vez que este projeto mexe no
+`public`. Era uma view sem `security_invoker` sobre `ibm_consent`,
+devolvendo e-mail, nome e empresa de quem tem consentimento pendente. A
+tabela está protegida (RLS + `ibm_e_admin()`); a view furava exatamente
+essa política, e o `anon` tinha SELECT nela.
+
+Estava vazia, nenhuma página e nenhuma função a lê — por isso deu para
+mexer sem risco. Para desfazer:
+
+```sql
+alter view public.ibm_fila_convite set (security_invoker = false);
+```
+
+### O que fica de recomendação
 
 **Proteção contra senha vazada, no Auth.** O painel do Supabase marca
 como desligada. Vale pouco aqui, porque o login é por magic link e não
 por senha, mas é um clique.
-
-**`public.ibm_fila_convite`**, do sistema de massagem, também é uma view
-sem `security_invoker`. Consultada como `anon`, voltou vazia — mas quem
-cuida daquele sistema deveria olhar.
 
 ### Como repetir
 

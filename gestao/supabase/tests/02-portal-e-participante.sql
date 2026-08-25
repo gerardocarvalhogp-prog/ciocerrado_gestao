@@ -8,6 +8,14 @@ select id as beta from patrocinadores where empresa='Beta Seguranca' \gset
 select r.id as res1 from reservas r join patrocinadores p on p.id=r.patrocinador_id
  where p.empresa='Alfa Cloud' and r.origem='cota' order by r.created_at limit 1 \gset
 
+-- o extra tambem sai daqui: dentro de `set role authenticated` um
+-- select em `reservas` bate em "permission denied for table reservas"
+-- desde que o acesso direto a tabela foi fechado, em 25/08
+select r.id as res_extra from reservas r
+  join patrocinadores p on p.id = r.patrocinador_id
+ where p.empresa='Alfa Cloud' and r.origem='extra'
+ order by r.created_at limit 1 \gset
+
 \echo '=== 2b · guarda com NULL (como Ana) ==='
 set role authenticated;
 set request.jwt.claims = '{"email":"ana@alfa.test","role":"authenticated"}';
@@ -52,8 +60,7 @@ set request.jwt.claims = '{"email":"bruno@beta.test","role":"authenticated"}';
 select patro_salvar_quarto(:'res1'::uuid,
   '[{"nome":"Invasor","tipo":"adulto"}]'::jsonb, false, null, false, null);
 \echo '-- e tenta cancelar o quarto extra da Alfa (deve FALHAR):'
-select patro_cancelar_quarto_extra(
-  (select r.id from reservas r where r.patrocinador_id=:'alfa'::uuid and r.origem='extra' limit 1));
+select patro_cancelar_quarto_extra(:'res_extra'::uuid);
 reset role;
 
 \echo ''

@@ -28,10 +28,16 @@ tudo roda como superusuário e **todo teste de permissão passa por engano**.
 
 ## Cuidado ao escrever teste novo
 
-Os ids precisam ser capturados com `\gset` **antes** do `set role`. As
-tabelas são staff-only na RLS, então um subselect rodando como Ana volta
-vazio e o teste passa a medir a RLS em vez da função — foi o que
-aconteceu nas duas primeiras versões destes arquivos.
+Os ids precisam ser capturados com `\gset` **antes** do `set role`.
+
+Isso era estilo e virou obrigação. Antes, um subselect rodando como Ana
+voltava vazio pela RLS e o teste passava a medir a RLS em vez da função
+— erro silencioso, que aconteceu nas duas primeiras versões destes
+arquivos. Desde 25/08 o papel `authenticated` não tem acesso nenhum às
+tabelas do schema (só RPC), então o mesmo subselect agora estoura com
+`permission denied for table X`. Barulhento, o que é melhor.
+
+Se o seu teste novo precisa de um id, pegue no topo, como postgres.
 
 `01` não é idempotente na parte de `sessoes` (a tabela não tem chave
 única), então rodar duas vezes cria mesas duplicadas. Dê `db reset` antes.
