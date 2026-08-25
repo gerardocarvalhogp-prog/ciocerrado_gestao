@@ -138,6 +138,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
       <button class="aba" role="tab" data-aba="cadastro" aria-selected="false">Cadastro<span class="contador oculto" id="c-sug"></span></button>
       <button class="aba" role="tab" data-aba="quartos" aria-selected="false">Quartos</button>
       <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
+      <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
       <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
       <button class="aba" role="tab" data-aba="pesquisa" aria-selected="false">Pesquisa</button>
       <button class="aba" role="tab" data-aba="prospeccao" aria-selected="false">Prospecção</button>
@@ -831,6 +832,128 @@ ABAS.etiquetas = async function(){
     ETIQ.map(e => ({ ...e, apto: e.apto || "" })),
     [["apto","APTO"],["nome","NOME"],["empresa","EMPRESA"],["categoria","TIPO"]],
     "etiquetas-cio-cerrado.xlsx", "Etiquetas"));
+
+  carregar();
+};
+
+// =====================================================================
+// ABA: BRINDES
+//
+// A lista sai com quem NÃO chegou em cima — é essa a lista que alguém
+// precisa olhar na véspera. O botão muda conforme o estado: quem está
+// a caminho se marca como recebido, quem foi recebido se marca como
+// entregue. Voltar atrás existe, mas fica escondido no seletor.
+// =====================================================================
+const ROTULO_BRINDE = {
+  prometido: "A enviar", enviado: "A caminho", recebido: "No resort",
+  entregue:  "Entregue", cancelado: "Cancelado"
+};
+const PROXIMO_BRINDE = { prometido: "recebido", enviado: "recebido", recebido: "entregue" };
+
+ABAS.brindes = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Brindes</h1>
+    <p class="sub">
+      O patrocinador marca o brinde na tela do quarto e informa um código de rastreio
+      para a remessa inteira. Aqui a organização confere a chegada e a entrega.
+    </p>
+    <div id="br-resumo"></div>
+    <div class="barra">
+      <div style="max-width:200px;"><label>Situação</label>
+        <select id="br-status">
+          <option value="">Todas</option>
+          <option value="prometido">A enviar</option>
+          <option value="enviado">A caminho</option>
+          <option value="recebido">No resort</option>
+          <option value="entregue">Entregue</option>
+          <option value="cancelado">Cancelado</option>
+        </select></div>
+      <div style="min-width:auto;"><button class="btn sec" id="br-exportar">Exportar Excel</button></div>
+    </div>
+    <div id="br-aviso"></div>
+    <div class="cartao"><div class="rolagem"><table id="br-tabela"></table></div></div>`;
+
+  let BR = [];
+
+  const carregar = async () => {
+    $("#br-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    try{
+      const [lista, resumo] = await Promise.all([
+        rpc("admin_listar_brindes", {
+          p_evento_slug: EVENTO,
+          p_status: $("#br-status").value || null,
+          p_limite: 500, p_offset: 0
+        }),
+        rpc("admin_brindes_resumo", { p_evento_slug: EVENTO })
+      ]);
+      BR = lista;
+
+      $("#br-resumo").innerHTML = Number(resumo.total)
+        ? `<div class="cartao"><p class="meta" style="margin:0;">
+             <strong style="font-size:15px;color:var(--verde);">${resumo.total}</strong> brinde(s)
+             de ${resumo.empresas} empresa(s) ·
+             ${resumo.prometido} a enviar · ${resumo.enviado} a caminho ·
+             ${resumo.recebido} no resort · ${resumo.entregue} entregue(s)
+             ${Number(resumo.cancelado) ? ` · ${resumo.cancelado} cancelado(s)` : ""}
+           </p></div>`
+        : `<div class="cartao"><p class="meta" style="margin:0;">
+             Nenhum patrocinador marcou brinde ainda.</p></div>`;
+
+      $("#br-tabela").innerHTML = BR.length ? `
+        <tr><th>Empresa</th><th>Quarto</th><th>Brinde</th><th>Rastreio</th>
+            <th>Situação</th><th></th></tr>
+        ${BR.map(b => `<tr data-id="${esc(b.brinde_id)}" data-status="${esc(b.status)}">
+          <td><strong>${esc(b.empresa)}</strong><br>
+              <span class="meta">${esc(b.cota||"—")}</span></td>
+          <td class="meta">${esc(b.quarto||"—")}</td>
+          <td>${esc(b.descricao||"—")}
+              ${b.observacao ? `<br><span class="meta">${esc(b.observacao)}</span>` : ""}</td>
+          <td class="meta">${b.rastreio
+               ? `${esc(b.rastreio)}<br>${esc(b.transportadora||"")}`
+               : "—"}</td>
+          <td><span class="selo ${b.status==="entregue"||b.status==="recebido" ? "ok" : "pend"}">
+                ${ROTULO_BRINDE[b.status]||esc(b.status)}</span>
+              ${b.recebido_em ? `<br><span class="meta">${dataBR(b.recebido_em)} · ${esc(b.recebido_por||"")}</span>` : ""}
+              ${b.entregue_em ? `<br><span class="meta">entregue ${dataBR(b.entregue_em)}</span>` : ""}</td>
+          <td style="white-space:nowrap;">
+            ${PROXIMO_BRINDE[b.status]
+               ? `<button class="btn mini br-avancar">Marcar ${ROTULO_BRINDE[PROXIMO_BRINDE[b.status]].toLowerCase()}</button>`
+               : ""}
+            <button class="btn sec mini br-mudar">Alterar</button>
+          </td></tr>`).join("")}`
+        : `<tr><td colspan="6" style="color:var(--suave)">Nada com esse filtro.</td></tr>`;
+
+      $$(".br-avancar").forEach(b => b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        b.disabled = true;
+        await marcar(tr.dataset.id, PROXIMO_BRINDE[tr.dataset.status]);
+      }));
+      $$(".br-mudar").forEach(b => b.addEventListener("click", () => {
+        const tr = b.closest("tr");
+        const novo = prompt(
+          "Nova situação: prometido, enviado, recebido, entregue ou cancelado",
+          tr.dataset.status);
+        if(novo) marcar(tr.dataset.id, novo.trim());
+      }));
+    }catch(e){ aviso("#br-tabela", explicar(e)); }
+  };
+
+  const marcar = async (id, status) => {
+    try{
+      await rpc("admin_marcar_brinde", { p_brinde_id: id, p_status: status, p_observacao: null });
+      aviso("#br-aviso", "", "ok");
+      carregar();
+    }catch(e){ aviso("#br-aviso", explicar(e)); }
+  };
+
+  $("#br-status").addEventListener("change", carregar);
+  $("#br-exportar").addEventListener("click", () => exportar(BR,
+    [["empresa","EMPRESA"],["cota","COTA"],["quarto","QUARTO"],["descricao","BRINDE"],
+     ["transportadora","TRANSPORTADORA"],["rastreio","RASTREIO"],["status","SITUACAO"],
+     ["recebido_em","RECEBIDO EM"],["recebido_por","RECEBIDO POR"],
+     ["entregue_em","ENTREGUE EM"],["observacao","OBSERVACAO"]],
+    "brindes-cio-cerrado.xlsx", "Brindes"));
 
   carregar();
 };

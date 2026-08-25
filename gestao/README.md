@@ -254,6 +254,20 @@ documento, não rascunho — o recálculo não a toca. Reabrir uma cobrança
 paga apaga a data de pagamento, para a conferência não ficar com data
 antiga em cobrança em aberto.
 
+**Brinde é por quarto, remessa é por empresa.** O patrocinador marca o
+brinde na tela do quarto — uma linha por reserva —, mas não posta uma
+caixa por quarto: posta uma caixa com tudo. Por isso o código de
+rastreio é informado uma vez, na aba **Brindes** do portal, e cai em
+todos os brindes prometidos daquela empresa. A granularidade por quarto
+continua existindo do outro lado: a organização marca `entregue` um a
+um, porque o brinde vai para um quarto específico.
+
+O caminho é `prometido → enviado → recebido → entregue`, mais
+`cancelado`. **A escada não é obrigatória**: brinde que o patrocinador
+traz na mala pula de `prometido` para `recebido` sem nunca ter rastreio.
+Voltar um estado atrás **limpa** as datas da frente — brinde reaberto com
+data de entrega antiga faz a conferência da véspera mentir.
+
 **Etiqueta funciona sem hospedagem.** Vem de três fontes: ocupantes de
 quarto, participantes sem reserva e equipe de patrocinador sem quarto.
 
@@ -354,4 +368,4 @@ supabase db advisors --linked --type security
 - Pagamento da fatura (hoje o valor é calculado e comunicado, não cobrado)
 - Webhook do Autentique — o status é lido por polling, não em tempo real
 - Importação do espelho de quartos do resort (hoje é por faixa de numeração)
-- Envio dos brindes com rastreio
+

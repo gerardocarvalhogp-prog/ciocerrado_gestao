@@ -204,6 +204,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
       <button class="aba" role="tab" data-aba="quartos" aria-selected="true">Quartos</button>
       <button class="aba" role="tab" data-aba="mesa" aria-selected="false">Mesa redonda</button>
       <button class="aba" role="tab" data-aba="indicacoes" aria-selected="false">Indicar CIO</button>
+      <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
       <button class="aba" role="tab" data-aba="manual" aria-selected="false">Manual</button>
     </div>
 
@@ -212,6 +213,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
     <section id="painel-quartos"></section>
     <section id="painel-mesa" class="oculto"></section>
     <section id="painel-indicacoes" class="oculto"></section>
+    <section id="painel-brindes" class="oculto"></section>
     <section id="painel-manual" class="oculto"></section>
   </div>
 </div>
@@ -402,11 +404,12 @@ function desenharCabecalho(){
 function ligarAbas(){
   $$(".aba").forEach(b => b.addEventListener("click", () => {
     $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
-    ["quartos","mesa","indicacoes","manual"].forEach(a =>
+    ["quartos","mesa","indicacoes","brindes","manual"].forEach(a =>
       $("#painel-"+a).classList.toggle("oculto", a !== b.dataset.aba));
 
     if(b.dataset.aba === "mesa")       carregarMesa();
     if(b.dataset.aba === "indicacoes") carregarIndicacoes();
+    if(b.dataset.aba === "brindes")    carregarBrindes();
     if(b.dataset.aba === "manual")     carregarManual();
   }));
 }
@@ -891,6 +894,97 @@ function trilhoFila(vez, minhaCota){
 
   return `<div class="fila-trilho">${passos}</div>
           <p class="fila-nota">${esc(nota)}</p>${notaPrazo(vez)}`;
+}
+
+// =====================================================================
+// ABA: BRINDES
+//
+// O brinde é por quarto, mas a empresa não posta uma caixa por quarto:
+// posta uma caixa com tudo. Por isso o código de rastreio é informado
+// uma vez e cai em todos os brindes prometidos de uma vez.
+// =====================================================================
+const ROTULO_BRINDE = {
+  prometido: "A enviar", enviado: "A caminho", recebido: "Recebido no resort",
+  entregue:  "Entregue no quarto", cancelado: "Cancelado"
+};
+const SELO_BRINDE = {
+  prometido: "pend", enviado: "vez", recebido: "ok", entregue: "ok", cancelado: "pend"
+};
+
+async function carregarBrindes(){
+  const alvo = $("#painel-brindes");
+  alvo.innerHTML = `<p class="carregando">Carregando…</p>`;
+
+  let lista;
+  try{
+    lista = await rpc("patro_meus_brindes", { p_patrocinador_id: PATRO.patrocinador_id });
+  }catch(e){ aviso(alvo, explicar(e)); return; }
+
+  if(lista.length === 0){
+    alvo.innerHTML = `
+      <h2>Brindes</h2>
+      <p class="sub">Você ainda não marcou brinde em nenhum quarto.</p>
+      <div class="vazio">
+        Na aba <strong>Quartos</strong>, marque "Vamos enviar brinde para o quarto"
+        e diga o que é. Os quartos marcados aparecem aqui para você informar o rastreio.
+      </div>`;
+    return;
+  }
+
+  const jaEnviado = lista.find(b => b.rastreio);
+
+  alvo.innerHTML = `
+    <h2>Brindes</h2>
+    <p class="sub">
+      ${lista.length} quarto(s) com brinde. Informe um código de rastreio só —
+      ele vale para toda a remessa.
+    </p>
+
+    <div class="cartao">
+      <div class="linha">
+        <div style="max-width:200px;"><label>Transportadora</label>
+          <input type="text" id="b-transp" placeholder="Correios, Jadlog…"
+                 value="${esc(jaEnviado?.transportadora || "")}"></div>
+        <div><label>Código de rastreio</label>
+          <input type="text" id="b-rastreio" placeholder="BR123456789BR"
+                 value="${esc(jaEnviado?.rastreio || "")}"></div>
+      </div>
+      <div id="b-aviso"></div>
+      <button class="btn" id="b-salvar">
+        ${jaEnviado ? "Atualizar rastreio" : "Informar envio"}
+      </button>
+      <p class="fila-nota" style="margin-top:8px;">
+        Errou o código? Pode corrigir aqui mesmo — vale o último informado.
+      </p>
+    </div>
+
+    <table style="margin-top:18px;"><tbody>
+      ${lista.map(b => `<tr>
+        <td><strong>${esc(b.quarto || "—")}</strong><br>
+            <span class="meta">${esc(b.descricao || "sem descrição")}</span></td>
+        <td style="text-align:right;">
+          <span class="selo ${SELO_BRINDE[b.status] || "pend"}">${ROTULO_BRINDE[b.status] || esc(b.status)}</span>
+          ${b.recebido_em ? `<br><span class="meta">recebido em ${dataBR(b.recebido_em)}</span>` : ""}
+          ${b.entregue_em ? `<br><span class="meta">entregue em ${dataBR(b.entregue_em)}</span>` : ""}
+        </td>
+      </tr>`).join("")}
+    </tbody></table>`;
+
+  $("#b-salvar").addEventListener("click", async () => {
+    const cod = $("#b-rastreio").value.trim();
+    if(!cod){ aviso("#b-aviso","Informe o código de rastreio."); return; }
+    const btn = $("#b-salvar");
+    btn.disabled = true; btn.textContent = "Salvando…";
+    try{
+      const r = await rpc("patro_informar_rastreio", {
+        p_patrocinador_id: PATRO.patrocinador_id,
+        p_transportadora: $("#b-transp").value.trim() || null,
+        p_rastreio: cod
+      });
+      aviso("#b-aviso", `Rastreio registrado em ${r.brindes} brinde(s).`, "ok");
+      carregarBrindes();
+    }catch(e){ aviso("#b-aviso", explicar(e)); btn.disabled = false; btn.textContent = "Informar envio"; }
+  });
 }
 
 // =====================================================================

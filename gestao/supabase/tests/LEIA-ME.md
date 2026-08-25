@@ -12,6 +12,10 @@ diferentes, quartos, um CIO com contrato assinado), `02` exercita portal
 e rooming, `03` exercita a fila da mesa redonda, `04` a fatura
 complementar e `05` a reserva da indicação com prazo por cota.
 
+`06` cobre o rastreio de brindes e roda depois de `01`, que já deixa a
+Alfa com um brinde prometido. Como `04`, ele grava estado (marca
+enviado/recebido/entregue) e não é idempotente.
+
 `03` e `05` **não rodam juntos**: os dois criam mesa redonda para as
 mesmas empresas e `sessoes` não tem chave única, então rodar os dois
 duplica as mesas. Escolha um por `db reset`.

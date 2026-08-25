@@ -114,8 +114,8 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 - [x] **Uma linhagem só**: o local reproduz o hospedado coluna a coluna,
       função a função, política a política
 - [x] Publicado — `https://ciocerrado.netlify.app/gestao/`
-- [ ] Pagamento da fatura, webhook do Autentique, espelho de quartos do
-      resort, rastreio de brindes
+- [x] Rastreio de brindes — da promessa do patrocinador ate a entrega no quarto
+- [ ] Pagamento da fatura, webhook do Autentique, espelho de quartos do resort
 
 ### O que está verificado e o que não está
 
