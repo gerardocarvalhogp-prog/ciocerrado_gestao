@@ -70,16 +70,11 @@ que o cabeçalho diz.
 | `01-fechar-anon.sql` | tira `execute` de 101 funções admin do papel `anon` | **sim** — conferido em 24/08: anon executa só `is_staff`, `meus_patrocinadores` e `part_autocadastro`, e o default privilege de funções não tem mais `anon` nem `public` |
 | `02-fatura-complementar.sql` | fatura nova cobra a diferença, não o valor cheio | **sim** — 24/08 |
 | `03-indicacao-e-porte.sql` | indicação no PERFIL ordena a lista; porte deixa de ser ordem alfabética | **sim** — 24/08; retorno conferido com as 6 colunas, `anon` sem execute, e o porte lido dos 4 perfis reais na ordem certa |
-| `04-prazo-de-indicacao.sql` | indicação vira reserva; prazo por cota faz a fila andar sozinha | **não** — falta aplicar |
+| `04-prazo-de-indicacao.sql` | indicação vira reserva; prazo por cota faz a fila andar sozinha | **sim** — 24/08; `cotas.prazo_indicacao` criada, `admin_salvar_cota` com 8 parâmetros e sem sobrecarga da versão de 7, `anon` sem execute nas quatro |
 
-> **O `04` precisa ser aplicado antes de publicar o `admin.html` desta
-> leva.** A tela passou a mandar `p_prazo_indicacao` para
-> `admin_salvar_cota` e a ler `prazo_indicacao` de `admin_listar_cotas`.
-> Sem o `04` no banco, salvar cota quebra.
->
-> ```bash
-> supabase db query --linked -f supabase/remoto/04-prazo-de-indicacao.sql
-> ```
+As 6 cotas do hospedado estão **sem prazo preenchido**, então a fila se
+comporta como antes até alguém preencher as datas na aba Estrutura. É o
+padrão seguro: cota sem prazo segura a vez até encerrar ou passar.
 
 Cada um tem um par versionado em `supabase/migrations/` com o mesmo
 corpo, para as duas linhagens não divergirem mais:
