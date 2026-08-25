@@ -11,54 +11,47 @@ de massagem que ocupa o `public`.
 ## 1. Banco — migrations
 
 O banco vive em `supabase/migrations/`, versionado. **Não cole SQL no
-painel**: a ordem entre os arquivos é significativa (ver abaixo) e o
-painel não a garante.
+painel.**
 
 ```bash
-supabase db reset
+supabase db reset    # reconstrói o banco local do zero
+supabase db push     # aplica no hospedado o que ainda não foi
 ```
 
-Apaga o banco local, roda as 20 migrations em ordem e aplica o
-`supabase/seed.sql`. É o teste de verdade — se as migrations não sobem
-do zero, o erro aparece aqui, não em produção.
+O `db reset` é o teste de verdade: se a migration não sobe do zero, o
+erro aparece aqui e não em produção. Repare que o CLI às vezes **sai com
+código 0 mesmo tendo falhado** — a falha vem como JSON na saída. Leia a
+saída, não só o código.
 
-Para aplicar no projeto hospedado, depois de passar no local:
+### O baseline
 
-```bash
-supabase db push
-```
+`20260824110100_baseline_hospedado.sql` é o dump do schema `gestao` do
+projeto hospedado, tirado em 24/08/2026. Ele é a origem: reproduz banco,
+funções, views, RLS e permissões exatamente como estão no ar.
 
-### A ordem importa
+Antes disso havia **duas** implementações do mesmo sistema — as
+migrations escritas à mão e o hospedado, montado direto no SQL Editor.
+As duas expunham a mesma API, mas por dentro divergiam: 33 funções
+locais chamavam helpers (`exigir_admin`, `evento_id_por_slug`,
+`cap_tipo`) que o hospedado nem tem. Cada correção precisava ser escrita
+duas vezes, e o `db reset` testava um sistema que não era o que estava
+publicado.
 
-| Faixa | O que é |
-|---|---|
-| `…100100` a `…100300` | schema base, duas colunas que faltavam, helpers `_exige_*` |
-| `…100400` a `…101000` | funções base: portal, participante, admin, check-in |
-| `…101100` a `…102000` | a cadeia incremental: pesquisa, cota única, prospecção, etiquetas, financeiro, faixa etária, correções do QA, jantares |
+A linhagem antiga está em `supabase/migrations-antigas/`, fora do
+caminho do CLI. Não roda mais; fica pelos cabeçalhos, que explicam
+decisão por decisão como cada parte chegou onde chegou.
 
-A terceira faixa **redefine 47 funções** da segunda — entre elas as
-correções do QA de 18/08. Como no Postgres a última definição vence,
-inverter a ordem reverteria essas correções sem erro nenhum na tela. Os
-timestamps já garantem isso; o cuidado é ao criar migration nova.
+**Não edite o baseline.** Mudança entra como migration nova, depois
+dele. A única linha do arquivo que não veio do `pg_dump` está marcada
+como tal: ela repõe o `search_path`, que o dump zera — sem isso a
+criação de `admins` quebra, porque a coluna gerada `email_norm` chama
+`norm_doc`, que chama `unaccent` sem qualificar.
 
-`…100200` e `…100300` existem porque os arquivos-base originais se
-perderam: a cadeia chama quatro helpers `_exige_*`/`_meu_participante` e
-lê `sessoes.passou_em` e `checkins.desfeito_em`, que nenhum outro
-arquivo cria. Sem eles, os `CREATE` passam e a primeira chamada quebra
-em tempo de execução.
+### O projeto hospedado é compartilhado
 
-### Antes do primeiro `db push`
-
-O projeto hospedado é **o mesmo do sistema de agendamento de massagem**,
-que está em produção no schema `public`. O `schema_base` avisa que uma
-tentativa anterior pode ter sobrescrito `public.norm_doc`. Confira antes:
-
-```sql
-select public.norm_doc('048.742.986-99');
-```
-
-Deve voltar `04874298699`. Se vier com ponto e hífen, o sistema de
-massagem já está com a função errada — corrija antes de seguir.
+É **o mesmo projeto do sistema de agendamento de massagem**, que está em
+produção no schema `public`. O `gestao` é isolado, mas o `db push` fala
+com o projeto inteiro: leia o que vai subir antes de subir.
 
 ### Expor o schema
 
@@ -276,7 +269,62 @@ exemplo. A geração das reservas respeita a composição.
 
 ---
 
-## 7. O que ainda não existe
+## 7. Segurança
+
+A chave `anon` está publicada dentro dos cinco `.html` — é assim que o
+Supabase funciona. Por isso a pergunta que importa não é "quem tem a
+chave", e sim "o que a chave abre".
+
+### O que foi testado, em 24/08/2026
+
+Com a chave anon e sem login nenhum, contra o projeto hospedado:
+
+| alvo | resultado |
+|---|---|
+| as 29 tabelas via `/rest/v1/` | `[]` — RLS ligada nas 29, 37 políticas, nenhuma vale para `anon` |
+| as 6 views via `/rest/v1/` | **vazavam** nome, empresa, apartamento e a fila de escolha |
+| funções administrativas | `permission denied` — `anon` executa só `part_autocadastro`, `is_staff` e `meus_patrocinadores` |
+| `service_role` / chaves de API nas páginas publicadas | nenhuma ocorrência |
+
+O vazamento das views foi corrigido em
+`20260824120000_fecha_views_para_anon.sql`: view no Postgres roda com o
+dono, não com quem consulta, então a RLS das tabelas de baixo não era
+aplicada. Agora as seis têm `security_invoker = true` e o `anon` perdeu
+o acesso às tabelas do schema.
+
+Também conferido, com consulta direta ao catálogo:
+
+- as 108 funções `admin_/patro_/part_/checkin_/jantar_` checam papel na
+  primeira linha; as quatro sem guarda ou são abertas por desenho
+  (`part_autocadastro`), ou filtram por `meus_patrocinadores()`
+  (`patro_meu_painel`), ou devolvem dado não sensível (`patro_manual`,
+  `patro_disponibilidade`)
+- nenhuma função `SECURITY DEFINER` está sem `search_path` fixo
+
+### O que fica de recomendação
+
+**`authenticated` ainda tem acesso de tabela.** Qualquer pessoa com um
+magic link é `authenticated`, e as 29 tabelas estão abertas para esse
+papel — sob RLS, que é escopada e foi conferida. Fechar também esse
+acesso seria defesa em profundidade, já que as telas só falam por RPC
+(não há um `.from(` nos cinco `.html`). Não fiz porque mexe no que já
+funciona e pede um teste de tela antes.
+
+**Proteção contra senha vazada, no Auth.** O painel do Supabase marca
+como desligada. Vale pouco aqui, porque o login é por magic link e não
+por senha, mas é um clique.
+
+**`public.ibm_fila_convite`**, do sistema de massagem, também é uma view
+sem `security_invoker`. Consultada como `anon`, voltou vazia — mas quem
+cuida daquele sistema deveria olhar.
+
+### Como repetir
+
+```bash
+supabase db advisors --linked --type security
+```
+
+## 8. O que ainda não existe
 
 - Pagamento da fatura (hoje o valor é calculado e comunicado, não cobrado)
 - Webhook do Autentique — o status é lido por polling, não em tempo real
