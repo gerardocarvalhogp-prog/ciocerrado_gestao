@@ -43,3 +43,6 @@ desktop.ini
 
 # Pasta montada pelo preparar-site.js. E derivada: nao versionar.
 _site/
+
+# Estado de execucao do Claude Code, por sessao. Nao versionar.
+**/.claude/scheduled_tasks.lock
