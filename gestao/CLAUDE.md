@@ -107,11 +107,12 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 ## Estado atual
 
-- [x] Schema SQL (25 tabelas, RLS, views)
-- [x] Funções — as 92 RPCs que as telas chamam existem
+- [x] Schema SQL (29 tabelas, 6 views, RLS)
+- [x] Funções — as 92 RPCs que as telas chamam existem, com os nomes de
+      parâmetro batendo (conferido contra o hospedado)
 - [x] Front do portal do patrocinador, rooming, admin, check-in e jantares
-- [x] Banco versionado em `supabase/migrations/` (23 migrations + seed)
-- [x] Sobe do zero num Postgres: `supabase db reset` roda limpo
+- [x] **Uma linhagem só**: o local reproduz o hospedado coluna a coluna,
+      função a função, política a política
 - [x] Publicado — `https://ciocerrado.netlify.app/gestao/`
 - [ ] Pagamento da fatura, webhook do Autentique, espelho de quartos do
       resort, rastreio de brindes
@@ -120,7 +121,8 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 Conferido no banco local (`supabase db reset` + `supabase/tests/`):
 
-- as 23 migrations sobem do zero, sem erro de compilação plpgsql
+- o baseline sobe do zero e o resultado bate com o hospedado: 359
+  colunas, 137 funções e 37 políticas, zero diferenças
 - `01` a `04` exercitam portal, rooming, fila da mesa redonda e fatura,
   trocando de papel com `request.jwt.claims` como o PostgREST faz
 - `anon` apanha nas funções administrativas e só passa em
@@ -139,10 +141,13 @@ as telas rodando contra o hospedado com usuário de verdade.
 1. A cadeia `…101100` a `…102000` redefine 47 funções das migrations
    anteriores, incluindo as correções do QA. Ordem invertida reverte as
    correções **sem erro nenhum**.
-2. O projeto hospedado é o mesmo do sistema de massagem em produção, e
-   o `gestao` de lá seguiu outro caminho: **nunca rode `db push`**
-   contra ele. Correção no hospedado vai por `supabase/remoto/`, um
-   arquivo por vez. Ver `supabase/remoto/LEIA-ME.md`.
+2. O projeto hospedado é o mesmo do sistema de massagem em produção. O
+   `gestao` de lá tinha seguido outro caminho, e desde 24/08/2026 ele é
+   a **origem**: `migrations/20260824110100_baseline_hospedado.sql` é o
+   dump dele, e o fluxo voltou a ser `db reset` no local, `db push` no
+   hospedado. `supabase/remoto/` está encerrada e
+   `supabase/migrations-antigas/` guarda a linhagem anterior, que não
+   roda mais.
 3. O site publica os **dois** sistemas (massagem em `/`, gestão em
    `/gestao/`). O deploy sai de `_site`, montado pelo
    `preparar-site.js` — publicar a raiz direto põe `.sql`, `.py` e

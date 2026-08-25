@@ -115,7 +115,10 @@ select * from admin_listar_equipe();
 \echo ''
 \echo '=== TESTE 4 · Ana preenche um quarto ==='
 select patro_salvar_quarto(
-  (select id from reservas r join patrocinadores p on p.id=r.patrocinador_id
+  -- r.id qualificado: reservas e patrocinadores tem id, e o `id` solto
+  -- que estava aqui fazia o teste morrer com "column reference id is
+  -- ambiguous" — erro do teste, que passava por erro do sistema
+  (select r.id from reservas r join patrocinadores p on p.id=r.patrocinador_id
     where p.empresa='Alfa Cloud' order by r.created_at limit 1),
   '[{"nome":"Ana Souza","cpf":"11122233344","tipo":"adulto","usa_transfer":true},
     {"nome":"Rui Lima","cpf":"55566677788","tipo":"adulto","usa_transfer":false}]'::jsonb,

@@ -1,102 +1,51 @@
-# O banco hospedado seguiu outro caminho
+# Esta pasta está encerrada
 
-**Não rode `supabase db push` contra o projeto `jlvcjqfrsxxexflvwbvn`.**
+Os arquivos daqui foram o caminho de correção enquanto havia **duas**
+implementações do sistema: as migrations escritas à mão e o schema
+`gestao` do projeto hospedado, que tinha seguido outro caminho.
 
-## O que foi medido
-
-Dump do schema `gestao` remoto, em 24/08/2026:
-
-| | remoto | local (`supabase/migrations/`) |
-|---|---|---|
-| tabelas | 29 | 29 |
-| funções | 132 | 129 |
-| histórico de migrations | vazio | 21 |
-
-As 21 migrations locais constam como **não aplicadas** no remoto. Mas o
-remoto não é um banco vazio esperando por elas: é uma implementação
-completa, aplicada direto no SQL Editor, e em pontos **mais avançada**
-que a local.
-
-O `gestao` hospedado ainda tem **dados de teste** (8 participantes, 4
-perfis, 5 sessões, 0 faturas). O que está em produção nesse projeto é o
-`public`, do sistema de massagem.
-
-## Nove funções que só existem no remoto
-
-```
-_exige_participante      _garantir_reserva        _recalcular_fechado
-admin_gerar_sessoes      admin_registrar_sugestao admin_remover_quartos_livres
-admin_remover_sessao     admin_salvar_sessao      part_minha_fatura
-```
-
-Gestão de sessões e fatura do participante — funcionalidade que os
-arquivos locais não têm.
-
-## Modelos de dados incompatíveis
-
-| assunto | remoto | local |
-|---|---|---|
-| pesquisa de investimento | chave dentro de `participante_perfil.respostas` (jsonb) | colunas próprias `investimentos`, `dispositivos`, `terceirizados` |
-| prospecção | uma tabela `prospeccoes` | duas: `prospeccao_rodadas` + `prospeccao_itens` |
-
-Aplicar as migrations locais por cima **substituiria** funções remotas
-por versões que leem um modelo de dados que não existe lá. Não é um
-merge; é uma troca de arquitetura.
-
-## O que o front precisa: nada
-
-As 97 RPCs que as cinco telas chamam **existem todas no remoto**, com os
-nomes de parâmetro batendo. O front pode ser publicado contra o banco
-hospedado como está.
-
----
-
-## Como aplicar um arquivo desta pasta
+Isso acabou em 24/08/2026. O hospedado virou a origem, e
+`supabase/migrations/20260824110100_baseline_hospedado.sql` é o dump
+dele. A partir daí:
 
 ```bash
-supabase db query --linked -f supabase/remoto/NN-arquivo.sql
+supabase db reset    # reproduz o hospedado do zero, local
+supabase db push     # aplica no hospedado o que vier depois do baseline
 ```
 
-Um arquivo por vez, na ordem numérica. Cada um é cirúrgico: mexe só no
-que o cabeçalho diz.
+**Não crie arquivo novo aqui.** Correção entra como migration.
 
-`00-estado-anterior.sql` é o dump das funções **antes** de 02 e 03 —
-é o rollback, não fonte para editar.
+## Por que existia
 
-## Estado das correções
+O hospedado tinha sido montado direto no SQL Editor e estava, em pontos,
+à frente das migrations. As duas linhagens expunham a mesma API — as 92
+RPCs que as telas chamam batiam nos dois lados — mas por dentro eram
+implementações diferentes: 33 funções locais chamavam `exigir_admin`,
+`evento_id_por_slug` e `cap_tipo`, helpers que o hospedado nem tem (lá a
+mesma checagem é `_exige_admin`). Onze funções existiam só de um lado.
 
-| arquivo | o que faz | aplicado no remoto |
-|---|---|---|
-| `01-fechar-anon.sql` | tira `execute` de 101 funções admin do papel `anon` | **sim** — conferido em 24/08: anon executa só `is_staff`, `meus_patrocinadores` e `part_autocadastro`, e o default privilege de funções não tem mais `anon` nem `public` |
-| `02-fatura-complementar.sql` | fatura nova cobra a diferença, não o valor cheio | **sim** — 24/08 |
-| `03-indicacao-e-porte.sql` | indicação no PERFIL ordena a lista; porte deixa de ser ordem alfabética | **sim** — 24/08; retorno conferido com as 6 colunas, `anon` sem execute, e o porte lido dos 4 perfis reais na ordem certa |
-| `04-prazo-de-indicacao.sql` | indicação vira reserva; prazo por cota faz a fila andar sozinha | **sim** — 24/08 |
-| `05-janela-por-cota.sql` | a janela vira relativa ("48h depois que a anterior encerrar") e prazo vencido passa a tirar da escolha | **sim** — 24/08; as seis funções com assinatura nova, uma versão de cada, `anon` sem execute |
+O custo era cobrado em toda mudança: cada correção escrita duas vezes, e
+o `db reset` testando um sistema que não era o que estava no ar.
 
-O hospedado está com `eventos.escolha_abre_em` **vazio** e as 6 cotas sem
-janela, então nada expira — a fila se comporta como antes. O relógio só
-começa quando alguém preencher "Escolha das mesas abre em" na aba
-Estrutura. É o padrão seguro e proposital: se o relógio começasse sozinho
-quando as mesas são criadas, a janela da Esmeralda queimaria semanas
-antes de alguém ser avisado.
+## O que foi aplicado por aqui, antes do encerramento
 
-Cada um tem um par versionado em `supabase/migrations/` com o mesmo
-corpo, para as duas linhagens não divergirem mais:
+| arquivo | o que fez |
+|---|---|
+| `01-fechar-anon.sql` | tirou `execute` de 101 funções administrativas do papel `anon` |
+| `02-fatura-complementar.sql` | fatura nova passa a cobrar a diferença, não o valor cheio |
+| `03-indicacao-e-porte.sql` | indicação no PERFIL ordena a lista; porte deixa de ser ordem alfabética |
+| `04-prazo-de-indicacao.sql` | indicação vira reserva, com prazo por cota |
+| `05-janela-por-cota.sql` | janela relativa ("48h depois que a anterior encerrar"); prazo vencido tira da escolha |
+| `06-checkin-desfazer-auditavel.sql` | desfazer check-in grava quem desfez e falha quando não desfaz nada |
 
-- `02` ↔ `20260824102200_fatura_complementar.sql`
-- `03` ↔ `20260824102300_indicacao_e_porte.sql`
+Todos estão dentro do baseline. `00-estado-anterior.sql` é o dump das
+funções antes de 02 e 03 — serve de rollback histórico, não de fonte.
 
-As duas correções passaram no local (`supabase db reset` com 23
-migrations, mais `supabase/tests/04-fatura-complementar.sql`).
+O `06` foi a única coisa em que a linhagem local estava na frente, e por
+isso subiu antes do dump: a versão do hospedado devolvia `{"ok": true}`
+mesmo sem ter desfeito nada, e não guardava o autor.
 
-Ainda não há tabela de RLS conferida no remoto além do básico: as 29
-tabelas do `gestao` estão todas com RLS ligada.
-
-## A regra da indicação, como ficou decidida
-
-O `03` implementou a indicação como **ordem** — o indicado subia ao topo
-da lista de quem indicou, mas continuava visível para as outras empresas.
-O `04` fecha a regra: indicação é **reserva**, e o que a solta é o prazo.
+## A regra da indicação, como ficou
 
 1. Enquanto a cota de quem indicou está na janela dela, o convidado
    indicado **não aparece** para mais ninguém.
@@ -104,25 +53,18 @@ O `04` fecha a regra: indicação é **reserva**, e o que a solta é o prazo.
    (encerra, passa a vez, enche a mesa) **ou** quando a janela dela vence
    — o que vier primeiro.
 3. Escolhido, o convidado fica preso naquela mesa: some da lista de
-   todos. Isso já funcionava.
+   todos.
 4. Janela vencida sem escolha: a reserva cai e ele volta para a lista
    geral.
 5. Quem perdeu a janela está **fora daquela sessão** — não escolhe nem
    quem sobrou.
 
 A janela é relativa: cada cota tem `janela_horas`, contadas do fim da
-anterior. A primeira começa em `eventos.escolha_abre_em`. Há ainda um
-teto absoluto opcional por cota (`prazo_indicacao`); vale o que vier
-primeiro entre os três.
+anterior. A primeira começa em `eventos.escolha_abre_em`. Há um teto
+absoluto opcional por cota (`prazo_indicacao`); vale o que vier primeiro
+entre os três. Âncora vazia = nada expira.
 
-Cota sem mesa daquele tipo não segura a fila: fecha no mesmo instante em
-que abre.
-
-A reserva vale nos dois sentidos da fila: o convidado indicado pela Ouro
-resiste à Esmeralda, que escolhe antes de todo mundo. Se valesse só de
-cima para baixo, não valeria nada — é o caso que
-`supabase/tests/05-reserva-e-prazo.sql` cobre.
-
-O prazo fica em `cotas.prazo_indicacao`, uma data por cota, editável na
-aba **Estrutura** do admin. Cota sem prazo se comporta como antes: segura
-a vez até encerrar ou passar.
+A reserva vale nos dois sentidos da fila: o indicado pela Ouro resiste à
+Esmeralda, que escolhe antes de todo mundo. Se valesse só de cima para
+baixo, não valeria nada — é o caso central de
+`supabase/tests/05-reserva-e-prazo.sql`.
