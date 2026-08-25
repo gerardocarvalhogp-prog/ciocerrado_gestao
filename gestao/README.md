@@ -110,9 +110,17 @@ aconteceu — útil para ter um link por posto.
 5. **Preços** — valores de acompanhante, criança e transfer
 6. **Equipe** — quem mais acessa, e com qual perfil
 7. **Mesas e jantares** — criar as sessões
+8. **Estrutura → Escolha das mesas abre em** — a largada do relógio
+9. **Estrutura → Janela (h)** em cada cota — 48h na Esmeralda, 48h na
+   Diamante, e assim por diante
 
 Sem o passo 4 o patrocinador entra no portal e vê "sua cota ainda não
 tem quartos liberados".
+
+Sem os passos 8 e 9 **nada expira**: a fila só anda quando cada empresa
+termina de escolher ou passa a vez. É o padrão seguro — o relógio só
+começa quando alguém diz que começou —, mas quer dizer que a regra de
+prazo fica inerte até você preencher esses dois campos.
 
 ---
 

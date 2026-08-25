@@ -36,14 +36,16 @@ Essa stack veio do sistema de agendamento de massagem, que já está em produç�
 - O sistema vive num **schema próprio `gestao`**, dentro do **mesmo projeto Supabase**
   do sistema de massagem. Motivo: os nomes de tabela colidiam com os do `public`
   (`eventos`, `participantes`, `reservas`, `admins`). Não mexer no `public` — ele é o
-  sistema de massagem em produção.
+  sistema de massagem em produção. A regra foi quebrada **uma vez**, de propósito e
+  documentado, em `migrations/20260825090100`: uma view de lá vazava dado pessoal para
+  `anon`. Se for quebrar de novo, que seja com o mesmo nível de justificativa.
 - **Patrocinador tem múltiplos usuários com login** (não um login único por empresa).
 - **Multievento por padrão.** Nada hardcoded para o Experience 2026. Um link por evento
   (`?evento=slug`), admins globais, importação por planilha modelo com linha de exemplo.
 - **Jantares e eventos menores** reaproveitam a lógica de alocação já usada nas mesas
   redondas (ver abaixo).
-- Schema SQL já escrito: **25 tabelas, RLS e views**. Próximo passo são as funções,
-  **começando pelo portal do patrocinador**.
+- Primeiro evento atendido de verdade: o **Experience 2027**. O de 2026 já aconteceu,
+  no fluxo antigo de planilhas — este sistema nasceu para a edição seguinte.
 
 ## Regras de negócio herdadas (mesas redondas → jantares)
 
@@ -77,8 +79,9 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 - Lógica sensível (reserva, alocação, contagem de cota) fica em **função SQL**, não no
   front — o front é estático e não dá pra confiar nele.
 - Reserva/atribuição concorrente usa `SELECT ... FOR UPDATE` na linha do recurso.
-- Toda função administrativa checa papel (`is_admin()` / equivalente) antes de qualquer
-  coisa. O sistema de massagem já usa papéis separados (`admin` completo vs `checkin`
+- Toda função administrativa checa papel (`_exige_admin()` / `_exige_staff()` /
+  `_exige_patrocinador()`) na **primeira linha**. Não é convenção: é a única proteção,
+  porque nenhum papel lê tabela direto. O sistema de massagem já usa papéis separados (`admin` completo vs `checkin`
   restrito) — seguir o mesmo modelo.
 - Documentos (CPF/e-mail) são normalizados antes de comparar: minúsculo, sem espaço,
   sem acento, só dígitos no CPF.
@@ -107,48 +110,74 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 ## Estado atual
 
-- [x] Schema SQL (29 tabelas, 6 views, RLS)
-- [x] Funções — as 92 RPCs que as telas chamam existem, com os nomes de
-      parâmetro batendo (conferido contra o hospedado)
-- [x] Front do portal do patrocinador, rooming, admin, check-in e jantares
-- [x] **Uma linhagem só**: o local reproduz o hospedado coluna a coluna,
-      função a função, política a política
-- [x] Publicado — `https://ciocerrado.netlify.app/gestao/`
-- [x] Rastreio de brindes — da promessa do patrocinador ate a entrega no quarto
+Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
+**29 tabelas, 6 views, 368 colunas, 143 funções, 37 políticas de RLS,
+8 migrations.**
+
+- [x] Banco, funções e RLS
+- [x] Front: portal do patrocinador, rooming, admin, check-in, jantares
+- [x] **Uma linhagem só** — o `db reset` local reproduz o hospedado
+      coluna a coluna, função a função, política a política
+- [x] Publicado em `https://ciocerrado.netlify.app/gestao/`
+- [x] Rastreio de brindes, da promessa até a entrega no quarto
 - [ ] Pagamento da fatura, webhook do Autentique, espelho de quartos do resort
 
 ### O que está verificado e o que não está
 
 Conferido no banco local (`supabase db reset` + `supabase/tests/`):
 
-- o baseline sobe do zero e o resultado bate com o hospedado: 359
-  colunas, 137 funções e 37 políticas, zero diferenças
-- `01` a `04` exercitam portal, rooming, fila da mesa redonda e fatura,
-  trocando de papel com `request.jwt.claims` como o PostgREST faz
-- `anon` apanha nas funções administrativas e só passa em
-  `part_autocadastro`
-- fatura complementar cobra a diferença, é idempotente no recálculo, e
+- o baseline sobe do zero e o resultado bate com o hospedado
+- os seis arquivos de teste exercitam portal, rooming, fila da mesa
+  redonda, fatura, reserva com janela e brindes — trocando de papel com
+  `request.jwt.claims`, como o PostgREST faz
+- fatura complementar cobra a diferença, é idempotente no recálculo e
   vira crédito quando alguém sai depois de pagar
+- a reserva da indicação resiste de baixo para cima: o indicado pela
+  Ouro não aparece para a Esmeralda
 
-Conferido no banco hospedado, por consulta direta: as correções de
-`supabase/remoto/` estão aplicadas (ver o LEIA-ME de lá).
+Conferido no hospedado, por consulta ao catálogo e por requisição real
+com a chave anon (ver README §7):
 
-**Não** verificado: o resto do comportamento de RLS tabela a tabela, e
-as telas rodando contra o hospedado com usuário de verdade.
+- as 97 RPCs que as telas chamam existem, com os nomes de parâmetro
+  batendo
+- `anon` e `authenticated` não leem tabela nem view nenhuma do schema
+- `anon` só executa `part_autocadastro`, `is_staff` e
+  `meus_patrocinadores`
+- zero achados de nível ERROR no `supabase db advisors`
 
-### Três armadilhas herdadas
+**Não** verificado: as telas rodando contra o hospedado com um usuário
+de verdade, logado por magic link. Tudo foi medido no Postgres e pela
+API — ninguém nunca clicou.
 
-1. A cadeia `…101100` a `…102000` redefine 47 funções das migrations
-   anteriores, incluindo as correções do QA. Ordem invertida reverte as
-   correções **sem erro nenhum**.
+### Três armadilhas
+
+1. **Nenhum papel lê tabela direto.** `anon` e `authenticated` só
+   executam função. Um `.from("participantes")` numa tela do `gestao`
+   morre com `permission denied` — o conserto é trocar por RPC, não
+   devolver o grant. (As telas do sistema de massagem, em `/`, usam
+   `.from()` no schema `public`; isso é outro schema e continua valendo.)
 2. O projeto hospedado é o mesmo do sistema de massagem em produção. O
    `gestao` de lá tinha seguido outro caminho, e desde 24/08/2026 ele é
    a **origem**: `migrations/20260824110100_baseline_hospedado.sql` é o
-   dump dele, e o fluxo voltou a ser `db reset` no local, `db push` no
-   hospedado. `supabase/remoto/` está encerrada e
-   `supabase/migrations-antigas/` guarda a linhagem anterior, que não
-   roda mais.
+   dump dele, e o fluxo é `db reset` no local, `db push` no hospedado.
+   `supabase/remoto/` está encerrada e `supabase/migrations-antigas/`
+   guarda a linhagem anterior, que não roda mais.
 3. O site publica os **dois** sistemas (massagem em `/`, gestão em
    `/gestao/`). O deploy sai de `_site`, montado pelo
    `preparar-site.js` — publicar a raiz direto põe `.sql`, `.py` e
-   `.md` em URL pública.
+   `.md` em URL pública, como já aconteceu uma vez.
+
+### O CLI mente sobre o código de saída
+
+`supabase db reset` e `db push` às vezes saem com **código 0 tendo
+falhado** — a falha vem como JSON na saída. Leia a saída, não só o
+código.
+
+### O que depende do organizador, não de código
+
+- as janelas das cotas e a largada (`eventos.escolha_abre_em`): a regra
+  está no ar mas inerte enquanto os campos estiverem vazios
+- dados reais de 2027 — hoje são 4 patrocinadores de ~61 e 8
+  participantes de ~130, e `sympla_event_id` está vazio
+- credenciais do `integracao.py` (Sympla, Autentique, Resend)
+- um teste de ponta a ponta com login de verdade
