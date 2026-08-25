@@ -37,3 +37,9 @@ _backup-meus/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Local Netlify folder
+.netlify
+
+# Pasta montada pelo preparar-site.js. E derivada: nao versionar.
+_site/

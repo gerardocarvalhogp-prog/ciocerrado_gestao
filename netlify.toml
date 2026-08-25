@@ -9,18 +9,34 @@
 #   /gestao/       sistema de gestao de eventos
 #
 # Publicar a partir de gestao/ substituiria o site inteiro e derrubaria
-# o agendamento de massagem. O publish abaixo e "." de proposito.
+# o agendamento de massagem.
 #
-#   netlify deploy --dir=.            (preview, gera URL temporaria)
-#   netlify deploy --dir=. --prod     (producao)
+# E NAO publique a raiz direto: o publish e "_site", nao ".".
 #
-# Rode sempre desta pasta, nunca de dentro de gestao/.
+# Publicar "." colocava codigo-fonte no ar. Conferido em 24/08/2026,
+# todos respondendo 200:
+#
+#   /schema.sql          /gestao/CLAUDE.md
+#   /gestao/integracao.py    /gestao/supabase/seed.sql
+#
+# Dado pessoal nao vazou (os .csv e as planilhas estao no .gitignore e
+# o CLI pulou), mas o mapa inteiro do banco ficou publico — junto com a
+# chave anon, que e publica por design. O preparar-site.js monta o
+# _site so com o que e web E esta versionado.
+#
+#   node preparar-site.js
+#   netlify deploy --dir=_site            (preview, gera URL temporaria)
+#   netlify deploy --dir=_site --prod     (producao)
+#
+# Rode sempre desta pasta, nunca de dentro de gestao/ — e rode o
+# preparar-site antes de cada deploy: o _site nao se atualiza sozinho.
 # =====================================================================
 
 [build]
-  publish = "."
-  # Site estatico: nao ha passo de build. Os .html carregam supabase-js
-  # e SheetJS por CDN.
+  publish = "_site"
+  # O site e estatico: os .html carregam supabase-js e SheetJS por CDN.
+  # O preparar-site.js nao compila nada, so escolhe o que pode ir ao
+  # ar; por isso fica fora do build do Netlify e roda na mao.
   command = ""
 
 # Sem cache no HTML: as telas carregam a chave anon e o slug do evento
