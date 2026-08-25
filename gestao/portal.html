@@ -766,6 +766,9 @@ async function desenharSessao(card, s){
       <button class="btn sec passar" style="margin-left:6px;">Passar a vez</button>
     </div>`;
 
+  // A lista ja vem ordenada pelo banco: primeiro quem a propria empresa
+  // indicou no PERFIL, depois por porte (faturamento), depois nome. O
+  // selo existe para essa ordem nao parecer aleatoria na tela.
   let disponiveis = [];
   try{
     disponiveis = await rpc("patro_convidados_disponiveis", { p_sessao_id: s.sessao_id });
@@ -784,7 +787,8 @@ async function desenharSessao(card, s){
         <td style="width:26px;">
           <input type="checkbox" class="pick" value="${esc(c.participante_id)}">
         </td>
-        <td><strong>${esc(c.nome)}</strong><br>
+        <td><strong>${esc(c.nome)}</strong>
+            ${c.indicado_por_mim ? `<span class="selo vez">indicado por você</span>` : ""}<br>
             <span class="meta">${esc(c.empresa || "")}${c.cargo ? " · " + esc(c.cargo) : ""}</span></td>
       </tr>`).join("")}</tbody></table>`;
   }
@@ -844,11 +848,26 @@ async function carregarCotas(){
   }
 }
 
+// O prazo da cota e o que faz a fila andar sozinha: vencido, a proxima
+// cota entra e os convidados que esta empresa indicou voltam para a
+// lista geral. Quem esta na tela precisa saber disso antes, nao depois.
+function notaPrazo(vez){
+  if(!vez.prazo) return "";
+  return vez.prazo_vencido
+    ? `<p class="fila-nota"><strong>O prazo da sua cota venceu em ${dataBR(vez.prazo)}.</strong>
+       As próximas empresas já entraram e quem você indicou voltou para a lista geral.
+       Você ainda pode escolher entre quem estiver disponível.</p>`
+    : `<p class="fila-nota">Você escolhe até <strong>${dataBR(vez.prazo)}</strong>.
+       Depois dessa data a vez passa para a próxima cota e quem você indicou
+       deixa de ficar reservado para você.</p>`;
+}
+
 function trilhoFila(vez, minhaCota){
   if(ORDEM_COTAS.length === 0){
     return `<p class="fila-nota">${esc(vez.minha_vez
       ? `Você é o próximo da fila — posição ${vez.posicao}.`
-      : `${vez.na_frente} empresa(s) na sua frente · posição ${vez.posicao}.`)}</p>`;
+      : `${vez.na_frente} empresa(s) na sua frente · posição ${vez.posicao}.`)}</p>`
+      + notaPrazo(vez);
   }
 
   const idx = ORDEM_COTAS.findIndex(c =>
@@ -868,7 +887,7 @@ function trilhoFila(vez, minhaCota){
     : `${vez.na_frente} empresa(s) na sua frente · sua posição na ordem geral: ${vez.posicao}.`;
 
   return `<div class="fila-trilho">${passos}</div>
-          <p class="fila-nota">${esc(nota)}</p>`;
+          <p class="fila-nota">${esc(nota)}</p>${notaPrazo(vez)}`;
 }
 
 // =====================================================================

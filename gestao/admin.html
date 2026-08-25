@@ -202,6 +202,12 @@ const dataBR = d => d ? String(d).split("T")[0].split("-").reverse().join("/") :
 const moeda = v => Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const dataHora = d => d ? new Date(d).toLocaleString("pt-BR") : "—";
 
+// Hoje em ISO, para comparar com data que vem do banco como texto
+// ("2026-09-01"). Comparar string com string evita o fuso: `new Date`
+// num "YYYY-MM-DD" e lido como UTC e volta um dia atras no Brasil.
+const HOJE_ISO = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+  .toISOString().slice(0, 10);
+
 // Exporta qualquer lista para Excel, mantendo a ordem das colunas.
 function exportar(linhas, colunas, nomeArquivo, nomeAba="Dados"){
   if(!linhas || linhas.length === 0){
@@ -1429,12 +1435,15 @@ async function blocoCotas(){
         <p class="sub" style="margin-bottom:12px;">
           ${COTA_UNICA
             ? "Evento de cota única: sem ordem de prioridade e sem fila de escolha."
-            : "A ordem define quem escolhe primeiro na mesa redonda — 1 escolhe antes de todos."}
+            : "A ordem define quem escolhe primeiro na mesa redonda — 1 escolhe antes de todos. " +
+              "O prazo é até quando a cota escolhe: vencido, a vez passa para a próxima e " +
+              "os convidados que ela indicou voltam para a lista geral."}
         </p>
         <div class="barra">
           <div style="max-width:160px;"><label>Nome</label><input type="text" id="co-nome" placeholder="Esmeralda"></div>
           ${COTA_UNICA ? "" :
-            `<div style="max-width:90px;"><label>Ordem</label><input type="text" id="co-ordem" placeholder="1"></div>`}
+            `<div style="max-width:90px;"><label>Ordem</label><input type="text" id="co-ordem" placeholder="1"></div>
+             <div style="max-width:150px;"><label>Prazo p/ escolher</label><input type="date" id="co-prazo"></div>`}
           <div style="max-width:100px;"><label>Singles</label><input type="text" id="co-q-single" placeholder="0"></div>
           <div style="max-width:100px;"><label>Duplos</label><input type="text" id="co-q-duplo" placeholder="0"></div>
           <div style="max-width:100px;"><label>Triplos</label><input type="text" id="co-q-triplo" placeholder="0"></div>
@@ -1450,14 +1459,19 @@ async function blocoCotas(){
         </p>
         <div id="co-aviso"></div>
         ${l.length ? `<table style="margin-top:10px;">
-          <tr>${COTA_UNICA ? "" : "<th>Ordem</th>"}<th>Cota</th><th>Quartos</th><th>Mesa</th>
+          <tr>${COTA_UNICA ? "" : "<th>Ordem</th><th>Prazo</th>"}<th>Cota</th><th>Quartos</th><th>Mesa</th>
               <th>Reunião</th><th>Jantar</th><th>Patrocinadores</th><th></th></tr>
           ${l.map(c => `<tr data-id="${esc(c.id)}" data-nome="${esc(c.nome)}"
                             data-ordem="${c.ordem_prioridade}"
+                            data-prazo="${esc(c.prazo_indicacao || "")}"
                             data-q='${esc(JSON.stringify(c.quartos||{}))}'
                             data-mesa="${c.vagas_mesa_redonda}"
                             data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}">
-            ${COTA_UNICA ? "" : `<td class="meta">${c.ordem_prioridade}</td>`}
+            ${COTA_UNICA ? "" : `<td class="meta">${c.ordem_prioridade}</td>
+              <td class="meta">${c.prazo_indicacao
+                   ? dataBR(c.prazo_indicacao) + (c.prazo_indicacao < HOJE_ISO
+                       ? ` <span class="selo pend">vencido</span>` : "")
+                   : "sem prazo"}</td>`}
             <td><strong>${esc(c.nome)}</strong></td>
             <td>${esc(comp(c.quartos))}<br><span class="meta">${c.total_quartos} no total</span></td>
             <td>${c.vagas_mesa_redonda || "—"}</td>
@@ -1482,6 +1496,7 @@ async function blocoCotas(){
       const q = JSON.parse(t.q || "{}");
       $("#co-nome").value = t.nome;
       if($("#co-ordem")) $("#co-ordem").value = t.ordem;
+      if($("#co-prazo")) $("#co-prazo").value = t.prazo || "";
       $("#co-q-single").value = q.single || "";
       $("#co-q-duplo").value  = q.duplo  || "";
       $("#co-q-triplo").value = q.triplo || "";
@@ -1573,11 +1588,15 @@ async function salvarCota(){
       p_quartos: quartos,
       p_vagas_mesa: parseInt($("#co-mesa").value,10) || 0,
       p_reuniao: $("#co-reuniao").value === "1",
-      p_jantar:  $("#co-jantar").value  === "1"
+      p_jantar:  $("#co-jantar").value  === "1",
+      // vazio vira null de proposito: e assim que se tira o prazo de
+      // uma cota que ja teve um
+      p_prazo_indicacao: $("#co-prazo")?.value || null
     });
     ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo"]
       .forEach(s => $(s).value = "");
     if($("#co-ordem")) $("#co-ordem").value = "";
+    if($("#co-prazo")) $("#co-prazo").value = "";
     blocoCotas();
   }catch(e){ aviso("#co-aviso", explicar(e)); }
   finally{ b.disabled = false; b.textContent = "Salvar cota"; }
