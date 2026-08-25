@@ -51,6 +51,10 @@ A alocação de convidados a mesas/jantares combina três camadas, nesta ordem:
 
 1. **Indicação direta** — se o patrocinador indicou a pessoa no PERFIL, ela vai para a
    mesa dele. Patrocinador também pode escolher os próprios convidados.
+   A indicação é **reserva com prazo**: o indicado some da lista das outras empresas
+   enquanto a cota de quem indicou estiver dentro de `cotas.prazo_indicacao`. Vencido o
+   prazo, a fila anda e a reserva cai. Vale nos dois sentidos da fila — o indicado pela
+   Prata resiste à Esmeralda.
 2. **Porte** — empresas de maior faturamento vão para as cotas mais altas, na ordem
    Esmeralda → Diamante → Platina → Ouro → Prata. Faturamento vem do export "Lista de
    participantes" do Sympla.
@@ -104,29 +108,40 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 - [x] Schema SQL (25 tabelas, RLS, views)
 - [x] Funções — as 92 RPCs que as telas chamam existem
 - [x] Front do portal do patrocinador, rooming, admin, check-in e jantares
-- [x] Banco versionado em `supabase/migrations/` (20 migrations + seed)
-- [ ] **Nada disso rodou num Postgres ainda** — ver abaixo
+- [x] Banco versionado em `supabase/migrations/` (23 migrations + seed)
+- [x] Sobe do zero num Postgres: `supabase db reset` roda limpo
+- [x] Publicado — `https://ciocerrado.netlify.app/gestao/`
 - [ ] Pagamento da fatura, webhook do Autentique, espelho de quartos do
       resort, rastreio de brindes
 
 ### O que está verificado e o que não está
 
-Conferido por análise estática, sem banco:
+Conferido no banco local (`supabase db reset` + `supabase/tests/`):
 
-- os nomes de parâmetro batem nas 92 chamadas (teste exato)
-- forma do retorno (tabela→array, jsonb→objeto) bate em todas
-- nenhuma coluna inexistente em `INSERT`/`UPDATE`
-- nenhuma colisão entre coluna de `RETURNS TABLE` e coluna de tabela
-  (o *"column reference is ambiguous"* que o QA de 18/08 pegou)
+- as 23 migrations sobem do zero, sem erro de compilação plpgsql
+- `01` a `04` exercitam portal, rooming, fila da mesa redonda e fatura,
+  trocando de papel com `request.jwt.claims` como o PostgREST faz
+- `anon` apanha nas funções administrativas e só passa em
+  `part_autocadastro`
+- fatura complementar cobra a diferença, é idempotente no recálculo, e
+  vira crédito quando alguém sai depois de pagar
 
-**Não** verificado: se cada função devolve o valor certo, comportamento
-de RLS, e erro de compilação plpgsql. Isso só `supabase db reset`
-responde — é o próximo passo.
+Conferido no banco hospedado, por consulta direta: as correções de
+`supabase/remoto/` estão aplicadas (ver o LEIA-ME de lá).
 
-### Duas armadilhas herdadas
+**Não** verificado: o resto do comportamento de RLS tabela a tabela, e
+as telas rodando contra o hospedado com usuário de verdade.
+
+### Três armadilhas herdadas
 
 1. A cadeia `…101100` a `…102000` redefine 47 funções das migrations
    anteriores, incluindo as correções do QA. Ordem invertida reverte as
    correções **sem erro nenhum**.
-2. O projeto hospedado é o mesmo do sistema de massagem em produção.
-   Antes de qualquer `db push`, confira `public.norm_doc` (ver README §1).
+2. O projeto hospedado é o mesmo do sistema de massagem em produção, e
+   o `gestao` de lá seguiu outro caminho: **nunca rode `db push`**
+   contra ele. Correção no hospedado vai por `supabase/remoto/`, um
+   arquivo por vez. Ver `supabase/remoto/LEIA-ME.md`.
+3. O site publica os **dois** sistemas (massagem em `/`, gestão em
+   `/gestao/`). O deploy sai de `_site`, montado pelo
+   `preparar-site.js` — publicar a raiz direto põe `.sql`, `.py` e
+   `.md` em URL pública.

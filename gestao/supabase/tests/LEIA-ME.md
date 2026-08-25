@@ -9,7 +9,12 @@ docker exec -i supabase_db_gestao-cio-cerrado psql -U postgres -d postgres -q \
 
 Ordem: `01` monta o cenário (evento aberto, duas patrocinadoras em cotas
 diferentes, quartos, um CIO com contrato assinado), `02` exercita portal
-e rooming, `03` exercita a fila da mesa redonda.
+e rooming, `03` exercita a fila da mesa redonda, `04` a fatura
+complementar e `05` a reserva da indicação com prazo por cota.
+
+`03` e `05` **não rodam juntos**: os dois criam mesa redonda para as
+mesmas empresas e `sessoes` não tem chave única, então rodar os dois
+duplica as mesas. Escolha um por `db reset`.
 
 ## Por que eles trocam de papel
 

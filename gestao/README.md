@@ -89,7 +89,19 @@ const SUPABASE_ANON = "COLE_AQUI_A_CHAVE_ANON";
 | `checkin.html` | equipe no resort | `/checkin.html?evento=cerrado2027` |
 | `jantares.html` | organização | `/jantares.html` (sem evento — módulo próprio) |
 
-Publique os quatro juntos no Netlify.
+Publique as cinco juntas no Netlify, **da pasta de cima** (a raiz serve
+também o agendamento de massagem, em `/`):
+
+```bash
+node preparar-site.js                  # monta o _site
+netlify deploy --dir=_site             # preview
+netlify deploy --dir=_site --prod      # producao
+```
+
+O `preparar-site.js` copia só o que é web e está versionado. Publicar a
+raiz direto colocaria `schema.sql`, as migrations, o `CLAUDE.md` e o
+`integracao.py` em URL pública — foi o que aconteceu no deploy de
+24/08/2026 e o que esse passo evita.
 
 O `checkin.html` aceita `&local=Lounge` para registrar onde o check-in
 aconteceu — útil para ter um link por posto.
@@ -187,6 +199,19 @@ contrato assinado. As duas condições são checadas no banco, não só na tela.
 (`cotas.ordem_prioridade`); dentro da mesma cota, quem fechou contrato e
 rooming antes. Quem não quer todas as vagas usa "passar a vez" e libera
 a fila.
+
+**Indicação no PERFIL é reserva, não sugestão.** Quem a empresa indicou
+não aparece para nenhuma outra enquanto a cota dela estiver no prazo
+(`cotas.prazo_indicacao`, uma data por cota, na aba Estrutura). A vez
+passa para a cota seguinte quando a anterior termina de escolher **ou**
+quando o prazo vence — o que vier primeiro. Vencido o prazo sem escolha,
+a reserva cai e o convidado volta para a lista geral; a empresa perde a
+fila e as reservas, mas continua podendo escolher entre quem estiver
+livre. Cota sem prazo segura a vez até encerrar ou passar.
+
+A reserva vale de baixo para cima também: o indicado pela Prata resiste
+à Esmeralda. Se valesse só de cima para baixo não valeria nada, porque a
+Esmeralda escolhe antes de todo mundo.
 
 **Fatura recalculada do zero** a cada save, nunca acumulada. Fatura já
 emitida ou paga não é tocada.
