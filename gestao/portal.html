@@ -205,6 +205,8 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
       <button class="aba" role="tab" data-aba="mesa" aria-selected="false">Mesa redonda</button>
       <button class="aba" role="tab" data-aba="indicacoes" aria-selected="false">Indicar CIO</button>
       <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
+      <button class="aba" role="tab" data-aba="convidados" aria-selected="false">Convidados</button>
+      <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
       <button class="aba" role="tab" data-aba="manual" aria-selected="false">Manual</button>
     </div>
 
@@ -214,6 +216,8 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
     <section id="painel-mesa" class="oculto"></section>
     <section id="painel-indicacoes" class="oculto"></section>
     <section id="painel-brindes" class="oculto"></section>
+    <section id="painel-convidados" class="oculto"></section>
+    <section id="painel-financeiro" class="oculto"></section>
     <section id="painel-manual" class="oculto"></section>
   </div>
 </div>
@@ -404,12 +408,15 @@ function desenharCabecalho(){
 function ligarAbas(){
   $$(".aba").forEach(b => b.addEventListener("click", () => {
     $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
-    ["quartos","mesa","indicacoes","brindes","manual"].forEach(a =>
+    ["quartos","mesa","indicacoes","brindes","convidados","financeiro","manual"]
+      .forEach(a =>
       $("#painel-"+a).classList.toggle("oculto", a !== b.dataset.aba));
 
     if(b.dataset.aba === "mesa")       carregarMesa();
     if(b.dataset.aba === "indicacoes") carregarIndicacoes();
     if(b.dataset.aba === "brindes")    carregarBrindes();
+    if(b.dataset.aba === "convidados") carregarConvidados();
+    if(b.dataset.aba === "financeiro") carregarFinanceiro();
     if(b.dataset.aba === "manual")     carregarManual();
   }));
 }
@@ -1062,6 +1069,163 @@ async function carregarBrindes(){
       btnEnviar.disabled = false; btnEnviar.textContent = "Informar envio";
     }
   });
+}
+
+
+// =====================================================================
+// ABA: FINANCEIRO
+//
+// A conta já era calculada; o patrocinador é que não tinha como vê-la.
+// Mostrar o item ao lado do total responde a pergunta seguinte antes
+// que ela seja feita: não é "quanto deu", é "por que deu isso".
+// =====================================================================
+const ROTULO_FATURA = {
+  estimada: "Estimativa", emitida: "Emitida", paga: "Paga",
+  sem_cobranca: "Sem cobrança"
+};
+
+async function carregarFinanceiro(){
+  const alvo = $("#painel-financeiro");
+  alvo.innerHTML = `<p class="carregando">Carregando…</p>`;
+
+  let f;
+  try{
+    f = await rpc("patro_minha_fatura", { p_patrocinador_id: PATRO.patrocinador_id });
+  }catch(e){ aviso(alvo, explicar(e)); return; }
+
+  const itens = f.itens || [];
+
+  if(f.status === "sem_cobranca"){
+    alvo.innerHTML = `
+      <h2>Financeiro</h2>
+      <div class="vazio">
+        Nada a cobrar até agora. Quarto além da cota, transfer e entrega de
+        brinde no quarto são o que gera custo — e você não tem nenhum deles.
+      </div>`;
+    return;
+  }
+
+  alvo.innerHTML = `
+    <h2>Financeiro</h2>
+    <p class="sub">
+      ${f.status === "estimada"
+        ? "Estimativa: muda sozinha se você alterar quartos, transfer ou brinde."
+        : "Valor fechado pela organização — mudanças no portal não alteram mais esta conta."}
+    </p>
+
+    <div class="cartao">
+      <div class="cartao-cab">
+        <div>
+          <h3>${moeda(f.total)}</h3>
+          <p class="meta">
+            ${f.vencimento ? `vence em ${dataBR(f.vencimento)}` : "sem vencimento definido"}
+            ${f.paga_em ? ` · paga em ${dataBR(f.paga_em)}` : ""}
+          </p>
+        </div>
+        <span class="selo ${f.status === "paga" ? "ok" : "pend"}">
+          ${ROTULO_FATURA[f.status] || esc(f.status)}
+        </span>
+      </div>
+
+      ${itens.length ? `
+        <table style="margin-top:14px;">
+          <tr><th>Item</th><th>Qtd</th><th>Unitário</th><th>Total</th></tr>
+          ${itens.map(i => `<tr>
+            <td>${esc(i.descricao)}</td>
+            <td class="meta">${i.quantidade}</td>
+            <td class="meta">${moeda(i.valor_unit)}</td>
+            <td><strong>${moeda(i.valor_total)}</strong></td>
+          </tr>`).join("")}
+        </table>`
+        : `<p class="fila-nota" style="margin-top:12px;">Sem itens lançados.</p>`}
+
+      ${f.observacao ? `<p class="fila-nota" style="margin-top:12px;">
+        <strong>Observação da organização:</strong> ${esc(f.observacao)}</p>` : ""}
+    </div>
+
+    <p class="fila-nota">
+      Dúvida sobre algum lançamento? Fale com a organização antes do vencimento.
+    </p>`;
+}
+
+// =====================================================================
+// ABA: CONVIDADOS
+//
+// Sai só quem está aprovado E com contrato assinado. Quem ainda pode
+// não vir não é presença confirmada, e prometer presença que não se
+// cumpre é pior do que não informar.
+//
+// Sem e-mail e sem telefone de propósito: contato o patrocinador recebe
+// de quem ele efetivamente escolheu, pelo mailing da sessão.
+// =====================================================================
+async function carregarConvidados(){
+  const alvo = $("#painel-convidados");
+  alvo.innerHTML = `<p class="carregando">Carregando…</p>`;
+
+  let filtros;
+  try{
+    filtros = await rpc("patro_filtros_convidados", { p_patrocinador_id: PATRO.patrocinador_id });
+  }catch(e){ aviso(alvo, explicar(e)); return; }
+
+  const opcoes = (lista, rotulo) =>
+    `<option value="">${rotulo}</option>` +
+    (lista || []).map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+
+  alvo.innerHTML = `
+    <h2>Quem já confirmou</h2>
+    <p class="sub">
+      ${filtros.total} executivo(s) com inscrição aprovada e contrato assinado.
+      Contato de quem você escolher para a mesa sai no mailing da sessão.
+    </p>
+    <div class="linha">
+      <div><label>Buscar</label>
+        <input type="text" id="cv-busca" placeholder="Nome ou empresa"></div>
+      <div style="max-width:170px;"><label>Estado</label>
+        <select id="cv-estado">${opcoes(filtros.estados, "Todos")}</select></div>
+      <div style="max-width:190px;"><label>Cidade</label>
+        <select id="cv-cidade">${opcoes(filtros.cidades, "Todas")}</select></div>
+      <div style="max-width:200px;"><label>Segmento</label>
+        <select id="cv-segmento">${opcoes(filtros.segmentos, "Todos")}</select></div>
+    </div>
+    <div id="cv-lista"><p class="carregando">Carregando…</p></div>`;
+
+  const buscar = async () => {
+    const box = $("#cv-lista");
+    try{
+      const l = await rpc("patro_convidados_confirmados", {
+        p_patrocinador_id: PATRO.patrocinador_id,
+        p_termo:    $("#cv-busca").value.trim() || null,
+        p_cidade:   $("#cv-cidade").value || null,
+        p_estado:   $("#cv-estado").value || null,
+        p_segmento: $("#cv-segmento").value || null,
+        p_limite: 500, p_offset: 0
+      });
+      box.innerHTML = l.length ? `
+        <p class="meta" style="margin:10px 0;">${l.length} resultado(s).</p>
+        <div class="cartao"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Cidade</th><th>Segmento</th><th></th></tr>
+          ${l.map(c => `<tr>
+            <td><strong>${esc(c.nome)}</strong>
+                ${c.cargo ? `<br><span class="meta">${esc(c.cargo)}</span>` : ""}</td>
+            <td>${esc(c.empresa || "—")}
+                ${c.porte ? `<br><span class="meta">${esc(c.porte)}</span>` : ""}</td>
+            <td class="meta">${esc(c.cidade || "—")}${c.estado ? " · " + esc(c.estado) : ""}</td>
+            <td class="meta">${esc(c.segmento || "—")}</td>
+            <td>${c.ja_e_meu_convidado
+                   ? `<span class="selo ok">na sua mesa</span>` : ""}</td>
+          </tr>`).join("")}
+        </table></div>`
+        : `<div class="vazio">Ninguém com esse filtro.</div>`;
+    }catch(e){ aviso(box, explicar(e)); }
+  };
+
+  let t;
+  $("#cv-busca").addEventListener("input", () => {
+    clearTimeout(t); t = setTimeout(buscar, 350);
+  });
+  ["#cv-estado","#cv-cidade","#cv-segmento"].forEach(sel =>
+    $(sel).addEventListener("change", buscar));
+  buscar();
 }
 
 // =====================================================================
