@@ -101,7 +101,18 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
     <label for="email">E-mail</label>
     <input type="email" id="email" autocomplete="email">
     <div style="margin-top:12px;">
-      <button class="btn" id="btn-entrar" style="width:100%;">Enviar link de acesso</button>
+      <label for="senha" style="margin-top:10px;">Senha</label>
+      <input type="password" id="senha" placeholder="sua senha" autocomplete="current-password">
+      <button class="btn" id="btn-entrar" style="width:100%;margin-top:12px;">Entrar</button>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:10px;">
+        <button class="btn sec mini" id="btn-esqueci">Esqueci minha senha</button>
+        <button class="btn sec mini" id="btn-criar-senha">Criar senha</button>
+      </div>
+      <p class="meta" style="margin-top:12px;">
+        Primeiro acesso? Use <strong>Criar senha</strong> com o e-mail que a
+        organização cadastrou. Se preferir entrar sem senha,
+        <a href="#" id="link-otp">receba um link por e-mail</a>.
+      </p>
     </div>
   </div>
 </div>
@@ -109,6 +120,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
 <div id="app" class="oculto">
   <header class="topo">
     <div class="marca">CIO Cerrado<span>Check-in</span></div>
+    <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>
     <button class="sair" id="btn-sair">Sair</button>
   </header>
 
@@ -202,21 +214,132 @@ async function rpc(nome, params){
 // =====================================================================
 // LOGIN
 // =====================================================================
+// =====================================================================
+// LOGIN POR SENHA
+//
+// O magic link continua existindo, como saída de emergência: quem foi
+// cadastrado pela organização e nunca entrou não tem senha ainda, e
+// quem perde o acesso à caixa de e-mail no meio de um evento não pode
+// ficar de fora. Senha é o caminho principal; link é o reserva.
+//
+// `resetPasswordForEmail` só funciona para quem JÁ existe no Auth —
+// quem nunca entrou precisa de "Criar senha", que faz o signUp. Por
+// isso os dois botões existem: são situações diferentes com a mesma
+// aparência, e juntá-los num só deixaria metade das pessoas presa.
+// =====================================================================
+function _emailLogin(){
+  const v = $("#email").value.trim();
+  if(!v){ aviso("#login-aviso","Informe seu e-mail."); return null; }
+  return v;
+}
+
 $("#btn-entrar").addEventListener("click", async () => {
-  const email = $("#email").value.trim();
-  if(!email){ $("#login-aviso").innerHTML = `<div class="aviso erro">Informe seu e-mail.</div>`; return; }
-  const b = $("#btn-entrar");
-  b.disabled = true; b.textContent = "Enviando…";
+  const email = _emailLogin(); if(!email) return;
+  const senha = $("#senha").value;
+  if(!senha){ aviso("#login-aviso","Informe sua senha."); return; }
+
+  const btn = $("#btn-entrar");
+  btn.disabled = true; btn.textContent = "Entrando…";
+  try{
+    const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+    if(error) throw error;
+    // o onAuthStateChange cuida de trocar para a tela do app
+  }catch(e){
+    aviso("#login-aviso", /invalid login/i.test(e.message || "")
+      ? "E-mail ou senha não conferem. Se é seu primeiro acesso, use Criar senha."
+      : explicar(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Entrar";
+  }
+});
+
+$("#btn-criar-senha").addEventListener("click", async () => {
+  const email = _emailLogin(); if(!email) return;
+  const senha = $("#senha").value;
+  if(senha.length < 8){
+    aviso("#login-aviso","Escolha uma senha de pelo menos 8 caracteres e clique em Criar senha.");
+    return;
+  }
+  const btn = $("#btn-criar-senha");
+  btn.disabled = true; btn.textContent = "Criando…";
+  try{
+    const { error } = await sb.auth.signUp({
+      email, password: senha,
+      options: { emailRedirectTo: location.href }
+    });
+    if(error) throw error;
+    aviso("#login-aviso",
+      "Senha criada. Se pedirmos confirmação, ela chega por e-mail — depois disso é só entrar.", "ok");
+  }catch(e){
+    aviso("#login-aviso", /already registered/i.test(e.message || "")
+      ? "Esse e-mail já tem cadastro. Use Entrar, ou Esqueci minha senha."
+      : explicar(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Criar senha";
+  }
+});
+
+$("#btn-esqueci").addEventListener("click", async () => {
+  const email = _emailLogin(); if(!email) return;
+  const btn = $("#btn-esqueci");
+  btn.disabled = true; btn.textContent = "Enviando…";
+  try{
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.href
+    });
+    if(error) throw error;
+    // A resposta é a mesma existindo ou não a conta, de propósito: dizer
+    // "esse e-mail não existe" entrega quem está cadastrado a quem
+    // estiver testando endereços.
+    aviso("#login-aviso",
+      "Se esse e-mail tiver cadastro, enviamos um link para definir a nova senha.", "ok");
+  }catch(e){
+    aviso("#login-aviso", explicar(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Esqueci minha senha";
+  }
+});
+
+$("#link-otp").addEventListener("click", async (ev) => {
+  ev.preventDefault();
+  const email = _emailLogin(); if(!email) return;
   try{
     const { error } = await sb.auth.signInWithOtp({
-      email, options:{ emailRedirectTo: location.href }});
+      email, options: { emailRedirectTo: location.href }
+    });
     if(error) throw error;
-    $("#login-aviso").innerHTML = `<div class="aviso ok">Link enviado. Abra seu e-mail.</div>`;
-  }catch(e){
-    $("#login-aviso").innerHTML = `<div class="aviso erro">${esc(explicar(e))}</div>`;
-  }finally{ b.disabled = false; b.textContent = "Enviar link de acesso"; }
+    aviso("#login-aviso","Link enviado. Abra seu e-mail para entrar.", "ok");
+  }catch(e){ aviso("#login-aviso", explicar(e)); }
 });
+
+$("#senha").addEventListener("keydown", e => {
+  if(e.key === "Enter") $("#btn-entrar").click();
+});
+
+// Volta do link de recuperação: o Supabase já deixou a sessão aberta,
+// e o que falta é a pessoa escolher a senha nova. Sem isso ela entra,
+// não troca nada, e no próximo acesso está travada de novo.
+sb.auth.onAuthStateChange(async (evento) => {
+  if(evento !== "PASSWORD_RECOVERY") return;
+  const nova = prompt("Digite a nova senha (mínimo 8 caracteres):");
+  if(!nova) return;
+  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  const { error } = await sb.auth.updateUser({ password: nova });
+  alert(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada. Use ela no próximo acesso.");
+});
+
+async function trocarMinhaSenha(){
+  const nova = prompt("Nova senha (mínimo 8 caracteres):");
+  if(!nova) return;
+  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  const { error } = await sb.auth.updateUser({ password: nova });
+  alert(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada.");
+}
 $("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
+$("#btn-senha").addEventListener("click", trocarMinhaSenha);
+
 $("#btn-sair").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
 
 // =====================================================================
