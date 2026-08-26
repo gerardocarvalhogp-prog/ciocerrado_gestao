@@ -1269,31 +1269,6 @@ async function abrirSessao(id, s){
       </div>
 
       <div class="cartao">
-        <h2>Adicionar quem não passou pelo Sympla</h2>
-        <p class="sub" style="margin-bottom:10px;">
-          Equipe do CIO Cerrado, time do patrocinador ou troca de última hora.
-          Entra já aprovado e sai identificado no mailing.
-        </p>
-        <div class="barra">
-          <div style="min-width:180px;"><label>Nome</label><input type="text" id="av-nome"></div>
-          <div style="min-width:150px;"><label>Empresa</label><input type="text" id="av-empresa"></div>
-          <div style="min-width:170px;"><label>E-mail</label><input type="email" id="av-email"></div>
-          <div style="max-width:140px;"><label>Telefone</label><input type="text" id="av-tel"></div>
-        </div>
-        <div class="barra">
-          <div style="max-width:180px;"><label>Cargo</label><input type="text" id="av-cargo"></div>
-          <div style="max-width:190px;"><label>Identificação no mailing</label>
-            <select id="av-rotulo">
-              <option value="CIO CERRADO">Equipe CIO Cerrado</option>
-              <option value="PATROCINADOR">Patrocinador</option>
-              <option value="CONVIDADO">Convidado</option>
-            </select></div>
-          <div style="min-width:auto;"><button class="btn" id="av-salvar">Adicionar</button></div>
-        </div>
-        <div id="av-aviso"></div>
-      </div>
-
-      <div class="cartao">
         <h2>Sugestões por aderência</h2>
         <p class="sub" style="margin-bottom:10px;">
           Cruzamento por segmento, porte e o que o patrocinador vende. Confira antes de confirmar.
@@ -1309,29 +1284,6 @@ async function abrirSessao(id, s){
           </tr>`).join("")}</table>` :
           `<div class="vazio">Sem sugestões disponíveis — todos já estão em outra sessão deste tipo.</div>`}
       </div>`;
-
-    $("#av-salvar").addEventListener("click", async () => {
-      const nome = $("#av-nome").value.trim();
-      if(!nome){ aviso("#av-aviso","Informe o nome."); return; }
-
-      const b = $("#av-salvar");
-      b.disabled = true; b.textContent = "Adicionando…";
-      try{
-        const r = await rpc("admin_convidado_avulso", {
-          p_sessao_id: id, p_nome: nome,
-          p_empresa: $("#av-empresa").value.trim() || null,
-          p_email:   $("#av-email").value.trim()   || null,
-          p_telefone: $("#av-tel").value.trim()    || null,
-          p_cargo:   $("#av-cargo").value.trim()   || null,
-          p_rotulo:  $("#av-rotulo").value
-        });
-        aviso("#aviso-global", r.gestor_reaproveitado
-          ? `${nome} já estava na base — adicionado à sessão.`
-          : `${nome} cadastrado e adicionado.`, "ok");
-        abrirSessao(id, s); ABAS.sessoes();
-      }catch(e){ aviso("#av-aviso", explicar(e)); }
-      finally{ b.disabled = false; b.textContent = "Adicionar"; }
-    });
 
     const bm = $("#s-mailing", box);
     if(bm) bm.addEventListener("click", async () => {

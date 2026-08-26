@@ -1167,22 +1167,43 @@ async function carregarManual(){
     const m = (await rpc("patro_manual", { p_evento_slug: EVENTO }))[0];
     if(!m){ alvo.innerHTML = `<div class="vazio">Manual ainda não publicado.</div>`; return; }
 
-    const prazos = [
-      ["Assinatura do contrato", m.prazo_contrato, "Depois desta data a inscrição não é garantida."],
-      ["Rooming list",           m.prazo_rooming,  "Nomes dos ocupantes de cada quarto."],
-      ["Cancelamento sem multa", m.prazo_cancelamento, "Após esta data há cobrança de no-show."]
-    ];
-
+    // Prazo de contrato e de cancelamento sao do CIO inscrito, nao do
+    // patrocinador: ele nao assina contrato de inscricao nem paga
+    // no-show. Mostrar aqui fazia a empresa procurar uma pendencia que
+    // nao era dela.
     alvo.innerHTML = `
       <h2>${esc(m.nome)}</h2>
       <p class="sub">${esc(m.local || "")} · ${dataBR(m.data_inicio)} a ${dataBR(m.data_fim)}</p>
+
       <div class="cartao">
+        <h3>Seu pacote</h3>
+        <table>
+          <tr><td><strong>Cota</strong></td><td>${esc(PATRO.cota || "—")}</td></tr>
+          <tr><td><strong>Quartos</strong></td>
+              <td>${PATRO.quartos_total} no total ·
+                  ${PATRO.quartos_preenchidos} preenchido(s)</td></tr>
+          <tr><td><strong>Vagas na mesa redonda</strong></td>
+              <td>${PATRO.vagas_mesa_redonda ?? "—"}</td></tr>
+          <tr><td><strong>Reunião exclusiva</strong></td>
+              <td>${PATRO.tem_reuniao_exclusiva ? "Sim" : "Não"}</td></tr>
+          <tr><td><strong>Jantar</strong></td>
+              <td>${PATRO.tem_jantar ? "Sim" : "Não"}</td></tr>
+        </table>
+      </div>
+
+      <div class="cartao">
+        <h3>Seus prazos</h3>
         <table>
           <tr><th>Prazo</th><th>Data</th><th>O que é</th></tr>
-          ${prazos.map(([t,d,o]) => `
-            <tr><td><strong>${t}</strong></td>
-                <td class="meta">${dataBR(d)}</td>
-                <td style="color:var(--suave)">${o}</td></tr>`).join("")}
+          <tr><td><strong>Rooming list</strong></td>
+              <td class="meta">${dataBR(m.prazo_rooming)}</td>
+              <td style="color:var(--suave)">
+                Nome de quem ocupa cada quarto da sua cota.</td></tr>
+          <tr><td><strong>Escolha dos convidados</strong></td>
+              <td class="meta">—</td>
+              <td style="color:var(--suave)">
+                Depende da sua cota e de quem escolhe antes de você.
+                A data aparece na aba <strong>Mesa redonda</strong> quando a fila abre.</td></tr>
         </table>
       </div>`;
   }catch(e){
