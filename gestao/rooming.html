@@ -460,7 +460,8 @@ async function areaRooming(){
     nome: o.nome || "", cpf: o.cpf || "",
     data_nascimento: o.data_nascimento || "",
     tipo: o.tipo || "adulto",
-    usa_transfer: !!o.usa_transfer
+    usa_transfer: !!o.usa_transfer,
+    transfer_origem: o.transfer_origem || null
   }));
 
   $("#area").innerHTML = `
@@ -488,9 +489,9 @@ async function areaRooming(){
 
       <div class="linha" style="margin-top:16px;">
         <div style="max-width:280px;">
-          <label>De onde sai o transfer</label>
+          <label>De onde <strong>você</strong> sai</label>
           <select id="transfer-origem">
-            <option value="">Não vamos usar transfer</option>
+            <option value="">Não vou usar transfer</option>
             <option value="GYN">Goiânia</option>
             <option value="BSB">Brasília</option>
           </select>
@@ -503,7 +504,8 @@ async function areaRooming(){
     </div>`;
 
   $("#add-pessoa").addEventListener("click", () => {
-    ACOMPANHANTES.push({ nome:"", cpf:"", data_nascimento:"", tipo:"adulto", usa_transfer:false });
+    ACOMPANHANTES.push({ nome:"", cpf:"", data_nascimento:"", tipo:"adulto",
+                       usa_transfer:false, transfer_origem:null });
     desenharPessoas();
   });
   $("#salvar-rooming").addEventListener("click", salvarRooming);
@@ -546,6 +548,14 @@ function desenharPessoas(){
             <input type="checkbox" class="f-transfer" ${p.usa_transfer ? "checked":""}> Usa
           </label>
         </div>
+        <div style="max-width:170px;">
+          <label>Sai de</label>
+          <select class="f-origem" ${p.usa_transfer ? "" : "disabled"}>
+            <option value="">—</option>
+            <option value="GYN" ${p.transfer_origem === "GYN" ? "selected":""}>Goiânia</option>
+            <option value="BSB" ${p.transfer_origem === "BSB" ? "selected":""}>Brasília</option>
+          </select>
+        </div>
       </div>`;
 
     // grava no estado a cada digitada para a fatura acompanhar.
@@ -555,7 +565,18 @@ function desenharPessoas(){
     el.querySelector(".f-cpf").addEventListener("input",  e => { p.cpf  = e.target.value; });
     el.querySelector(".f-nasc").addEventListener("change",e => { p.data_nascimento = e.target.value; atualizarFatura(); });
     el.querySelector(".f-tipo").addEventListener("change",e => { p.tipo = e.target.value; atualizarFatura(); });
-    el.querySelector(".f-transfer").addEventListener("change", e => { p.usa_transfer = e.target.checked; atualizarFatura(); });
+    el.querySelector(".f-transfer").addEventListener("change", e => {
+      p.usa_transfer = e.target.checked;
+      // a origem so faz sentido para quem usa: deixar habilitada convida
+      // a preencher e depois desmarcar, e ai a origem fica orfa no banco
+      const sel = el.querySelector(".f-origem");
+      sel.disabled = !p.usa_transfer;
+      if(!p.usa_transfer){ sel.value = ""; p.transfer_origem = null; }
+      atualizarFatura();
+    });
+    el.querySelector(".f-origem").addEventListener("change", e => {
+      p.transfer_origem = e.target.value || null;
+    });
     el.querySelector(".remover").addEventListener("click", () => {
       ACOMPANHANTES.splice(i,1); desenharPessoas(); atualizarFatura();
     });
@@ -631,7 +652,15 @@ async function salvarRooming(){
   const titularTransfer = $("#titular-transfer").checked;
 
   if(titularTransfer && !origem){
-    aviso("#aviso-rooming","Escolha de onde sai o transfer.");
+    aviso("#aviso-rooming","Escolha de onde você sai no transfer.");
+    return;
+  }
+
+  // o banco recusa igual; barrar aqui evita a viagem e diz o nome de quem falta
+  const semOrigem = lista.find(p => p.usa_transfer && !p.transfer_origem);
+  if(semOrigem){
+    aviso("#aviso-rooming",
+      `Escolha de onde ${semOrigem.nome.trim() || "o acompanhante"} sai no transfer.`);
     return;
   }
 

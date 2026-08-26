@@ -625,7 +625,20 @@ function campoOcupante(o, i){
       <label class="check" style="padding-top:8px;">
         <input type="checkbox" class="f-ocup-transfer" ${o.usa_transfer ? "checked" : ""}> Usa
       </label>
+    </div>
+    <div style="max-width:160px;">
+      <label>Sai de</label>
+      <select class="f-ocup-origem" ${o.usa_transfer ? "" : "disabled"}>
+        <option value="">—</option>
+        <option value="GYN" ${o.transfer_origem === "GYN" ? "selected" : ""}>Goiânia</option>
+        <option value="BSB" ${o.transfer_origem === "BSB" ? "selected" : ""}>Brasília</option>
+      </select>
     </div>`;
+  d.querySelector(".f-ocup-transfer").addEventListener("change", e => {
+    const sel = d.querySelector(".f-ocup-origem");
+    sel.disabled = !e.target.checked;
+    if(!e.target.checked) sel.value = "";
+  });
   return d;
 }
 
@@ -639,7 +652,8 @@ async function salvarQuarto(ed, q){
     nome: r.querySelector(".f-nome").value.trim(),
     cpf:  r.querySelector(".f-cpf").value.trim(),
     tipo: "adulto",
-    usa_transfer: r.querySelector(".f-ocup-transfer").checked
+    usa_transfer: r.querySelector(".f-ocup-transfer").checked,
+    transfer_origem: r.querySelector(".f-ocup-origem").value || null
   })).filter(o => o.nome !== "");
 
   if(lista.length === 0){
@@ -647,14 +661,24 @@ async function salvarQuarto(ed, q){
     return;
   }
 
+  // A origem que vale e a de cada pessoa. Esta continua sendo gravada em
+  // `reservas` porque relatorio e tela ainda leem de la, mas nao decide
+  // mais nada: duas pessoas do mesmo quarto podem sair de cidades
+  // diferentes.
   const origem = ed.querySelector(".f-transfer").value;
+
+  const semOrigem = lista.find(o => o.usa_transfer && !o.transfer_origem);
+  if(semOrigem){
+    aviso(alvoAviso, `Escolha de onde ${semOrigem.nome} sai no transfer.`);
+    return;
+  }
 
   btn.disabled = true; btn.textContent = "Salvando…";
   try{
     await rpc("patro_salvar_quarto", {
       p_reserva_id: q.reserva_id,
       p_ocupantes: lista,
-      p_usa_transfer: origem !== "",
+      p_usa_transfer: lista.some(o => o.usa_transfer),
       p_transfer_origem: origem || null,
       p_brinde_enviar: ed.querySelector(".f-brinde-tem").checked,
       p_brinde_descricao: ed.querySelector(".f-brinde-desc").value.trim() || null
