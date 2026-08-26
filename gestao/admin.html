@@ -1152,12 +1152,30 @@ ABAS.brindes = async function(){
         b.disabled = true;
         await marcar(tr.dataset.id, PROXIMO_BRINDE[tr.dataset.status]);
       }));
+      // Antes era um prompt() pedindo o nome do estado digitado à mão:
+      // aceitava erro de digitação, não mostrava onde o brinde está, e
+      // oferecia como "novidade" o estado em que ele já se encontra.
       $$(".br-mudar").forEach(b => b.addEventListener("click", () => {
         const tr = b.closest("tr");
-        const novo = prompt(
-          "Nova situação: prometido, enviado, recebido, entregue ou cancelado",
-          tr.dataset.status);
-        if(novo) marcar(tr.dataset.id, novo.trim());
+        const atual = tr.dataset.status;
+        const cel = b.closest("td");
+        if(cel.querySelector(".br-select")) return;   // já está aberto
+
+        const sel = document.createElement("select");
+        sel.className = "br-select";
+        sel.style.cssText = "max-width:150px;margin-top:6px;";
+        sel.innerHTML = Object.entries(ROTULO_BRINDE)
+          .map(([k,v]) => `<option value="${k}" ${k===atual?"selected":""}>${v}</option>`)
+          .join("");
+        cel.appendChild(sel);
+        sel.focus();
+        sel.addEventListener("change", () => {
+          if(sel.value !== atual) marcar(tr.dataset.id, sel.value);
+          else sel.remove();
+        });
+        // clicar fora sem escolher nada fecha, em vez de deixar o
+        // seletor pendurado na linha
+        sel.addEventListener("blur", () => setTimeout(() => sel.remove(), 150));
       }));
     }catch(e){ aviso("#br-tabela", explicar(e)); }
   };
