@@ -1074,8 +1074,9 @@ ABAS.brindes = async function(){
   c.innerHTML = `
     <h1>Brindes</h1>
     <p class="sub">
-      O patrocinador marca o brinde na tela do quarto e informa um código de rastreio
-      para a remessa inteira. Aqui a organização confere a chegada e a entrega.
+      Um brinde por empresa, com destino: fica no stand ou é entregue no quarto.
+      Entrega no quarto é serviço do resort e entra na fatura do patrocinador.
+      Aqui a organização confere a chegada e a entrega.
     </p>
     <div id="br-resumo"></div>
     <div class="barra">
@@ -1114,18 +1115,21 @@ ABAS.brindes = async function(){
              de ${resumo.empresas} empresa(s) ·
              ${resumo.prometido} a enviar · ${resumo.enviado} a caminho ·
              ${resumo.recebido} no resort · ${resumo.entregue} entregue(s)
+             ${Number(resumo.no_quarto) ? ` · <strong>${resumo.no_quarto} para entrega no quarto</strong>` : ""}
              ${Number(resumo.cancelado) ? ` · ${resumo.cancelado} cancelado(s)` : ""}
            </p></div>`
         : `<div class="cartao"><p class="meta" style="margin:0;">
              Nenhum patrocinador marcou brinde ainda.</p></div>`;
 
       $("#br-tabela").innerHTML = BR.length ? `
-        <tr><th>Empresa</th><th>Quarto</th><th>Brinde</th><th>Rastreio</th>
+        <tr><th>Empresa</th><th>Destino</th><th>Brinde</th><th>Rastreio</th>
             <th>Situação</th><th></th></tr>
         ${BR.map(b => `<tr data-id="${esc(b.brinde_id)}" data-status="${esc(b.status)}">
           <td><strong>${esc(b.empresa)}</strong><br>
               <span class="meta">${esc(b.cota||"—")}</span></td>
-          <td class="meta">${esc(b.quarto||"—")}</td>
+          <td>${b.destino === "quarto"
+                 ? `<span class="selo vez">no quarto</span><br><span class="meta">${b.quartos} quarto(s)</span>`
+                 : `<span class="meta">stand</span>`}</td>
           <td>${esc(b.descricao||"—")}
               ${b.observacao ? `<br><span class="meta">${esc(b.observacao)}</span>` : ""}</td>
           <td class="meta">${b.rastreio
@@ -1168,7 +1172,7 @@ ABAS.brindes = async function(){
 
   $("#br-status").addEventListener("change", carregar);
   $("#br-exportar").addEventListener("click", () => exportar(BR,
-    [["empresa","EMPRESA"],["cota","COTA"],["quarto","QUARTO"],["descricao","BRINDE"],
+    [["empresa","EMPRESA"],["cota","COTA"],["destino","DESTINO"],["quartos","QUARTOS"],["descricao","BRINDE"],
      ["transportadora","TRANSPORTADORA"],["rastreio","RASTREIO"],["status","SITUACAO"],
      ["recebido_em","RECEBIDO EM"],["recebido_por","RECEBIDO POR"],
      ["entregue_em","ENTREGUE EM"],["observacao","OBSERVACAO"]],

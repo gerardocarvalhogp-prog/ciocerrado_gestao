@@ -573,19 +573,9 @@ async function abrirEditor(ed, q){
         </select>
       </div>
     </div>
-    <div class="linha">
-      <div>
-        <label class="check">
-          <input type="checkbox" class="f-brinde-tem"> Vamos enviar brinde para o quarto
-        </label>
-      </div>
-    </div>
-    <div class="linha f-brinde-box oculto">
-      <div>
-        <label>Qual brinde</label>
-        <input type="text" class="f-brinde-desc" placeholder="Ex.: kit café + caneca">
-      </div>
-    </div>
+    <p class="fila-nota" style="margin:-2px 0 10px;">
+      O brinde é da empresa, não do quarto — fica na aba <strong>Brindes</strong>.
+    </p>
     <div class="aviso-quarto"></div>
     <button class="btn salvar">Salvar quarto</button>`;
 
@@ -597,13 +587,6 @@ async function abrirEditor(ed, q){
 
   const tr = ed.querySelector(".f-transfer");
   if(q.usa_transfer && q.transfer_origem) tr.value = q.transfer_origem;
-
-  const chk = ed.querySelector(".f-brinde-tem");
-  const cx  = ed.querySelector(".f-brinde-box");
-  chk.checked = !!q.brinde_vai_enviar;
-  cx.classList.toggle("oculto", !chk.checked);
-  ed.querySelector(".f-brinde-desc").value = q.brinde_descricao || "";
-  chk.addEventListener("change", () => cx.classList.toggle("oculto", !chk.checked));
 
   ed.querySelector(".salvar").addEventListener("click", () => salvarQuarto(ed, q));
 }
@@ -679,9 +662,7 @@ async function salvarQuarto(ed, q){
       p_reserva_id: q.reserva_id,
       p_ocupantes: lista,
       p_usa_transfer: lista.some(o => o.usa_transfer),
-      p_transfer_origem: origem || null,
-      p_brinde_enviar: ed.querySelector(".f-brinde-tem").checked,
-      p_brinde_descricao: ed.querySelector(".f-brinde-desc").value.trim() || null
+      p_transfer_origem: origem || null
     });
     aviso("#aviso-global", `${q.rotulo} salvo.`, "ok");
     // o contador "N preenchido(s)" do cabeçalho vem de patro_meu_painel,
@@ -939,75 +920,133 @@ async function carregarBrindes(){
   const alvo = $("#painel-brindes");
   alvo.innerHTML = `<p class="carregando">Carregando…</p>`;
 
-  let lista;
+  let b;
   try{
-    lista = await rpc("patro_meus_brindes", { p_patrocinador_id: PATRO.patrocinador_id });
+    b = await rpc("patro_meu_brinde", { p_patrocinador_id: PATRO.patrocinador_id });
   }catch(e){ aviso(alvo, explicar(e)); return; }
 
-  if(lista.length === 0){
-    alvo.innerHTML = `
-      <h2>Brindes</h2>
-      <p class="sub">Você ainda não marcou brinde em nenhum quarto.</p>
-      <div class="vazio">
-        Na aba <strong>Quartos</strong>, marque "Vamos enviar brinde para o quarto"
-        e diga o que é. Os quartos marcados aparecem aqui para você informar o rastreio.
-      </div>`;
-    return;
-  }
-
-  const jaEnviado = lista.find(b => b.rastreio);
+  const temBrinde = !!b.vai_enviar;
+  const custo = Number(b.custo_se_quarto || 0);
 
   alvo.innerHTML = `
-    <h2>Brindes</h2>
+    <h2>Brinde da empresa</h2>
     <p class="sub">
-      ${lista.length} quarto(s) com brinde. Informe um código de rastreio só —
-      ele vale para toda a remessa.
+      Um brinde por empresa, não um por quarto. Diga o que é e para onde vai.
     </p>
 
     <div class="cartao">
       <div class="linha">
-        <div style="max-width:200px;"><label>Transportadora</label>
-          <input type="text" id="b-transp" placeholder="Correios, Jadlog…"
-                 value="${esc(jaEnviado?.transportadora || "")}"></div>
-        <div><label>Código de rastreio</label>
-          <input type="text" id="b-rastreio" placeholder="BR123456789BR"
-                 value="${esc(jaEnviado?.rastreio || "")}"></div>
+        <div>
+          <label class="check">
+            <input type="checkbox" id="b-tem" ${temBrinde ? "checked" : ""}>
+            Vamos levar brinde
+          </label>
+        </div>
       </div>
+
+      <div id="b-campos" class="${temBrinde ? "" : "oculto"}">
+        <div class="linha">
+          <div><label>O que é</label>
+            <input type="text" id="b-desc" placeholder="Ex.: caneca térmica"
+                   value="${esc(b.descricao || "")}"></div>
+          <div style="max-width:140px;"><label>Quantidade</label>
+            <input type="text" id="b-qtd" placeholder="60"
+                   value="${esc(b.quantidade ?? "")}"></div>
+        </div>
+        <div class="linha">
+          <div style="max-width:280px;">
+            <label>Para onde vai</label>
+            <select id="b-destino">
+              <option value="stand" ${b.destino === "quarto" ? "" : "selected"}>
+                Fica no nosso stand
+              </option>
+              <option value="quarto" ${b.destino === "quarto" ? "selected" : ""}>
+                Entregue no quarto dos convidados
+              </option>
+            </select>
+          </div>
+        </div>
+        <p class="fila-nota" id="b-custo"></p>
+      </div>
+
       <div id="b-aviso"></div>
-      <button class="btn" id="b-salvar">
-        ${jaEnviado ? "Atualizar rastreio" : "Informar envio"}
-      </button>
-      <p class="fila-nota" style="margin-top:8px;">
-        Errou o código? Pode corrigir aqui mesmo — vale o último informado.
-      </p>
+      <button class="btn" id="b-salvar">Salvar brinde</button>
     </div>
 
-    <table style="margin-top:18px;"><tbody>
-      ${lista.map(b => `<tr>
-        <td><strong>${esc(b.quarto || "—")}</strong><br>
-            <span class="meta">${esc(b.descricao || "sem descrição")}</span></td>
-        <td style="text-align:right;">
-          <span class="selo ${SELO_BRINDE[b.status] || "pend"}">${ROTULO_BRINDE[b.status] || esc(b.status)}</span>
-          ${b.recebido_em ? `<br><span class="meta">recebido em ${dataBR(b.recebido_em)}</span>` : ""}
-          ${b.entregue_em ? `<br><span class="meta">entregue em ${dataBR(b.entregue_em)}</span>` : ""}
-        </td>
-      </tr>`).join("")}
-    </tbody></table>`;
+    ${temBrinde ? `
+      <h2 style="margin-top:26px;">Envio</h2>
+      <div class="cartao">
+        <p class="sub" style="margin-bottom:12px;">
+          Situação: <span class="selo ${SELO_BRINDE[b.status] || "pend"}">${ROTULO_BRINDE[b.status] || esc(b.status || "")}</span>
+          ${b.recebido_em ? ` · recebido em ${dataBR(b.recebido_em)}` : ""}
+        </p>
+        <div class="linha">
+          <div style="max-width:200px;"><label>Transportadora</label>
+            <input type="text" id="b-transp" placeholder="Correios, Jadlog…"
+                   value="${esc(b.transportadora || "")}"></div>
+          <div><label>Código de rastreio</label>
+            <input type="text" id="b-rastreio" placeholder="BR123456789BR"
+                   value="${esc(b.rastreio || "")}"></div>
+        </div>
+        <div id="b-aviso-envio"></div>
+        <button class="btn sec" id="b-enviar">
+          ${b.rastreio ? "Atualizar rastreio" : "Informar envio"}
+        </button>
+        <p class="fila-nota" style="margin-top:8px;">
+          Errou o código? Pode corrigir aqui — vale o último informado.
+        </p>
+      </div>` : ""}`;
+
+  const mostrarCusto = () => {
+    const noQuarto = $("#b-destino").value === "quarto";
+    $("#b-custo").innerHTML = noQuarto
+      ? `Entrega no quarto é serviço do resort, cobrado por porta:
+         <strong>${b.quartos} quarto(s) × ${moeda(b.preco_entrega)} = ${moeda(custo)}</strong>,
+         que entra na sua fatura.`
+      : `No stand não há custo — o brinde fica na sua mesa e quem quiser, pega.`;
+  };
+
+  $("#b-tem").addEventListener("change", e =>
+    $("#b-campos").classList.toggle("oculto", !e.target.checked));
+  $("#b-destino").addEventListener("change", mostrarCusto);
+  mostrarCusto();
 
   $("#b-salvar").addEventListener("click", async () => {
-    const cod = $("#b-rastreio").value.trim();
-    if(!cod){ aviso("#b-aviso","Informe o código de rastreio."); return; }
     const btn = $("#b-salvar");
     btn.disabled = true; btn.textContent = "Salvando…";
+    try{
+      await rpc("patro_salvar_brinde", {
+        p_patrocinador_id: PATRO.patrocinador_id,
+        p_vai_enviar: $("#b-tem").checked,
+        p_descricao: $("#b-desc").value.trim() || null,
+        p_quantidade: parseInt($("#b-qtd").value, 10) || null,
+        p_destino: $("#b-destino").value
+      });
+      aviso("#b-aviso", "Brinde salvo.", "ok");
+      carregarBrindes();
+    }catch(e){
+      aviso("#b-aviso", explicar(e));
+      btn.disabled = false; btn.textContent = "Salvar brinde";
+    }
+  });
+
+  const btnEnviar = $("#b-enviar");
+  if(btnEnviar) btnEnviar.addEventListener("click", async () => {
+    const cod = $("#b-rastreio").value.trim();
+    if(!cod){ aviso("#b-aviso-envio","Informe o código de rastreio."); return; }
+    btnEnviar.disabled = true; btnEnviar.textContent = "Salvando…";
     try{
       const r = await rpc("patro_informar_rastreio", {
         p_patrocinador_id: PATRO.patrocinador_id,
         p_transportadora: $("#b-transp").value.trim() || null,
         p_rastreio: cod
       });
-      aviso("#b-aviso", `Rastreio registrado em ${r.brindes} brinde(s).`, "ok");
+      aviso("#b-aviso-envio", `Rastreio registrado.`, "ok");
       carregarBrindes();
-    }catch(e){ aviso("#b-aviso", explicar(e)); btn.disabled = false; btn.textContent = "Informar envio"; }
+    }catch(e){
+      aviso("#b-aviso-envio", explicar(e));
+      btnEnviar.disabled = false; btnEnviar.textContent = "Informar envio";
+    }
   });
 }
 
