@@ -458,26 +458,40 @@ function blocoDisponibilidade(disp){
     <tr>
       <td style="text-transform:capitalize">${esc(d.tipo)}</td>
       <td>${d.livres}</td>
+      <td class="meta">${Number(d.valor) > 0 ? moeda(d.valor) : "sob consulta"}</td>
       <td style="text-align:right">
         ${d.livres > 0
-          ? `<button class="btn sec mini comprar" data-tipo="${esc(d.tipo)}">Reservar</button>`
+          ? `<button class="btn sec mini comprar" data-tipo="${esc(d.tipo)}"
+                     data-valor="${esc(d.valor ?? 0)}">Reservar</button>`
           : `<span class="selo pend">Esgotado</span>`}
       </td>
     </tr>`).join("");
 
   return `
     <h2 style="margin-top:28px;">Quartos disponíveis</h2>
-    <p class="sub">Reserve um quarto além da sua cota. A disponibilidade é do hotel, em tempo real.</p>
+    <p class="sub">
+      Reserve um quarto além da sua cota. A disponibilidade é do hotel, em tempo real,
+      e o valor entra na sua fatura.
+    </p>
     <div class="cartao">
       <table>
-        <tr><th>Tipo</th><th>Livres</th><th></th></tr>
-        ${linhas || `<tr><td colspan="3" style="color:var(--suave)">Sem quartos livres no momento.</td></tr>`}
+        <tr><th>Tipo</th><th>Livres</th><th>Valor</th><th></th></tr>
+        ${linhas || `<tr><td colspan="4" style="color:var(--suave)">Sem quartos livres no momento.</td></tr>`}
       </table>
     </div>`;
 }
 
 function ligarCompra(){
   $$(".comprar").forEach(b => b.addEventListener("click", async () => {
+    // reservar quarto extra gera cobranca: confirmar com o valor na
+    // frente evita o clique sem querer e a ligacao depois
+    const v = Number(b.dataset.valor || 0);
+    const quanto = v > 0 ? moeda(v) : "valor a combinar com a organização";
+    if(!confirm(`Reservar um quarto ${b.dataset.tipo} adicional?
+
+` +
+                `Custo: ${quanto}, que entra na sua fatura.`)) return;
+
     b.disabled = true; b.textContent = "Reservando…";
     try{
       const r = await rpc("patro_comprar_quarto", {
