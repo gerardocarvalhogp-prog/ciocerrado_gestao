@@ -1343,17 +1343,10 @@ ABAS.relatorios = function(){
       <button class="btn sec" id="r-pesquisa">Carregar</button>
       <div id="box-pesquisa"></div>
     </div>
-
-    <div class="cartao">
-      <h2>Check-ins</h2>
-      <p class="sub" style="margin-bottom:10px;">Resumo por patrocinador. Abra uma empresa para ver o detalhe.</p>
-      <button class="btn sec" id="r-checkins">Carregar</button>
-      <div id="box-checkins"></div>
-    </div>`;
+`;
 
   $("#r-mailing").addEventListener("click",  () => relMailing());
   $("#r-pesquisa").addEventListener("click", () => relPesquisa());
-  $("#r-checkins").addEventListener("click", () => relCheckins());
 };
 
 // Puxa todas as paginas: o Data API corta em 1000 linhas por resposta.
@@ -3329,53 +3322,6 @@ async function salvarMembro(){
   finally{ btn.disabled = false; btn.textContent = "Salvar"; }
 }
 
-async function relCheckins(){
-  const box = $("#box-checkins");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
-  try{
-    const resumo = await rpc("admin_rel_checkins_resumo", { p_evento_slug: EVENTO });
-    const total = resumo.reduce((s,r) => s + Number(r.total_checkins), 0);
-
-    box.innerHTML = `
-      <p class="meta" style="margin:10px 0;">
-        ${resumo.length} patrocinador(es) · ${total} check-in(s) no total.
-      </p>
-      <button class="btn sec mini" id="x-resumo">Exportar resumo</button>
-      <div class="rolagem" style="max-height:280px;margin-top:10px;">
-        <table><tr><th>Empresa</th><th>Check-ins</th><th></th></tr>
-        ${resumo.map(r => `<tr data-emp="${esc(r.empresa)}">
-          <td>${esc(r.empresa)}</td><td>${r.total_checkins}</td>
-          <td><button class="btn sec mini detalhe">Detalhe</button></td></tr>`).join("")}</table>
-      </div>
-      <div id="box-detalhe"></div>`;
-
-    $("#x-resumo").addEventListener("click", () => exportar(resumo, [
-      ["empresa","Empresa"],["total_checkins","Total de Check-ins"]
-    ], "checkins-resumo.xlsx", "Resumo Geral"));
-
-    $$(".detalhe", box).forEach(b => b.addEventListener("click", async () => {
-      const emp = b.closest("tr").dataset.emp;
-      const d = $("#box-detalhe");
-      d.innerHTML = `<p class="carregando">Carregando ${esc(emp)}…</p>`;
-      try{
-        const l = await puxarTudo("admin_rel_checkins_detalhe", { p_empresa: emp });
-        d.innerHTML = `
-          <h2 style="margin-top:16px;">${esc(emp)}</h2>
-          <p class="meta">${l.length} check-in(s).</p>
-          <button class="btn sec mini" id="x-det">Exportar Excel</button>
-          <div class="rolagem" style="max-height:240px;margin-top:10px;">
-            <table><tr><th>Nome</th><th>E-mail</th><th>Quando</th></tr>
-            ${l.map(r => `<tr><td>${esc(r.nome)}</td><td class="meta">${esc(r.email||"—")}</td>
-              <td class="meta">${dataHora(r.registrado_em)}</td></tr>`).join("")}</table>
-          </div>`;
-        $("#x-det").addEventListener("click", () => exportar(
-          l.map(r => ({...r, registrado_em: dataHora(r.registrado_em)})),
-          [["nome","Nome do Usuário"],["email","E-mail"],["registrado_em","Data/Hora do Check-in"]],
-          `checkins-${emp.toLowerCase().replace(/[^a-z0-9]+/g,"-")}.xlsx`, emp.slice(0,30)));
-      }catch(e){ aviso(d, explicar(e)); }
-    }));
-  }catch(e){ aviso(box, explicar(e)); }
-}
 </script>
 </body>
 </html>

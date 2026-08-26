@@ -414,7 +414,7 @@ async function desenharJantar(){
         <div>
           <a class="btn sec mini" href="checkin.html?jantar=${esc(J.id)}" target="_blank" rel="noopener"
              style="text-decoration:none;display:inline-block;">Abrir check-in</a>
-          <button class="btn sec mini" id="cv-exportar">Exportar mailing</button>
+          <button class="btn sec mini" id="cv-exportar" title="Só quem fez check-in">Exportar mailing (presentes)</button>
         </div>
       </div>
       <div id="cv-lista"><p class="carregando">Carregando…</p></div>
@@ -756,10 +756,24 @@ async function carregarConvidados(){
   }catch(e){ aviso(box, explicar(e)); }
 }
 
+// O mailing sai de quem FEZ CHECK-IN, nao de quem foi convidado. É a
+// lista que serve para follow-up depois do jantar: quem confirmou e não
+// apareceu não deve entrar como se tivesse estado lá.
+//
+// `jantar_checkin_registrar` marca o convidado como "compareceu", então
+// o filtro é por esse status. Os dados de contato vêm da listagem de
+// convidados, que é onde estão e-mail, telefone e cargo — o check-in
+// registra a presença, não o cadastro.
 async function exportarMailing(){
   try{
     const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
-    exportar(l.filter(c => c.status==="confirmado" || c.status==="compareceu"),
+    const presentes = l.filter(c => c.status === "compareceu");
+    if(presentes.length === 0){
+      aviso("#aviso-global",
+        "Ninguém fez check-in neste jantar ainda — o mailing sairia vazio.");
+      return;
+    }
+    exportar(presentes,
       [["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],["email","E-mail"],
        ["telefone","Telefone"],["rotulo","Identificação"]],
       `Mailing_${J.patrocinador_nome.replace(/\\W+/g,"_")}.xlsx`, "Mailing");
