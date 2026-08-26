@@ -532,7 +532,8 @@ ABAS.cadastro = async function(){
     <div class="cartao">
       <h2>Importar planilha</h2>
       <p class="sub" style="margin-bottom:12px;">
-        Colunas esperadas: nome, email, empresa, cargo, telefone, cnpj, segmento, estado, perfil.
+        Colunas esperadas: nome, email, empresa, cargo, telefone, cnpj, segmento, estado, perfil,
+        cidade, posição, faturamento, funcionários, linkedin.
         Célula vazia não apaga o que já existe. <strong>Troca de empresa</strong> de quem já está
         cadastrado não é aplicada direto — vira sugestão para você aprovar abaixo.
       </p>
@@ -546,7 +547,53 @@ ABAS.cadastro = async function(){
 
     <h2 style="margin-top:22px;">Sugestões para revisar</h2>
     <p class="sub">Trocas de empresa, gestores novos e divergências encontradas na base. Nada é aplicado sem sua aprovação.</p>
-    <div class="cartao" id="box-sug"><p class="carregando">Carregando…</p></div>`;
+    <div class="cartao" id="box-sug"><p class="carregando">Carregando…</p></div>
+
+    <h2 style="margin-top:22px;">Empresas</h2>
+    <p class="sub">
+      Cadastro à parte, opcional. Vincular um gestor a uma empresa aqui não muda o texto livre
+      que já está nele — é um vínculo a mais, para reunir todos os contatos (fornecedor incluso)
+      de uma mesma empresa num só lugar.
+    </p>
+    <div class="cartao">
+      <div class="barra">
+        <div><label>Nome</label><input type="text" id="emp-nome" placeholder="Nome da empresa"></div>
+        <div><label>CNPJ</label><input type="text" id="emp-cnpj"></div>
+        <div><label>Segmento</label><input type="text" id="emp-segmento"></div>
+        <div><label>Cidade</label><input type="text" id="emp-cidade"></div>
+        <div style="max-width:70px;"><label>UF</label><input type="text" id="emp-estado" maxlength="2"></div>
+        <div><label>Site</label><input type="text" id="emp-site" placeholder="https://"></div>
+      </div>
+      <input type="hidden" id="emp-id">
+      <div id="emp-aviso"></div>
+      <button class="btn" id="emp-salvar">Salvar empresa</button>
+      <button class="btn sec" id="emp-cancelar" style="margin-left:6px;display:none;">Cancelar edição</button>
+    </div>
+    <div class="barra">
+      <div><label>Buscar empresa</label><input type="text" id="emp-busca" placeholder="Nome da empresa"></div>
+    </div>
+    <div class="cartao"><div class="rolagem"><table id="emp-tabela"></table></div></div>
+
+    <h2 style="margin-top:22px;">Todos os gestores <span class="escopo-global">todos os eventos</span></h2>
+    <p class="sub">Base completa, incluindo fornecedores e quem ainda não tem e-mail cadastrado.</p>
+    <div class="barra">
+      <div><label>Buscar</label><input type="text" id="g-busca" placeholder="Nome ou empresa"></div>
+      <div style="max-width:200px;"><label>Perfil</label>
+        <select id="g-perfil">
+          <option value="">Todos</option>
+          <option value="GESTOR">Gestor</option>
+          <option value="INFLUENCER">Influencer</option>
+          <option value="ANALISTA">Analista</option>
+          <option value="FORNECEDOR">Fornecedor</option>
+          <option value="ÁREA DE NEGÓCIO">Área de negócio</option>
+          <option value="CIO CERRADO">CIO Cerrado</option>
+        </select></div>
+      <div style="min-width:auto;"><button class="btn sec" id="g-exportar">Exportar Excel</button></div>
+      <div style="min-width:auto;"><button class="btn sec" id="g-etiquetas">Emitir etiquetas</button></div>
+    </div>
+    <div id="g-resumo"></div>
+    <div class="cartao"><div class="rolagem"><table id="g-tabela"></table></div></div>
+    <div id="g-paginacao" class="meta" style="margin-top:8px;"></div>`;
 
   let LINHAS = [];
 
@@ -579,10 +626,11 @@ ABAS.cadastro = async function(){
           ${LINHAS.length} linha(s) lida(s)${semEmail ? ` · ${semEmail} sem nome ou e-mail serão ignoradas` : ""}
         </p>
         <div class="rolagem" style="max-height:220px;margin-top:8px;">
-          <table><tr><th>Nome</th><th>E-mail</th><th>Empresa</th></tr>
+          <table><tr><th>Nome</th><th>E-mail</th><th>Empresa</th><th>LinkedIn</th></tr>
           ${LINHAS.slice(0,20).map(l => `<tr>
             <td>${esc(l.nome||"—")}</td><td class="meta">${esc(l.email||"—")}</td>
-            <td>${esc(l.empresa||"—")}</td></tr>`).join("")}</table>
+            <td>${esc(l.empresa||"—")}</td>
+            <td class="meta">${l.linkedin ? "✓" : "—"}</td></tr>`).join("")}</table>
         </div>`;
       $("#btn-importar").disabled = LINHAS.length === 0;
       aviso("#imp-aviso","");
@@ -611,6 +659,7 @@ ABAS.cadastro = async function(){
             <td class="meta">${d.linha}</td><td>${esc(d.nome||"—")}</td>
             <td><span class="selo erro">${esc(d.motivo)}</span></td></tr>`).join("")}</table>`;
       }
+      carregarGestores();
     }catch(e){
       aviso("#imp-aviso", explicar(e));
     }finally{
@@ -618,7 +667,177 @@ ABAS.cadastro = async function(){
     }
   });
 
+  // ---------------------------------------------------------------
+  // EMPRESAS
+  // ---------------------------------------------------------------
+  let EMPRESAS_CACHE = [];
+
+  const carregarEmpresas = async () => {
+    $("#emp-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    try{
+      EMPRESAS_CACHE = await rpc("admin_listar_empresas", {
+        p_busca: $("#emp-busca").value || null, p_limite: 200, p_offset: 0
+      });
+      $("#emp-tabela").innerHTML = `
+        <tr><th>Nome</th><th>Segmento</th><th>Cidade/UF</th><th>Gestores</th><th></th></tr>
+        ${EMPRESAS_CACHE.map(e => `<tr>
+          <td>${esc(e.nome)}</td>
+          <td class="meta">${esc(e.segmento||"—")}</td>
+          <td class="meta">${esc([e.cidade,e.estado].filter(Boolean).join("/")||"—")}</td>
+          <td class="meta">${e.qtd_gestores}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn sec mini emp-editar" data-id="${esc(e.id)}">Editar</button>
+            <button class="btn sec mini emp-remover" data-id="${esc(e.id)}">Remover</button>
+          </td></tr>`).join("") ||
+        `<tr><td colspan="5" style="color:var(--suave)">Nenhuma empresa cadastrada ainda.</td></tr>`}`;
+
+      $$("#emp-tabela .emp-editar").forEach(b => b.addEventListener("click", () => {
+        const e = EMPRESAS_CACHE.find(x => x.id === b.dataset.id);
+        $("#emp-id").value = e.id;
+        $("#emp-nome").value = e.nome || "";
+        $("#emp-cnpj").value = e.cnpj || "";
+        $("#emp-segmento").value = e.segmento || "";
+        $("#emp-cidade").value = e.cidade || "";
+        $("#emp-estado").value = e.estado || "";
+        $("#emp-site").value = e.site || "";
+        $("#emp-cancelar").style.display = "";
+        $("#emp-nome").scrollIntoView({ behavior:"smooth", block:"center" });
+      }));
+      $$("#emp-tabela .emp-remover").forEach(b => b.addEventListener("click", async () => {
+        const e = EMPRESAS_CACHE.find(x => x.id === b.dataset.id);
+        if(!confirm(`Remover "${e.nome}"?\n\n${e.qtd_gestores} gestor(es) vinculado(s) continuam existindo — só perdem o vínculo com esta empresa.`)) return;
+        try{
+          await rpc("admin_remover_empresa", { p_id: e.id });
+          carregarEmpresas(); carregarGestores();
+        }catch(err){ aviso("#emp-aviso", explicar(err)); }
+      }));
+    }catch(e){ aviso("#emp-tabela", explicar(e)); }
+  };
+
+  $("#emp-busca").addEventListener("input", carregarEmpresas);
+
+  $("#emp-cancelar").addEventListener("click", () => {
+    $("#emp-id").value = ""; $("#emp-nome").value = ""; $("#emp-cnpj").value = "";
+    $("#emp-segmento").value = ""; $("#emp-cidade").value = ""; $("#emp-estado").value = "";
+    $("#emp-site").value = ""; $("#emp-cancelar").style.display = "none";
+  });
+
+  $("#emp-salvar").addEventListener("click", async () => {
+    const btn = $("#emp-salvar");
+    btn.disabled = true;
+    try{
+      await rpc("admin_salvar_empresa", {
+        p_nome: $("#emp-nome").value, p_id: $("#emp-id").value || null,
+        p_cnpj: $("#emp-cnpj").value || null, p_site: $("#emp-site").value || null,
+        p_segmento: $("#emp-segmento").value || null,
+        p_cidade: $("#emp-cidade").value || null, p_estado: $("#emp-estado").value || null
+      });
+      $("#emp-cancelar").click();
+      aviso("#emp-aviso", "Empresa salva.", "ok");
+      carregarEmpresas();
+    }catch(e){ aviso("#emp-aviso", explicar(e)); }
+    finally{ btn.disabled = false; }
+  });
+
+  // ---------------------------------------------------------------
+  // GRID DE GESTORES
+  // ---------------------------------------------------------------
+  let G_OFFSET = 0, G_TOTAL = 0;
+  const G_PASSO = 100;
+  let GESTORES_CACHE = [];
+
+  const carregarGestores = async () => {
+    $("#g-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    try{
+      GESTORES_CACHE = await rpc("admin_listar_gestores", {
+        p_busca: $("#g-busca").value || null, p_perfil: $("#g-perfil").value || null,
+        p_limite: G_PASSO, p_offset: G_OFFSET
+      });
+      G_TOTAL = GESTORES_CACHE.length ? Number(GESTORES_CACHE[0].total_geral) : 0;
+
+      $("#g-tabela").innerHTML = `
+        <tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th>E-mail</th><th>Perfil</th><th>LinkedIn</th><th></th></tr>
+        ${GESTORES_CACHE.map(g => `<tr data-id="${esc(g.id)}">
+          <td>${esc(g.nome)}</td>
+          <td class="g-empresa-cel">${esc(g.empresa||"—")}
+              ${g.empresa_id ? `<br><span class="selo ok" style="font-size:10px;">vinculado</span>` : ""}</td>
+          <td class="meta">${esc(g.cargo||"—")}</td>
+          <td class="meta">${g.email ? esc(g.email) : `<span class="selo pend">sem e-mail</span>`}</td>
+          <td class="meta">${esc(g.perfil||"—")}</td>
+          <td class="meta">${g.linkedin ? `<a href="${esc(g.linkedin)}" target="_blank" rel="noopener">perfil</a>` : "—"}</td>
+          <td><button class="btn sec mini g-vincular">Vincular empresa</button></td>
+        </tr>`).join("") ||
+        `<tr><td colspan="7" style="color:var(--suave)">Nenhum gestor com esse filtro.</td></tr>`}`;
+
+      $("#g-resumo").innerHTML = `<p class="meta">${G_TOTAL} gestor(es) no total.</p>`;
+      $("#g-paginacao").innerHTML = G_TOTAL > G_PASSO
+        ? `Mostrando ${G_OFFSET+1}–${Math.min(G_OFFSET+G_PASSO, G_TOTAL)} de ${G_TOTAL}
+           <button class="btn sec mini" id="g-anterior" ${G_OFFSET===0?"disabled":""}>Anterior</button>
+           <button class="btn sec mini" id="g-proximo" ${G_OFFSET+G_PASSO>=G_TOTAL?"disabled":""}>Próxima</button>`
+        : "";
+      $("#g-anterior")?.addEventListener("click", () => { G_OFFSET = Math.max(0, G_OFFSET-G_PASSO); carregarGestores(); });
+      $("#g-proximo")?.addEventListener("click", () => { G_OFFSET += G_PASSO; carregarGestores(); });
+
+      $$("#g-tabela .g-vincular").forEach(b => b.addEventListener("click", async (ev) => {
+        const tr = ev.target.closest("tr");
+        const gid = tr.dataset.id;
+        const nomeEmpresa = prompt("Nome da empresa (precisa já estar cadastrada acima):");
+        if(nomeEmpresa === null) return;
+        if(nomeEmpresa.trim() === ""){
+          await rpc("admin_associar_gestor_empresa", { p_gestor_id: gid, p_empresa_id: null });
+          carregarGestores(); return;
+        }
+        const achada = EMPRESAS_CACHE.find(e => e.nome.toLowerCase() === nomeEmpresa.trim().toLowerCase());
+        if(!achada){
+          alert(`"${nomeEmpresa}" não está na lista de empresas cadastradas acima. Cadastre primeiro ou confira a grafia.`);
+          return;
+        }
+        try{
+          await rpc("admin_associar_gestor_empresa", { p_gestor_id: gid, p_empresa_id: achada.id });
+          carregarGestores();
+        }catch(e){ aviso("#g-resumo", explicar(e)); }
+      }));
+    }catch(e){ aviso("#g-tabela", explicar(e)); }
+  };
+
+  $("#g-busca").addEventListener("input", () => { G_OFFSET = 0; carregarGestores(); });
+  $("#g-perfil").addEventListener("change", () => { G_OFFSET = 0; carregarGestores(); });
+
+  $("#g-exportar").addEventListener("click", async () => {
+    const btn = $("#g-exportar");
+    btn.disabled = true; btn.textContent = "Preparando…";
+    try{
+      let todos = [], offset = 0, total = null;
+      while(total === null || offset < total){
+        const p = await rpc("admin_listar_gestores", {
+          p_busca: $("#g-busca").value || null, p_perfil: $("#g-perfil").value || null,
+          p_limite: 500, p_offset: offset
+        });
+        if(p.length === 0) break;
+        if(total === null) total = Number(p[0].total_geral);
+        todos = todos.concat(p);
+        offset += 500;
+      }
+      exportar(todos, [
+        ["nome","Nome"],["empresa","Empresa"],["cargo","Cargo"],["email","E-mail"],
+        ["telefone","Telefone"],["cidade","Cidade"],["estado","Estado"],
+        ["perfil","Perfil"],["linkedin","LinkedIn"]
+      ], "gestores-cio-cerrado.xlsx", "Gestores");
+    }finally{ btn.disabled = false; btn.textContent = "Exportar Excel"; }
+  });
+
+  $("#g-etiquetas").addEventListener("click", () => {
+    // etiqueta simples (nome + empresa), sem numero de apto: fora de
+    // um evento nao ha reserva nem quarto — a impressao rica fica na
+    // aba Etiquetas, que e por evento
+    if(!GESTORES_CACHE.length){ aviso("#g-resumo","Nada carregado para gerar etiqueta."); return; }
+    exportar(GESTORES_CACHE, [["nome","NOME"],["empresa","EMPRESA"]],
+      "etiquetas-gestores-cio-cerrado.xlsx", "Etiquetas");
+  });
+
   carregarSugestoes();
+  carregarEmpresas();
+  carregarGestores();
 };
 
 const ROTULO_SUG = {
