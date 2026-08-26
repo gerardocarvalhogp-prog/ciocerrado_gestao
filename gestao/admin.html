@@ -1767,7 +1767,8 @@ ABAS.estrutura = async function(){
     <p class="sub">Dados do evento, cotas e inventário de quartos.</p>
     <div id="bl-evento"><p class="carregando">Carregando…</p></div>
     <div id="bl-cotas"></div>
-    <div id="bl-quartos"></div>`;
+    <div id="bl-quartos"></div>
+    <div id="bl-categorias"></div>`;
   await blocoEvento();
   await blocoCotas();
   await blocoQuartos();
@@ -2093,6 +2094,15 @@ async function blocoQuartos(){
           e a alocação já feita fica de pé.
         </p>
         <div id="qt-aviso"></div>
+        <div style="border-top:1px solid var(--linha);margin-top:12px;padding-top:12px;">
+          <p class="sub" style="margin-bottom:8px;">
+            <strong>Ou suba o mapa do resort.</strong> O hotel manda uma aba por prédio,
+            com o número, o andar, o corredor e a categoria de cada apartamento —
+            importar evita transcrever 424 linhas à mão.
+          </p>
+          <input type="file" id="mp-arquivo" accept=".xlsx,.xls">
+          <div id="mp-aviso"></div>
+        </div>
         ${r.length ? `<table style="margin-top:10px;">
           <tr><th>Tipo</th><th>Total</th><th>Livres</th><th>Ocupados</th></tr>
           ${r.map(x => `<tr>
@@ -2120,6 +2130,7 @@ async function blocoQuartos(){
           ? `${res.criados} quarto(s) criado(s) na faixa ${res.faixa}.`
           : `Nenhum criado — a faixa ${res.faixa} já existe.`, res.criados ? "ok" : "erro");
         blocoQuartos();
+        blocoCategorias();
       }catch(e){ aviso("#qt-aviso", explicar(e)); }
       finally{ b.disabled = false; b.textContent = "Criar faixa"; }
     });
@@ -2146,8 +2157,156 @@ async function blocoQuartos(){
       }catch(e){ aviso("#qt-aviso", explicar(e)); }
       finally{ b.disabled = false; b.textContent = "Alterar tipo da faixa"; }
     });
+    $("#mp-arquivo").addEventListener("change", e => {
+      const f = e.target.files[0];
+      if(f) importarMapaResort(f);
+      e.target.value = "";
+    });
   }catch(e){ aviso("#bl-quartos", explicar(e)); }
 }
+
+// =====================================================================
+// ESPELHO DE QUARTOS DO RESORT
+//
+// O hotel manda uma aba por prédio, cada uma com duas partes: um
+// dicionário de categorias no topo e, depois de uma linha "MAPA DE
+// ALOCAÇÕES", uma linha por apartamento.
+//
+// A leitura é por posição de coluna, não por nome: os títulos vêm com
+// acento, maiúscula e células mescladas, e o mesmo arquivo muda de
+// cabeçalho entre versões. O que não muda é a ordem — prédio, andar,
+// corredor, apto, categoria.
+// =====================================================================
+function lerMapaResort(wb){
+  const cats = new Map();
+  const quartos = [];
+  const semAcento = t => String(t ?? "").normalize("NFD")
+    .replace(/[̀-ͯ]/g,"").toUpperCase();
+
+  wb.SheetNames.forEach(nome => {
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[nome], { header:1, defval:"" });
+
+    // Só entra aba que traz o mapa, e o próprio arquivo diz onde ele
+    // começa. Sem esta âncora a leitura pesca lixo das outras abas:
+    // qualquer linha com número numa coluna e texto na seguinte vira
+    // "apartamento", e a aba COTAS transforma patrocinador em quarto —
+    // 703 registros em vez de 424, medido no arquivo de 2026.
+    const marco = aoa.findIndex(l =>
+      l.some(c => semAcento(c).includes("MAPA DE ALOCA")));
+    if(marco < 0) return;
+
+    // o dicionário de categorias fica ACIMA do marco
+    aoa.slice(0, marco).forEach(linha => {
+      const col = i => String(linha[i] ?? "").trim();
+      const cod = col(1);
+      if(cod && cod === cod.toUpperCase() && !/^\d+$/.test(cod)
+         && /cama|apartamento/i.test(col(4))){
+        if(!cats.has(cod)) cats.set(cod, { codigo:cod, nome:col(2), descricao:col(4) });
+      }
+    });
+
+    // e o mapa, abaixo dele. +1 pula a linha de títulos.
+    aoa.slice(marco + 1).forEach(linha => {
+      const col = i => String(linha[i] ?? "").trim();
+      const apto = col(4), categoria = col(5);
+      if(/^\d+$/.test(apto) && categoria){
+        quartos.push({ numero:apto, bloco:col(1), andar:col(2),
+                       corredor:col(3), categoria });
+      }
+    });
+  });
+
+  return { categorias:[...cats.values()], quartos };
+}
+
+async function importarMapaResort(arquivo){
+  const box = $("#mp-aviso");
+  try{
+    const buf = await arquivo.arrayBuffer();
+    const wb  = XLSX.read(buf, { type:"array" });
+    const { categorias, quartos } = lerMapaResort(wb);
+
+    if(quartos.length === 0){
+      aviso(box, "Não encontrei nenhum apartamento neste arquivo. " +
+                 "Confira se é o Mapa de Alocações do resort.");
+      return;
+    }
+
+    if(!confirm(`Importar ${quartos.length} apartamento(s) e ` +
+                `${categorias.length} categoria(s)?\n\n` +
+                `Quartos que já existem têm prédio, andar, corredor e categoria ` +
+                `atualizados. Capacidade e tipo NÃO são tocados — quem os define ` +
+                `é a categoria, logo abaixo.`)) return;
+
+    const r = await rpc("admin_importar_mapa_quartos", {
+      p_evento_slug: EVENTO, p_categorias: categorias, p_quartos: quartos });
+
+    aviso(box, `${r.linhas_recebidas} linha(s) lidas · ` +
+               `${r.quartos_no_evento} quarto(s) no evento · ` +
+               `${r.categorias} categoria(s).`, "ok");
+    blocoQuartos();
+    blocoCategorias();
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+// A capacidade real está em prosa no arquivo do hotel ("2 camas queen e
+// 1 cama de viúva"), e o que o resort aceita cobrar não está escrito em
+// lugar nenhum. Por isso o import entra com 2 e a organização ajusta
+// aqui, uma vez por categoria — são 192 apartamentos SUP, corrigir um a
+// um seria transcrever o mapa de novo.
+async function blocoCategorias(){
+  const alvo = $("#bl-categorias");
+  if(!alvo) return;
+  try{
+    const l = await rpc("admin_listar_categorias_quarto", { p_evento_slug: EVENTO });
+    if(l.length === 0){ alvo.innerHTML = ""; return; }
+
+    alvo.innerHTML = `
+      <div class="cartao">
+        <h2>Categorias do resort</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Vieram do arquivo do hotel. Confirme com o resort quantas pessoas cada
+          uma comporta e qual o tipo para efeito de preço — mudar aqui vale para
+          todos os quartos da categoria.
+        </p>
+        <div id="cat-aviso"></div>
+        <div class="rolagem"><table>
+          <tr><th>Código</th><th>Categoria</th><th>Quartos</th>
+              <th>Comporta</th><th>Tipo</th><th></th></tr>
+          ${l.map(c => `<tr data-cod="${esc(c.codigo)}">
+            <td><strong>${esc(c.codigo)}</strong></td>
+            <td>${esc(c.nome || "—")}<br>
+                <span class="meta">${esc((c.descricao||"").slice(0,70))}</span></td>
+            <td class="meta">${c.quartos}</td>
+            <td><input type="text" class="cat-cap" value="${c.capacidade}"
+                       style="max-width:60px;"></td>
+            <td><select class="cat-tipo">
+                  ${["single","duplo","triplo"].map(t =>
+                    `<option value="${t}" ${t===c.tipo?"selected":""}>${t}</option>`).join("")}
+                </select></td>
+            <td><button class="btn sec mini cat-salvar">Salvar</button></td>
+          </tr>`).join("")}
+        </table></div>
+      </div>`;
+
+    $$(".cat-salvar", alvo).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true;
+      try{
+        const r = await rpc("admin_salvar_categoria_quarto", {
+          p_evento_slug: EVENTO,
+          p_codigo: tr.dataset.cod,
+          p_capacidade: parseInt(tr.querySelector(".cat-cap").value, 10),
+          p_tipo: tr.querySelector(".cat-tipo").value
+        });
+        aviso("#cat-aviso", `${r.quartos_atualizados} quarto(s) atualizados.`, "ok");
+        blocoQuartos();
+      }catch(e){ aviso("#cat-aviso", explicar(e)); }
+      finally{ b.disabled = false; }
+    }));
+  }catch(e){ aviso(alvo, explicar(e)); }
+}
+
 
 // =====================================================================
 // ABA: PATROCINADORES
