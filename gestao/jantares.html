@@ -374,6 +374,19 @@ async function desenharJantar(){
     </div>
 
     <div class="cartao">
+      <h2>Escolher direto da base</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Busca em todos os gestores já cadastrados (1.400+), sem passar pela análise por IA.
+        Use quando já sabe quem quer convidar.
+      </p>
+      <div class="barra">
+        <div><label>Nome ou empresa</label><input type="text" id="bs-busca" placeholder="Digite para buscar…"></div>
+      </div>
+      <div id="bs-aviso"></div>
+      <div id="bs-resultado"></div>
+    </div>
+
+    <div class="cartao">
       <h2>Adicionar quem não passou pela análise</h2>
       <p class="sub" style="margin-bottom:10px;">Staff, equipe do patrocinador ou troca de última hora. Entra já confirmado.</p>
       <div class="barra">
@@ -398,7 +411,11 @@ async function desenharJantar(){
     <div class="cartao">
       <div class="cartao-cab" style="margin-bottom:8px;">
         <h2 style="margin:0;">Convidados</h2>
-        <button class="btn sec mini" id="cv-exportar">Exportar mailing</button>
+        <div>
+          <a class="btn sec mini" href="checkin.html?jantar=${esc(J.id)}" target="_blank" rel="noopener"
+             style="text-decoration:none;display:inline-block;">Abrir check-in</a>
+          <button class="btn sec mini" id="cv-exportar">Exportar mailing</button>
+        </div>
       </div>
       <div id="cv-lista"><p class="carregando">Carregando…</p></div>
     </div>`;
@@ -409,6 +426,12 @@ async function desenharJantar(){
   $("#pr-rodar").addEventListener("click", rodarProspeccaoJantar);
   $("#av-salvar").addEventListener("click", salvarAvulso);
   $("#cv-exportar").addEventListener("click", exportarMailing);
+
+  let bsDebounce;
+  $("#bs-busca").addEventListener("input", () => {
+    clearTimeout(bsDebounce);
+    bsDebounce = setTimeout(buscarNaBase, 350);
+  });
 
   const sincHib = () => { $("#pr-hib").disabled = !$("#pr-priv").checked; };
   $("#pr-priv").addEventListener("change", sincHib);
@@ -623,6 +646,48 @@ function desenharProspeccaoJantar(){
     }catch(e){ aviso("#pr-aviso", explicar(e)); }
     finally{ b.disabled = false; b.textContent = "Salvar selecionados como convidados"; }
   });
+}
+
+async function buscarNaBase(){
+  const termo = $("#bs-busca").value.trim();
+  if(termo.length < 3){
+    $("#bs-resultado").innerHTML = "";
+    if(termo.length > 0) aviso("#bs-aviso","Digite ao menos 3 letras.");
+    else aviso("#bs-aviso","");
+    return;
+  }
+  aviso("#bs-aviso","");
+  $("#bs-resultado").innerHTML = `<p class="carregando">Buscando…</p>`;
+  try{
+    const l = await rpc("admin_listar_gestores", { p_busca: termo, p_limite: 15, p_offset: 0 });
+    $("#bs-resultado").innerHTML = l.length === 0
+      ? `<div class="vazio">Ninguém encontrado com esse termo.</div>`
+      : `<div class="rolagem" style="max-height:260px;"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th></th></tr>
+          ${l.map(g => `<tr data-id="${esc(g.id)}">
+            <td>${esc(g.nome)}</td>
+            <td class="meta">${esc(g.empresa||"—")}</td>
+            <td class="meta">${esc(g.cargo||"—")}</td>
+            <td><button class="btn sec mini bs-add">Adicionar</button></td>
+          </tr>`).join("")}
+        </table></div>
+        ${l.length >= 15 ? `<p class="meta" style="margin-top:6px;">Mostrando os 15 primeiros — refine a busca se não achou.</p>` : ""}`;
+
+    $$("#bs-resultado .bs-add").forEach(b => b.addEventListener("click", async (ev) => {
+      const tr = ev.target.closest("tr");
+      b.disabled = true; b.textContent = "Adicionando…";
+      try{
+        await rpc("jantar_adicionar_convidado_existente", {
+          p_jantar_id: J.id, p_gestor_id: tr.dataset.id, p_rotulo: "CONVIDADO"
+        });
+        aviso("#bs-aviso", `${tr.querySelector("td").innerText} adicionado.`, "ok");
+        carregarConvidados();
+      }catch(e){
+        aviso("#bs-aviso", explicar(e));
+        b.disabled = false; b.textContent = "Adicionar";
+      }
+    }));
+  }catch(e){ aviso("#bs-resultado", explicar(e)); }
 }
 
 async function salvarAvulso(){
