@@ -5,9 +5,13 @@
    Ver auditoria de UX de 28/08/2026 para o diagnóstico completo. */
 
 :root{
-  --verde:#14312B;        /* tinta principal */
-  --verde-med:#1D6F5C;    /* confirmado / sucesso */
-  --ouro:#A8842C;         /* SINAL: reservado para "sua vez" (fila de cota) — não usar como decoração */
+  --verde:#387828;        /* tinta principal — extraído do símbolo oficial (ciocerrado.com.br), ver assets/identidade-visual.md */
+  --verde-med:#1D6F5C;    /* confirmado / sucesso — token semântico à parte, não vem da marca */
+  --ouro:#8A6400;         /* SINAL: reservado para "sua vez" (fila de cota) — não usar como decoração.
+                              Mesmo matiz do laranja da marca (H43°), mas mais escuro/saturado que o
+                              #E8A800 do símbolo: em fill sólido grande o E8A800 vale, mas como texto/selo
+                              sobre fundo claro ele cai pra ~1.8:1 de contraste — ilegível. Este valor
+                              passa WCAG AA (~4.7:1) mantendo o mesmo matiz. */
   --alerta:#9C6413;       /* atenção genérica — distinto do --ouro, que tem significado próprio */
   --alerta-bg:#FBF0DC;
   --papel:#FBFAF7;
