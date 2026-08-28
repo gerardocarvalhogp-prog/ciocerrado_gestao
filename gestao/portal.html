@@ -62,6 +62,28 @@ button{font-family:inherit;cursor:pointer;}
   padding:10px 14px;font-size:14px;color:var(--suave);white-space:nowrap;
 }
 .aba[aria-selected="true"]{color:var(--verde);border-bottom-color:var(--verde);font-weight:600;}
+.aba .flag{
+  display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--ouro);margin-left:5px;vertical-align:middle;
+}
+
+/* ---------- resumo de pendências — visível antes de entrar em qualquer aba ---------- */
+.resumo-pend{
+  background:#F7EFD9;border:1px solid #EAD9A8;border-radius:var(--raio);
+  padding:12px 14px;margin-bottom:18px;
+}
+.resumo-pend .titulo{
+  font-family:'Archivo',sans-serif;font-weight:700;font-size:13.5px;
+  color:var(--ouro);margin:0 0 6px;
+}
+.resumo-pend ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;}
+.resumo-pend li{font-size:13.5px;color:var(--texto);}
+.resumo-pend button{
+  background:none;border:none;padding:0;font:inherit;color:var(--verde);
+  text-decoration:underline;cursor:pointer;
+}
+.resumo-pend.tudo-ok{background:var(--ok-bg, #E4F0EA);border-color:#C9E0D4;}
+.resumo-pend.tudo-ok .titulo{color:var(--verde-med);}
 
 h1{font-family:'Archivo',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
 h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
@@ -202,6 +224,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
 
   <div class="wrap">
     <div id="cabecalho"></div>
+    <div id="resumo-pendencias"></div>
 
     <div class="abas" role="tablist">
       <button class="aba" role="tab" data-aba="quartos" aria-selected="true">Quartos</button>
@@ -497,9 +520,82 @@ async function iniciar(){
     }
     ligarAbas();
     carregarQuartos();
+    calcularPendencias();
   }catch(e){
     aviso("#aviso-global", explicar(e));
   }
+}
+
+// =====================================================================
+// RESUMO DE PENDÊNCIAS
+//
+// O patrocinador tem pouco treino e usa o portal raramente — sem isto,
+// só descobre o que falta entrando aba por aba. Só entra aqui o que dá
+// pra saber com segurança pelas mesmas funções/RPCs que as abas já
+// chamam: quartos (do painel, sempre disponível), mesa redonda
+// (escolhidos vs vagas, já vem pronto de patro_minhas_sessoes) e
+// financeiro (fatura emitida e não paga). Brindes ficou de fora de
+// propósito: "não vamos levar" e "ainda não respondeu" têm a mesma cara
+// nos dados hoje, e não dá pra distinguir sem adivinhar.
+// =====================================================================
+async function calcularPendencias(){
+  const pend = [];
+
+  if(PATRO.quartos_total > 0 && PATRO.quartos_preenchidos < PATRO.quartos_total){
+    pend.push({
+      aba: "quartos",
+      texto: `${PATRO.quartos_total - PATRO.quartos_preenchidos} de ${PATRO.quartos_total} quarto(s) sem ocupante preenchido`
+    });
+  }
+
+  try{
+    const sessoes = await rpc("patro_minhas_sessoes", { p_patrocinador_id: PATRO.patrocinador_id });
+    const abertas = (sessoes || []).filter(s => !s.encerrada && Number(s.escolhidos) < Number(s.vagas));
+    if(abertas.length > 0){
+      pend.push({
+        aba: "mesa",
+        texto: abertas.length === 1
+          ? `${NOME_TIPO[abertas[0].tipo] || "Sessão"} com vaga(s) por escolher`
+          : `${abertas.length} sessão(ões) de mesa redonda com vaga(s) por escolher`
+      });
+    }
+  }catch(e){ /* patrocinador sem mesa redonda na cota: sem sessao, sem pendencia */ }
+
+  try{
+    const f = await rpc("patro_minha_fatura", { p_patrocinador_id: PATRO.patrocinador_id });
+    if(f.status === "emitida"){
+      pend.push({
+        aba: "financeiro",
+        texto: `Fatura de ${moeda(f.total)} emitida${f.vencimento ? `, vence em ${dataBR(f.vencimento)}` : ""}`
+      });
+    }
+  }catch(e){ /* sem fatura ainda: nao e pendencia */ }
+
+  desenharResumoPendencias(pend);
+}
+
+function desenharResumoPendencias(pend){
+  $$(".aba .flag").forEach(f => f.remove());
+  pend.forEach(p => {
+    const aba = $(`.aba[data-aba="${p.aba}"]`);
+    if(aba) aba.insertAdjacentHTML("beforeend", `<span class="flag"></span>`);
+  });
+
+  const alvo = $("#resumo-pendencias");
+  if(pend.length === 0){
+    alvo.innerHTML = `<div class="resumo-pend tudo-ok"><p class="titulo">Tudo em dia por aqui.</p></div>`;
+    return;
+  }
+  alvo.innerHTML = `
+    <div class="resumo-pend">
+      <p class="titulo">${pend.length === 1 ? "1 pendência" : `${pend.length} pendências`}</p>
+      <ul>${pend.map(p => `
+        <li><button type="button" data-ir="${p.aba}">${esc(p.texto)}</button></li>`).join("")}
+      </ul>
+    </div>`;
+  $$("#resumo-pendencias [data-ir]").forEach(b => b.addEventListener("click", () => {
+    $(`.aba[data-aba="${b.dataset.ir}"]`)?.click();
+  }));
 }
 
 function desenharCabecalho(){
@@ -621,6 +717,7 @@ function ligarCompra(){
       aviso("#aviso-global", `${r.rotulo} reservado. Preencha os ocupantes abaixo.`, "ok");
       await recarregarPainel();
       carregarQuartos();
+      calcularPendencias();
     }catch(e){
       aviso("#aviso-global", explicar(e));
     }
@@ -671,6 +768,7 @@ function cartaoQuarto(q){
       // ficava desatualizado ate a pessoa recarregar a pagina na mao
       await recarregarPainel();
       carregarQuartos();
+      calcularPendencias();
     }catch(e){ aviso("#aviso-global", explicar(e)); }
   });
 
@@ -800,6 +898,7 @@ async function salvarQuarto(ed, q){
     // Comprar e cancelar já faziam isso; salvar tinha ficado de fora.
     await recarregarPainel();
     carregarQuartos();
+    calcularPendencias();
   }catch(e){
     aviso(alvoAviso, explicar(e));
     btn.disabled = false; btn.textContent = "Salvar quarto";
@@ -955,6 +1054,7 @@ async function desenharSessao(card, s){
       });
       aviso("#aviso-global", `${r.inseridos} convidado(s) confirmado(s).`, "ok");
       carregarMesa();
+      calcularPendencias();
     }catch(e){
       aviso(corpo.querySelector(".aviso-sessao"), explicar(e));
       btn.disabled = false; btn.textContent = "Confirmar escolhas";
@@ -967,6 +1067,7 @@ async function desenharSessao(card, s){
     try{
       await rpc("patro_passar_a_vez", { p_sessao_id: s.sessao_id });
       carregarMesa();
+      calcularPendencias();
     }catch(e){ aviso("#aviso-global", explicar(e)); }
   });
 }
@@ -1367,13 +1468,18 @@ async function carregarIndicacoes(){
     <h2 style="margin-top:26px;">Suas indicações</h2>
     <div id="i-lista"><p class="carregando">Carregando…</p></div>`;
 
+  $("#i-nome").addEventListener("input", () => DS.limparInvalido($("#i-nome")));
   $("#i-enviar").addEventListener("click", enviarIndicacao);
   listarIndicacoes();
 }
 
 async function enviarIndicacao(){
   const nome = $("#i-nome").value.trim();
-  if(!nome){ aviso("#i-aviso","Informe pelo menos o nome do CIO."); return; }
+  if(!nome){
+    DS.marcarInvalido($("#i-nome"), "Informe pelo menos o nome do CIO.");
+    $("#i-nome").focus();
+    return;
+  }
 
   const btn = $("#i-enviar");
   btn.disabled = true; btn.textContent = "Enviando…";
