@@ -93,6 +93,14 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
 .login h1{font-size:20px;}
 .voltar{background:none;border:none;color:var(--verde);text-decoration:underline;
   font-size:13px;padding:0;margin-bottom:14px;}
+
+/* Navegacao entre as telas da equipe. Cada tela e um .html isolado —
+   sem isto, trocar de tela exigia saber a URL de cor. */
+.ir-para{display:flex;gap:2px;align-items:center;}
+.ir-para a{color:rgba(255,255,255,.75);text-decoration:none;font-size:12.5px;
+  padding:4px 9px;border-radius:var(--raio);white-space:nowrap;}
+.ir-para a:hover{background:rgba(255,255,255,.12);color:#fff;}
+.ir-para a[aria-current="page"]{background:rgba(255,255,255,.18);color:#fff;font-weight:600;}
 </style>
 </head>
 <body>
@@ -124,6 +132,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
 <div id="app" class="oculto">
   <header class="topo">
     <div class="marca">CIO Cerrado<span>Jantares</span></div>
+    <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html">Painel</a><a href="jantares.html" aria-current="page">Jantares</a><a href="checkin.html">Check-in</a></nav>
     <div class="topo-dir">
       <span class="quem" id="quem"></span>
       <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>
@@ -578,7 +587,8 @@ async function desenharJantar(){
         <div>
           <a class="btn sec mini" href="checkin.html?jantar=${esc(J.id)}" target="_blank" rel="noopener"
              style="text-decoration:none;display:inline-block;">Abrir check-in</a>
-          <button class="btn sec mini" id="cv-exportar" title="Só quem fez check-in">Exportar mailing (presentes)</button>
+          <button class="btn sec mini" id="cv-etiquetas" title="Crachás dos convidados">Etiquetas</button>
+          <button class="btn sec mini" id="cv-exportar" title="Convidados ou só quem compareceu">Exportar mailing</button>
         </div>
       </div>
       <div id="cv-lista"><p class="carregando">Carregando…</p></div>
@@ -590,6 +600,7 @@ async function desenharJantar(){
   $("#pr-rodar").addEventListener("click", rodarProspeccaoJantar);
   $("#av-salvar").addEventListener("click", salvarAvulso);
   $("#cv-exportar").addEventListener("click", exportarMailing);
+  $("#cv-etiquetas").addEventListener("click", exportarEtiquetasJantar);
 
   let bsDebounce;
   $("#bs-busca").addEventListener("input", () => {
@@ -1035,6 +1046,32 @@ async function carregarConvidados(){
 // o filtro é por esse status. Os dados de contato vêm da listagem de
 // convidados, que é onde estão e-mail, telefone e cargo — o check-in
 // registra a presença, não o cadastro.
+// Etiquetas do jantar: crachá de mesa, não de evento.
+//
+// A aba Etiquetas do painel é por evento — sai de v_esperados, que se
+// apoia em reserva e quarto. Jantar não tem hospedagem nem evento_id,
+// então nada daquilo se aplica aqui. O que a mesa precisa é o nome
+// como a pessoa quer ser chamada, a empresa e o cargo.
+//
+// Sai quem foi convidado de fato (recusado fica de fora — não vai
+// aparecer), ordenado por nome, que é como as etiquetas são separadas
+// na hora de entregar.
+async function exportarEtiquetasJantar(){
+  try{
+    const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
+    const vao = l.filter(c => c.status !== "recusado");
+    if(vao.length === 0){
+      aviso("#aviso-global", "Nenhum convidado ativo neste jantar — as etiquetas sairiam vazias.");
+      return;
+    }
+    exportar(
+      vao.slice().sort((a,b) => (a.nome||"").localeCompare(b.nome||"", "pt-BR")),
+      [["nome","NOME"],["empresa","EMPRESA"],["cargo","CARGO"],["rotulo","IDENTIFICAÇÃO"]],
+      `Etiquetas_${(J.patrocinador_nome||"jantar").replace(/\W+/g,"_")}.xlsx`,
+      "Etiquetas");
+  }catch(e){ aviso("#aviso-global", explicar(e)); }
+}
+
 // Exporta a lista do jantar. Nasceu como "lista de presentes" (só quem
 // deu check-in), o que faz sentido DEPOIS do jantar — mas antes dele
 // ninguém compareceu, e o botão simplesmente se recusava a exportar.

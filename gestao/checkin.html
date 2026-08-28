@@ -89,6 +89,14 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
   border-radius:var(--raio);font-family:inherit;font-size:14px;
   background:var(--superficie);color:var(--texto);}
 #form-novo label{margin-bottom:3px;}
+
+/* Navegacao entre as telas da equipe. Cada tela e um .html isolado —
+   sem isto, trocar de tela exigia saber a URL de cor. */
+.ir-para{display:flex;gap:2px;align-items:center;}
+.ir-para a{color:rgba(255,255,255,.75);text-decoration:none;font-size:12.5px;
+  padding:4px 9px;border-radius:var(--raio);white-space:nowrap;}
+.ir-para a:hover{background:rgba(255,255,255,.12);color:#fff;}
+.ir-para a[aria-current="page"]{background:rgba(255,255,255,.18);color:#fff;font-weight:600;}
 </style>
 </head>
 <body>
@@ -120,6 +128,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
 <div id="app" class="oculto">
   <header class="topo">
     <div class="marca">CIO Cerrado<span>Check-in</span></div>
+    <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html">Painel</a><a href="jantares.html">Jantares</a><a href="checkin.html" aria-current="page">Check-in</a></nav>
     <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>
     <button class="sair" id="btn-sair">Sair</button>
   </header>
