@@ -513,7 +513,29 @@ async function desenharJantar(){
     </div>
 
     <div class="cartao">
-      <h2>Buscar convidados</h2>
+      <h2>Buscar no cadastro</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Procura nos 1.500+ gestores já cadastrados e adiciona direto, sem passar
+        pela análise de aderência. É o caminho para quando você já sabe quem quer
+        convidar — ou quer alguém que a análise não trouxe.
+      </p>
+      <div class="barra">
+        <div><label>Nome ou empresa</label><input type="text" id="bs-busca" placeholder="Digite para buscar…"></div>
+        <div style="max-width:170px;"><label>Perfil</label><select id="bs-perfil"><option value="">Todos</option></select></div>
+        <div style="max-width:190px;"><label>Segmento</label><select id="bs-segmento"><option value="">Todos</option></select></div>
+        <div style="max-width:100px;"><label>Estado</label><select id="bs-estado"><option value="">Todos</option></select></div>
+        <div style="min-width:auto;"><button class="btn sec" id="bs-buscar">Buscar</button></div>
+      </div>
+      <div id="bs-aviso"></div>
+      <div id="bs-resultado"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Sugerir convidados por aderência (IA)</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Pesquisa o patrocinador na web e pontua cada empresa da base pelo encaixe
+        com o que ele vende. Use quando ainda não sabe quem chamar.
+      </p>
       <div class="barra">
         <div style="min-width:280px;"><label>Abrangência geográfica</label>
           <input type="text" id="pr-abr" value="Grande Brasília (DF + entorno)"></div>
@@ -536,27 +558,9 @@ async function desenharJantar(){
           <input type="text" id="pr-obs"></div>
       </div>
       <button class="btn" id="pr-rodar">Analisar</button>
-      <span class="meta" style="margin-left:8px;">Pesquisa o patrocinador na web e pontua cada empresa.</span>
       <div id="pr-aviso"></div>
       <div id="pr-status"></div>
       <div id="pr-resultado"></div>
-    </div>
-
-    <div class="cartao">
-      <h2>Escolher direto da base</h2>
-      <p class="sub" style="margin-bottom:10px;">
-        Busca em todos os gestores já cadastrados (1.400+), sem passar pela análise por IA.
-        Use quando já sabe quem quer convidar.
-      </p>
-      <div class="barra">
-        <div><label>Nome ou empresa</label><input type="text" id="bs-busca" placeholder="Digite para buscar…"></div>
-        <div style="max-width:170px;"><label>Perfil</label><select id="bs-perfil"><option value="">Todos</option></select></div>
-        <div style="max-width:190px;"><label>Segmento</label><select id="bs-segmento"><option value="">Todos</option></select></div>
-        <div style="max-width:100px;"><label>Estado</label><select id="bs-estado"><option value="">Todos</option></select></div>
-        <div style="min-width:auto;"><button class="btn sec" id="bs-buscar">Buscar</button></div>
-      </div>
-      <div id="bs-aviso"></div>
-      <div id="bs-resultado"></div>
     </div>
 
     <div class="cartao">
