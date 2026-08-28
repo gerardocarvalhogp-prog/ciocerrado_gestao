@@ -1,0 +1,124 @@
+/* Design system compartilhado das 5 telas do sistema de gestão.
+   Tokens de cor idênticos aos que já existiam em cada arquivo (não mudam
+   nada visualmente por si só) — o que este arquivo resolve é o drift:
+   cada tela tinha seu próprio .cartao com padding diferente. Agora é um só.
+   Ver auditoria de UX de 28/08/2026 para o diagnóstico completo. */
+
+:root{
+  --verde:#14312B;        /* tinta principal */
+  --verde-med:#1D6F5C;    /* confirmado / sucesso */
+  --ouro:#A8842C;         /* SINAL: reservado para "sua vez" (fila de cota) — não usar como decoração */
+  --alerta:#9C6413;       /* atenção genérica — distinto do --ouro, que tem significado próprio */
+  --alerta-bg:#FBF0DC;
+  --papel:#FBFAF7;
+  --superficie:#FFFFFF;
+  --linha:#DDE0D8;
+  --texto:#243B35;
+  --suave:#6B7C76;
+  --erro:#9B3226;
+  --erro-bg:#FBF0EE;
+  --ok-bg:#E8F2EC;
+  --raio:6px;
+
+  /* espaçamento em grade de 8px — usar isto em vez de valores soltos */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+
+  /* escala tipográfica */
+  --tx-xs:11px; --tx-sm:12.5px; --tx-base:14px; --tx-md:15px; --tx-lg:17px; --tx-xl:20px;
+}
+
+/* ---------- cartão-base — padronizado, era 15/16/18px conforme o arquivo ---------- */
+.cartao{
+  background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio);padding:var(--sp-4);margin-bottom:var(--sp-4);
+}
+
+/* ---------- botões ---------- */
+.btn.perigo{background:var(--erro);}
+.btn.perigo:hover{background:#7F281E;}
+.btn.mini{
+  padding:7px 12px;font-size:var(--tx-sm);min-height:32px;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+
+/* ---------- selos de status ---------- */
+.selo.ok{background:var(--ok-bg);color:var(--verde-med);}
+.selo.alerta{background:var(--alerta-bg);color:var(--alerta);}
+.selo.erro{background:var(--erro-bg);color:var(--erro);}
+
+/* ---------- avisos (mensagem de bloco, não é toast) ---------- */
+.aviso.alerta{background:var(--alerta-bg);border-color:#E8D5A8;color:var(--alerta);}
+.aviso.info{background:var(--papel);border-color:var(--linha);color:var(--suave);}
+
+/* ---------- formulário: validação amarrada ao campo ---------- */
+.campo-erro{display:none;color:var(--erro);font-size:var(--tx-xs);margin-top:4px;}
+.campo-erro.visivel{display:block;}
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"]{
+  border-color:var(--erro) !important;
+}
+
+/* ---------- tabela larga: rola dentro do próprio contêiner, não a página ----------
+   display:block em <table> vira contêiner de rolagem sem quebrar o layout interno
+   (thead/tbody/tr/td continuam em contexto de tabela) — nenhuma tabela precisa de
+   wrapper novo no HTML para ganhar isto. */
+table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;}
+.tabela-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+/* .rolagem já é o próprio contêiner de scroll (vertical e horizontal) em admin.html
+   e jantares.html — herdar overflow-x:auto do <table> genérico acima quebra
+   position:sticky no <th>, porque overflow-x:auto força overflow-y:auto também
+   (regra do spec de CSS), criando um segundo contexto de scroll dentro do primeiro.
+   Revertido aqui pra tabela voltar a ser só tabela e o .rolagem cuidar do scroll. */
+.rolagem table{display:table;overflow:visible;max-width:none;}
+
+/* ---------- skeleton — substitui "Carregando…" texto puro ---------- */
+.skeleton{
+  background:linear-gradient(90deg, var(--linha) 25%, #EEF0EA 37%, var(--linha) 63%);
+  background-size:400% 100%;
+  animation:ds-shimmer 1.4s ease-in-out infinite;
+  border-radius:4px;
+}
+.skeleton-linha{height:14px;margin-bottom:8px;}
+.skeleton-linha:last-child{width:70%;margin-bottom:0;}
+.skeleton-cartao{height:60px;border-radius:var(--raio);}
+@keyframes ds-shimmer{0%{background-position:100% 0;}100%{background-position:-100% 0;}}
+
+/* ---------- modal — substitui confirm() nativo. Ver DS.confirmar() em design-system.js ---------- */
+.ds-backdrop{
+  position:fixed;inset:0;background:rgba(20,49,43,.45);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  z-index:1000;opacity:0;transition:opacity .15s ease;
+}
+.ds-backdrop.aberto{opacity:1;}
+.ds-modal{
+  background:var(--superficie);border-radius:10px;max-width:420px;width:100%;
+  padding:22px 24px;box-shadow:0 20px 50px rgba(20,49,43,.25);
+  transform:translateY(8px) scale(.98);transition:transform .15s ease;
+}
+.ds-backdrop.aberto .ds-modal{transform:translateY(0) scale(1);}
+.ds-modal h2{font-family:'Archivo',sans-serif;font-size:var(--tx-lg);margin:0 0 8px;color:var(--texto);}
+.ds-modal p{font-size:var(--tx-base);color:var(--suave);margin:0 0 20px;line-height:1.5;}
+.ds-modal.tom-perigo h2{color:var(--erro);}
+.ds-modal-acoes{display:flex;justify-content:flex-end;gap:8px;}
+
+/* ---------- toast — substitui alert() nativo. Ver DS.avisar() em design-system.js ---------- */
+.ds-toasts{
+  position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;
+  gap:8px;z-index:1100;max-width:360px;
+}
+.ds-toast{
+  background:var(--verde);color:#fff;border-radius:var(--raio);padding:12px 14px;
+  font-size:var(--tx-sm);box-shadow:0 8px 24px rgba(20,49,43,.2);
+  opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease;
+}
+.ds-toast.aberto{opacity:1;transform:translateY(0);}
+.ds-toast.tom-erro{background:var(--erro);}
+.ds-toast.tom-ok{background:var(--verde-med);}
+
+@media (prefers-reduced-motion: reduce){
+  .skeleton{animation:none;background:var(--linha);}
+  .ds-backdrop,.ds-modal,.ds-toast{transition:none;}
+}
+
+@media (max-width:480px){
+  .ds-toasts{left:16px;right:16px;bottom:16px;max-width:none;}
+}

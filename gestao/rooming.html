@@ -4,16 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sua hospedagem · CIO Cerrado</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="icon" href="assets/icons/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/icons/favicon-16x16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/design-system.js"></script>
 <style>
-:root{
-  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
-  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
-  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
-}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
@@ -47,11 +49,6 @@ button{font-family:inherit;cursor:pointer;}
 h1{font-family:'Archivo',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
 h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
 .sub{color:var(--suave);font-size:13.5px;margin:0 0 22px;}
-
-.cartao{
-  background:var(--superficie);border:1px solid var(--linha);
-  border-radius:var(--raio);padding:18px;margin-bottom:14px;
-}
 
 /* ---------- trilha de etapas (signature) ---------- */
 .trilha{margin:0 0 26px;}
@@ -382,19 +379,19 @@ sb.auth.onAuthStateChange(async (evento) => {
   if(evento !== "PASSWORD_RECOVERY") return;
   const nova = prompt("Digite a nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada. Use ela no próximo acesso.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada. Use ela no próximo acesso.", {tom: error ? "erro" : "ok"});
 });
 
 async function trocarMinhaSenha(){
   const nova = prompt("Nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada.", {tom: error ? "erro" : "ok"});
 }
 
 $("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
@@ -763,9 +760,10 @@ async function salvarRooming(){
   // Aviso, não bloqueio: sem a data o valor sai pela faixa padrão, e a
   // pessoa pode legitimamente não saber a data do acompanhante agora.
   const semData = lista.filter(p => !p.data_nascimento).length;
-  if(semData && !confirm(
+  if(semData && !(await DS.confirmar(
       `${semData} acompanhante(s) sem data de nascimento. ` +
-      `O valor será calculado pela faixa padrão e pode mudar depois. Continuar?`)) return;
+      `O valor será calculado pela faixa padrão e pode mudar depois. Continuar?`,
+      {titulo:"Continuar sem data de nascimento?"}))) return;
 
   const origem = $("#transfer-origem").value;
   const titularTransfer = $("#titular-transfer").checked;

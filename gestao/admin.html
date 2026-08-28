@@ -4,17 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Painel · CIO Cerrado</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="icon" href="assets/icons/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/icons/favicon-16x16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="assets/design-system.js"></script>
 <style>
-:root{
-  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
-  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
-  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
-}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{background:var(--papel);color:var(--texto);
@@ -43,8 +45,14 @@ button{font-family:inherit;cursor:pointer;}
   padding:2px 9px;margin-left:8px;text-transform:uppercase;letter-spacing:.04em;}
 
 .wrap{max-width:1120px;margin:0 auto;padding:22px 20px 80px;}
-.abas{display:flex;gap:2px;border-bottom:1px solid var(--linha);
+.abas{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--linha);
   margin-bottom:22px;overflow-x:auto;}
+/* agrupa as 15 abas por etapa do fluxo — eram uma fileira só, sem hierarquia
+   nenhuma entre "Painel" e "Preços". Ver auditoria de UX de 28/08/2026. */
+.aba-grupo{display:flex;align-items:center;gap:2px;flex:none;}
+.aba-grupo-rotulo{font-family:'IBM Plex Mono',monospace;font-size:10px;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--suave);
+  white-space:nowrap;padding-right:6px;opacity:.75;}
 .aba{background:none;border:none;border-bottom:2px solid transparent;
   padding:9px 13px;font-size:13.5px;color:var(--suave);white-space:nowrap;}
 .aba[aria-selected="true"]{color:var(--verde);border-bottom-color:var(--verde);font-weight:600;}
@@ -55,8 +63,6 @@ h1{font-family:'Archivo',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing
 h2{font-family:'Archivo',sans-serif;font-size:16px;margin:0 0 8px;}
 .sub{color:var(--suave);font-size:13px;margin:0 0 18px;}
 
-.cartao{background:var(--superficie);border:1px solid var(--linha);
-  border-radius:var(--raio);padding:15px;margin-bottom:12px;}
 .barra{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;}
 .barra > div{min-width:150px;}
 
@@ -71,7 +77,6 @@ input[type=text],input[type=email],input[type=file],select{
 .btn:disabled{background:#A9B5B0;cursor:not-allowed;}
 .btn.sec{background:transparent;color:var(--verde);border:1px solid var(--linha);}
 .btn.sec:hover{background:#F1F3EE;}
-.btn.mini{padding:4px 9px;font-size:12px;}
 .btn.perigo{background:transparent;color:var(--erro);border:1px solid #E4CFCB;}
 .btn.ok{background:var(--verde-med);}
 
@@ -82,6 +87,11 @@ th{text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:500;font-si
   background:var(--superficie);}
 td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
 .rolagem{max-height:520px;overflow:auto;}
+/* cancela o table{display:block;overflow-x:auto} do design system compartilhado
+   dentro do .rolagem: aqui quem já rola nos dois eixos é o próprio .rolagem —
+   se a tabela também virar contêiner de rolagem, o sticky do <th> passa a colar
+   nela em vez de colar no .rolagem, e para de funcionar. */
+.rolagem table{display:table;overflow:visible;max-width:none;width:auto;min-width:100%;}
 
 .selo{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;
   border-radius:20px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
@@ -154,24 +164,46 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
   </header>
   <div class="wrap">
     <div class="abas" role="tablist">
-      <button class="aba" role="tab" data-aba="painel" aria-selected="true">Painel</button>
-      <button class="aba" role="tab" data-aba="aprovacoes" aria-selected="false">Aprovações<span class="contador oculto" id="c-aprov"></span></button>
-      <button class="aba" role="tab" data-aba="cadastro" aria-selected="false">Cadastro<span class="contador oculto" id="c-sug"></span></button>
-      <button class="aba" role="tab" data-aba="quartos" aria-selected="false">Quartos</button>
-      <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
-      <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
-      <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
-      <button class="aba" role="tab" data-aba="pesquisa" aria-selected="false">Pesquisa</button>
-      <button class="aba" role="tab" data-aba="prospeccao" aria-selected="false">Prospecção</button>
-      <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
-      <button class="aba" role="tab" data-aba="relatorios" aria-selected="false">Relatórios</button>
-      <button class="aba" role="tab" data-aba="estrutura" aria-selected="false">Estrutura</button>
-      <button class="aba" role="tab" data-aba="patrocinadores" aria-selected="false">Patrocinadores</button>
-      <button class="aba" role="tab" data-aba="precos" aria-selected="false">Preços</button>
-      <button class="aba" role="tab" data-aba="equipe" aria-selected="false">Equipe</button>
+      <div class="aba-grupo">
+        <span class="aba-grupo-rotulo" aria-hidden="true">Visão geral</span>
+        <button class="aba" role="tab" data-aba="painel" aria-selected="true">Painel</button>
+      </div>
+      <div class="aba-grupo">
+        <span class="aba-grupo-rotulo" aria-hidden="true">Cadastro &amp; aprovação</span>
+        <button class="aba" role="tab" data-aba="aprovacoes" aria-selected="false">Aprovações<span class="contador oculto" id="c-aprov"></span></button>
+        <button class="aba" role="tab" data-aba="cadastro" aria-selected="false">Cadastro<span class="contador oculto" id="c-sug"></span></button>
+        <button class="aba" role="tab" data-aba="patrocinadores" aria-selected="false">Patrocinadores</button>
+      </div>
+      <div class="aba-grupo">
+        <span class="aba-grupo-rotulo" aria-hidden="true">Logística</span>
+        <button class="aba" role="tab" data-aba="quartos" aria-selected="false">Quartos</button>
+        <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
+        <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
+        <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
+        <button class="aba" role="tab" data-aba="estrutura" aria-selected="false">Estrutura</button>
+      </div>
+      <div class="aba-grupo">
+        <span class="aba-grupo-rotulo" aria-hidden="true">Financeiro</span>
+        <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
+        <button class="aba" role="tab" data-aba="precos" aria-selected="false">Preços</button>
+        <button class="aba" role="tab" data-aba="relatorios" aria-selected="false">Relatórios</button>
+      </div>
+      <div class="aba-grupo">
+        <span class="aba-grupo-rotulo" aria-hidden="true">Divulgação</span>
+        <button class="aba" role="tab" data-aba="pesquisa" aria-selected="false">Pesquisa</button>
+        <button class="aba" role="tab" data-aba="prospeccao" aria-selected="false">Prospecção</button>
+      </div>
+      <div class="aba-grupo">
+        <span class="aba-grupo-rotulo" aria-hidden="true">Equipe</span>
+        <button class="aba" role="tab" data-aba="equipe" aria-selected="false">Equipe</button>
+      </div>
     </div>
     <div id="aviso-global"></div>
-    <div id="conteudo"><p class="carregando">Carregando…</p></div>
+    <div id="conteudo">
+      <div class="skeleton skeleton-cartao" style="margin-bottom:8px;"></div>
+      <div class="skeleton skeleton-cartao" style="margin-bottom:8px;"></div>
+      <div class="skeleton skeleton-cartao"></div>
+    </div>
   </div>
 </div>
 
@@ -386,19 +418,19 @@ sb.auth.onAuthStateChange(async (evento) => {
   if(evento !== "PASSWORD_RECOVERY") return;
   const nova = prompt("Digite a nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada. Use ela no próximo acesso.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada. Use ela no próximo acesso.", {tom: error ? "erro" : "ok"});
 });
 
 async function trocarMinhaSenha(){
   const nova = prompt("Nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada.", {tom: error ? "erro" : "ok"});
 }
 $("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
 $("#btn-senha").addEventListener("click", trocarMinhaSenha);
@@ -509,7 +541,7 @@ const ABAS = {};
 
 ABAS.painel = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando painel…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
     // Pagina de verdade: com limite fixo de 500, um evento maior perderia
     // gente da lista sem avisar ninguem.
@@ -591,7 +623,7 @@ ABAS.painel = async function(){
 // =====================================================================
 ABAS.aprovacoes = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando fila…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
     const [pend, indic] = await Promise.all([
       rpc("admin_listar_pendentes",  { p_evento_slug: EVENTO }),
@@ -654,7 +686,7 @@ ABAS.aprovacoes = async function(){
 async function decidir(btn, aprovado){
   const tr = btn.closest("tr");
   const id = tr.dataset.id;
-  if(!aprovado && !confirm("Recusar este cadastro?")) return;
+  if(!aprovado && !(await DS.confirmar("O cadastro deixa de aparecer na fila de aprovação.", {titulo:"Recusar este cadastro?", tom:"perigo", textoConfirmar:"Recusar"}))) return;
 
   $$("button", tr).forEach(b => b.disabled = true);
   try{
@@ -713,7 +745,7 @@ ABAS.cadastro = async function(){
 
     <h2 style="margin-top:22px;">Sugestões para revisar</h2>
     <p class="sub">Trocas de empresa, gestores novos e divergências encontradas na base. Nada é aplicado sem sua aprovação.</p>
-    <div class="cartao" id="box-sug"><p class="carregando">Carregando…</p></div>
+    <div class="cartao" id="box-sug">${DS.skeletonCartoes(2)}</div>
 
     <h2 style="margin-top:22px;">Empresas</h2>
     <p class="sub">
@@ -1012,7 +1044,7 @@ ABAS.cadastro = async function(){
   let EMPRESAS_CACHE = [];
 
   const carregarEmpresas = async () => {
-    $("#emp-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    $("#emp-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
     try{
       EMPRESAS_CACHE = await rpc("admin_listar_empresas", {
         p_busca: $("#emp-busca").value || null,
@@ -1054,7 +1086,8 @@ ABAS.cadastro = async function(){
       }));
       $$("#emp-tabela .emp-remover").forEach(b => b.addEventListener("click", async () => {
         const e = EMPRESAS_CACHE.find(x => x.id === b.dataset.id);
-        if(!confirm(`Remover "${e.nome}"?\n\n${e.qtd_gestores} gestor(es) vinculado(s) continuam existindo — só perdem o vínculo com esta empresa.`)) return;
+        if(!(await DS.confirmar(`${e.qtd_gestores} gestor(es) vinculado(s) continuam existindo — só perdem o vínculo com esta empresa.`,
+            {titulo:`Remover "${e.nome}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
         try{
           await rpc("admin_remover_empresa", { p_id: e.id });
           carregarEmpresas(); carregarGestores();
@@ -1080,7 +1113,14 @@ ABAS.cadastro = async function(){
     $("#emp-site").value = ""; $("#emp-cancelar").style.display = "none";
   });
 
+  $("#emp-nome").addEventListener("input", () => DS.limparInvalido($("#emp-nome")));
+
   $("#emp-salvar").addEventListener("click", async () => {
+    if(!$("#emp-nome").value.trim()){
+      DS.marcarInvalido($("#emp-nome"), "Informe o nome da empresa.");
+      $("#emp-nome").focus();
+      return;
+    }
     const btn = $("#emp-salvar");
     btn.disabled = true;
     try{
@@ -1117,7 +1157,7 @@ ABAS.cadastro = async function(){
   });
 
   const carregarGestores = async () => {
-    $("#g-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    $("#g-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
     try{
       GESTORES_CACHE = await rpc("admin_listar_gestores", {
         ...filtrosGestores(), p_limite: G_PASSO, p_offset: G_OFFSET
@@ -1161,7 +1201,7 @@ ABAS.cadastro = async function(){
         }
         const achada = EMPRESAS_CACHE.find(e => e.nome.toLowerCase() === nomeEmpresa.trim().toLowerCase());
         if(!achada){
-          alert(`"${nomeEmpresa}" não está na lista de empresas cadastradas acima. Cadastre primeiro ou confira a grafia.`);
+          DS.avisar(`"${nomeEmpresa}" não está na lista de empresas cadastradas acima. Cadastre primeiro ou confira a grafia.`, {tom:"erro"});
           return;
         }
         try{
@@ -1298,7 +1338,7 @@ async function revisar(btn, aprovar){
 // =====================================================================
 ABAS.quartos = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando alocação…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
     const [pessoas, livres] = await Promise.all([
       rpc("admin_listar_alocacao", { p_evento_slug: EVENTO, p_apenas_sem_quarto:false }),
@@ -1421,7 +1461,7 @@ ABAS.etiquetas = async function(){
   let ETIQ = [];
 
   const carregar = async () => {
-    $("#e-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    $("#e-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
     try{
       ETIQ = await rpc("admin_etiquetas", {
         p_evento_slug: EVENTO,
@@ -1504,7 +1544,7 @@ ABAS.brindes = async function(){
   let BR = [];
 
   const carregar = async () => {
-    $("#br-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+    $("#br-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
     try{
       const [lista, resumo] = await Promise.all([
         rpc("admin_listar_brindes", {
@@ -1611,7 +1651,7 @@ ABAS.brindes = async function(){
 // =====================================================================
 ABAS.sessoes = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando sessões…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
     const sessoes = await rpc("admin_listar_sessoes", { p_evento_slug: EVENTO, p_tipo: null });
 
@@ -1647,7 +1687,7 @@ ABAS.sessoes = async function(){
 
 async function abrirSessao(id, s){
   const box = $("#s-detalhe");
-  box.innerHTML = `<p class="carregando">Carregando convidados…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   box.scrollIntoView({ behavior:"smooth", block:"nearest" });
 
   try{
@@ -1772,7 +1812,7 @@ async function puxarTudo(fn, extras={}, passo=500){
 
 async function relMailing(){
   const box = $("#box-mailing");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   try{
     const l = await puxarTudo("admin_rel_mailing");
     box.innerHTML = `
@@ -1794,7 +1834,7 @@ async function relMailing(){
 
 async function relPesquisa(){
   const box = $("#box-pesquisa");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   try{
     const l = await puxarTudo("admin_rel_pesquisa");
     box.innerHTML = `
@@ -1832,7 +1872,7 @@ const SELO_FAT = {
 
 ABAS.financeiro = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
 
   try{
     const r = await rpc("admin_financeiro_resumo", { p_evento_slug: EVENTO });
@@ -1913,7 +1953,7 @@ ABAS.financeiro = async function(){
     };
 
     const carregar = async () => {
-      $("#fi-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
+      $("#fi-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
       try{
         // pagina de verdade: uma edição com 130 CIOs e 61 patrocinadores
         // passa folgado do teto de 1000 linhas do Data API
@@ -1934,8 +1974,9 @@ ABAS.financeiro = async function(){
     ], "financeiro-cio-cerrado.xlsx", "Faturas"));
 
     $("#fi-recalcular").addEventListener("click", async () => {
-      if(!confirm("Recalcular as faturas estimadas deste evento?\n\n" +
-                  "As já emitidas, pagas ou canceladas não são tocadas.")) return;
+      if(!(await DS.confirmar(
+          "Todas as faturas ainda estimadas deste evento serão recalculadas. As já emitidas, pagas ou canceladas não são tocadas.",
+          {titulo:"Recalcular faturas do evento?", tom:"perigo", textoConfirmar:"Recalcular"}))) return;
       const b = $("#fi-recalcular");
       b.disabled = true; b.textContent = "Recalculando…";
       try{
@@ -1956,7 +1997,7 @@ ABAS.financeiro = async function(){
 
 async function verItens(tr){
   const box = $("#fi-detalhe");
-  box.innerHTML = `<p class="carregando">Carregando itens…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   box.scrollIntoView({ behavior:"smooth", block:"nearest" });
   try{
     const l = await rpc("admin_fatura_itens", { p_fatura_id: tr.dataset.id });
@@ -2061,7 +2102,7 @@ ABAS.estrutura = async function(){
   c.innerHTML = `
     <h1>Estrutura do evento</h1>
     <p class="sub">Dados do evento, cotas e inventário de quartos.</p>
-    <div id="bl-evento"><p class="carregando">Carregando…</p></div>
+    <div id="bl-evento">${DS.skeletonCartoes(2)}</div>
     <div id="bl-cotas"></div>
     <div id="bl-quartos"></div>
     <div id="bl-categorias"></div>`;
@@ -2255,6 +2296,8 @@ async function blocoCotas(){
       </div>`;
 
     $("#co-salvar").addEventListener("click", salvarCota);
+    $("#co-nome").addEventListener("input", () => DS.limparInvalido($("#co-nome")));
+    if($("#co-ordem")) $("#co-ordem").addEventListener("input", () => DS.limparInvalido($("#co-ordem")));
 
     $$(".co-editar").forEach(b => b.addEventListener("click", () => {
       const t = b.closest("tr").dataset;
@@ -2274,7 +2317,8 @@ async function blocoCotas(){
 
     $$(".co-apagar").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
-      if(!confirm(`Remover a cota "${tr.dataset.nome}"?`)) return;
+      if(!(await DS.confirmar("Esta ação não pode ser desfeita.",
+          {titulo:`Remover a cota "${tr.dataset.nome}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
       b.disabled = true;
       try{ await rpc("admin_remover_cota", { p_cota_id: tr.dataset.id }); blocoCotas(); }
       catch(e){ aviso("#co-aviso", explicar(e)); b.disabled = false; }
@@ -2293,7 +2337,7 @@ let COTA_UNICA = false;
 // e trocar o campo "cota" um por um.
 async function patrocinadoresDaCota(cotaId, cotaNome){
   const box = $("#co-detalhe");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   try{
     const todos = await rpc("admin_listar_patrocinadores", { p_evento_slug: EVENTO });
 
@@ -2332,12 +2376,20 @@ async function patrocinadoresDaCota(cotaId, cotaNome){
 
 async function salvarCota(){
   const nome  = $("#co-nome").value.trim();
-  if(!nome){ aviso("#co-aviso","Informe o nome da cota."); return; }
+  if(!nome){
+    DS.marcarInvalido($("#co-nome"), "Informe o nome da cota.");
+    $("#co-nome").focus();
+    return;
+  }
+  DS.limparInvalido($("#co-nome"));
 
   const ordem = COTA_UNICA ? 1 : parseInt($("#co-ordem")?.value, 10);
   if(!COTA_UNICA && (!ordem || ordem < 1)){
-    aviso("#co-aviso","A ordem começa em 1."); return;
+    DS.marcarInvalido($("#co-ordem"), "A ordem começa em 1.");
+    $("#co-ordem").focus();
+    return;
   }
+  if(!COTA_UNICA && $("#co-ordem")) DS.limparInvalido($("#co-ordem"));
 
   const quartos = {};
   [["single","#co-q-single"],["duplo","#co-q-duplo"],["triplo","#co-q-triplo"]]
@@ -2448,11 +2500,9 @@ async function blocoQuartos(){
       const de = $("#qt-de").value.trim(), ate = $("#qt-ate").value.trim();
       const tipo = $("#qt-tipo").value;
       if(!de || !ate){ aviso("#qt-aviso","Informe a faixa que quer corrigir."); return; }
-      if(!confirm(`Passar os quartos de ${de} a ${ate} para ${tipo}?
-
-` +
-                  `Só muda o tipo no inventário do hotel. Não altera o que ` +
-                  `cada patrocinador paga por quarto extra.`)) return;
+      if(!(await DS.confirmar(
+          "Só muda o tipo no inventário do hotel. Não altera o que cada patrocinador paga por quarto extra.",
+          {titulo:`Passar os quartos de ${de} a ${ate} para ${tipo}?`}))) return;
 
       const b = $("#qt-alterar");
       b.disabled = true; b.textContent = "Alterando…";
@@ -2541,11 +2591,10 @@ async function importarMapaResort(arquivo){
       return;
     }
 
-    if(!confirm(`Importar ${quartos.length} apartamento(s) e ` +
-                `${categorias.length} categoria(s)?\n\n` +
-                `Quartos que já existem têm prédio, andar, corredor e categoria ` +
-                `atualizados. Capacidade e tipo NÃO são tocados — quem os define ` +
-                `é a categoria, logo abaixo.`)) return;
+    if(!(await DS.confirmar(
+        "Quartos que já existem têm prédio, andar, corredor e categoria atualizados. " +
+        "Capacidade e tipo NÃO são tocados — quem os define é a categoria, logo abaixo.",
+        {titulo:`Importar ${quartos.length} apartamento(s) e ${categorias.length} categoria(s)?`}))) return;
 
     const r = await rpc("admin_importar_mapa_quartos", {
       p_evento_slug: EVENTO, p_categorias: categorias, p_quartos: quartos });
@@ -2622,7 +2671,7 @@ async function blocoCategorias(){
 // =====================================================================
 ABAS.patrocinadores = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
     const [lista, cotas] = await Promise.all([
       rpc("admin_listar_patrocinadores", { p_evento_slug: EVENTO }),
@@ -2726,6 +2775,7 @@ ABAS.patrocinadores = async function(){
       <div id="pt-detalhe"></div>`;
 
     $("#pt-salvar").addEventListener("click", salvarPatrocinador);
+    $("#pt-empresa").addEventListener("input", () => DS.limparInvalido($("#pt-empresa")));
 
     $("#pt-buscar").addEventListener("click", async () => {
       const nome = $("#pt-empresa").value.trim();
@@ -2807,7 +2857,8 @@ ABAS.patrocinadores = async function(){
 
     $$(".pt-apagar").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
-      if(!confirm(`Remover "${tr.dataset.empresa}"?`)) return;
+      if(!(await DS.confirmar("Esta ação não pode ser desfeita.",
+          {titulo:`Remover "${tr.dataset.empresa}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
       b.disabled = true;
       try{ await rpc("admin_remover_patrocinador", { p_id: tr.dataset.id }); ABAS.patrocinadores(); }
       catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
@@ -2822,7 +2873,12 @@ ABAS.patrocinadores = async function(){
 
 async function salvarPatrocinador(){
   const empresa = $("#pt-empresa").value.trim();
-  if(!empresa){ aviso("#pt-aviso","Informe a empresa."); return; }
+  if(!empresa){
+    DS.marcarInvalido($("#pt-empresa"), "Informe a empresa.");
+    $("#pt-empresa").focus();
+    return;
+  }
+  DS.limparInvalido($("#pt-empresa"));
 
   const b = $("#pt-salvar");
   b.disabled = true; b.textContent = "Salvando…";
@@ -2873,7 +2929,7 @@ async function pesquisarEmpresa(nome, site){
 
 async function abrirUsuarios(id, empresa){
   const box = $("#pt-detalhe");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   box.scrollIntoView({ behavior:"smooth", block:"nearest" });
 
   try{
@@ -2978,7 +3034,7 @@ ABAS.pesquisa = async function(){
         Quantos CIOs pretendem aumentar investimento em cada área nos próximos 12 meses.
         Clique numa linha para ver quem são.
       </p>
-      <div id="pq-areas"><p class="carregando">Carregando…</p></div>
+      <div id="pq-areas">${DS.skeletonCartoes(2)}</div>
       <div id="pq-detalhe"></div>
     </div>
 
@@ -3159,7 +3215,7 @@ async function areasPesquisa(){
 
 async function detalheArea(area){
   const box = $("#pq-detalhe");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   try{
     const l = await rpc("admin_pesquisa_por_area", {
       p_evento_slug: EVENTO, p_area: area, p_intencao: "aumentar" });
@@ -3185,7 +3241,7 @@ async function detalheArea(area){
 
 async function listarPesquisa(){
   const box = $("#pq-lista");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.innerHTML = DS.skeletonCartoes(3);
   try{
     const l = await puxarTudo("admin_rel_pesquisa");
     const semResposta = l.filter(x => !x.respondeu).length;
@@ -3248,7 +3304,7 @@ let PROSP_EXECS = "1";
 
 ABAS.prospeccao = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
     const [sessoes, rodadas, locais] = await Promise.all([
       rpc("admin_listar_sessoes", { p_evento_slug: EVENTO, p_tipo: "jantar" }),
@@ -3748,7 +3804,7 @@ ABAS.precos = async function(){
 
     <div class="cartao">
       <h2>Tabela atual</h2>
-      <div id="pr-lista"><p class="carregando">Carregando…</p></div>
+      <div id="pr-lista">${DS.skeletonCartoes(2)}</div>
     </div>`;
 
   $("#pr-salvar").addEventListener("click", salvarPreco);
@@ -3797,7 +3853,8 @@ async function listarPrecos(){
 
     $$("#pr-lista .apagar").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
-      if(!confirm(`Remover o preço "${tr.dataset.item}"?`)) return;
+      if(!(await DS.confirmar("Esta ação não pode ser desfeita.",
+          {titulo:`Remover o preço "${tr.dataset.item}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
       b.disabled = true;
       try{
         await rpc("admin_remover_preco", { p_preco_id: tr.dataset.id });
@@ -3877,7 +3934,7 @@ ABAS.equipe = async function(){
 
     <div class="cartao">
       <h2>Acessos ativos</h2>
-      <div id="eq-lista"><p class="carregando">Carregando…</p></div>
+      <div id="eq-lista">${DS.skeletonCartoes(2)}</div>
     </div>
 
     <div class="cartao">
@@ -3886,7 +3943,7 @@ ABAS.equipe = async function(){
         Avisos de inscrição aprovada, rooming confirmado e convites ficam aqui até serem
         enviados. O envio usa o Resend e precisa da chave configurada no projeto.
       </p>
-      <div id="nt-resumo"><p class="carregando">Carregando…</p></div>
+      <div id="nt-resumo">${DS.skeletonCartoes(2)}</div>
       <div id="nt-aviso"></div>
       <button class="btn sec" id="nt-teste">Enviar teste para mim</button>
       <button class="btn" id="nt-enviar" style="margin-left:6px;">Enviar toda a fila</button>
@@ -3931,12 +3988,11 @@ ABAS.equipe = async function(){
     // remetente — disparar tudo manda e-mail sobre fatos de semanas
     // atras. Vale dizer o tamanho do estrago antes.
     const r = await rpc("admin_notificacoes_resumo");
-    if(!confirm(
-      `Enviar ${r.enfileiradas} e-mail(s) agora?\n\n` +
-      `Vão para pessoas reais. Se houver avisos antigos na fila, elas receberão ` +
-      `mensagens sobre fatos que já passaram.\n\n` +
-      `Para só conferir a configuração, use "Enviar teste para mim".`
-    )) return;
+    if(!(await DS.confirmar(
+        `Vão para pessoas reais. Se houver avisos antigos na fila, elas receberão mensagens sobre fatos que já passaram. ` +
+        `Para só conferir a configuração, use "Enviar teste para mim".`,
+        {titulo:`Enviar ${r.enfileiradas} e-mail(s) agora?`, tom:"perigo", textoConfirmar:"Enviar agora"}
+    ))) return;
     b.disabled = true; b.textContent = "Enviando…";
     try{
       const { data, error } = await sb.functions.invoke("enviar-notificacoes", { body: {} });
@@ -4009,10 +4065,10 @@ async function listarEquipe(){
     $$("#eq-lista .resetar").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
       const email = tr.dataset.email;
-      if(!confirm(
-        `Enviar e-mail de redefinição de senha para ${email}?\n\n` +
-        `A pessoa recebe um link e escolhe a nova senha. Você não vê nem define a senha dela.`
-      )) return;
+      if(!(await DS.confirmar(
+        "A pessoa recebe um link e escolhe a nova senha. Você não vê nem define a senha dela.",
+        {titulo:`Enviar e-mail de redefinição para ${email}?`, textoConfirmar:"Enviar"}
+      ))) return;
       b.disabled = true; b.textContent = "Enviando…";
       try{
         const { error } = await sb.auth.resetPasswordForEmail(email, {
@@ -4027,7 +4083,8 @@ async function listarEquipe(){
 
     $$("#eq-lista .apagar").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
-      if(!confirm(`Remover o acesso de ${tr.dataset.email}?`)) return;
+      if(!(await DS.confirmar("Esta pessoa perde o acesso ao painel imediatamente.",
+          {titulo:`Remover o acesso de ${tr.dataset.email}?`, tom:"perigo", textoConfirmar:"Remover acesso"}))) return;
       b.disabled = true;
       try{
         await rpc("admin_remover_membro", { p_id: tr.dataset.id });

@@ -4,17 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Jantares · CIO Cerrado</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="icon" href="assets/icons/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/icons/favicon-16x16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/design-system.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <style>
-:root{
-  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
-  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
-  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
-}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{background:var(--papel);color:var(--texto);
@@ -43,8 +45,6 @@ h1{font-family:'Archivo',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing
 h2{font-family:'Archivo',sans-serif;font-size:16px;margin:0 0 8px;}
 .sub{color:var(--suave);font-size:13px;margin:0 0 18px;}
 
-.cartao{background:var(--superficie);border:1px solid var(--linha);
-  border-radius:var(--raio);padding:15px;margin-bottom:12px;}
 .cartao-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
 .barra{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;}
 .barra > div{min-width:150px;}
@@ -62,9 +62,14 @@ input[type=text],input[type=email],input[type=date],input[type=file],select{
 .btn:disabled{background:#A9B5B0;cursor:not-allowed;}
 .btn.sec{background:transparent;color:var(--verde);border:1px solid var(--linha);}
 .btn.sec:hover{background:#F1F3EE;}
-.btn.mini{padding:4px 9px;font-size:12px;}
 .btn.perigo{background:transparent;color:var(--erro);border:1px solid #E4CFCB;}
 .btn.ok{background:var(--verde-med);}
+/* dentro do modal (DS.confirmar) o botão de perigo precisa ser sólido,
+   não o outline que .btn.perigo já tem nesta página — especificidade
+   maior só aqui, sem tocar o CSS compartilhado (outra tarefa mexe nele
+   em paralelo, em admin.html). */
+.ds-modal .btn.perigo{background:var(--erro);color:#fff;border:none;}
+.ds-modal .btn.perigo:hover{background:#7F281E;}
 
 table{width:100%;border-collapse:collapse;font-size:13px;}
 th{text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:10.5px;
@@ -72,6 +77,13 @@ th{text-align:left;font-family:'IBM Plex Mono',monospace;font-weight:500;font-si
   border-bottom:1px solid var(--linha);padding:7px 6px;}
 td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
 .rolagem{max-height:480px;overflow:auto;}
+
+/* linha inteira clicável nas tabelas de seleção (prospecção, busca no
+   cadastro) — a caixinha de 13px era o único alvo de clique antes disso */
+tr.linha-clique{cursor:pointer;}
+tr.linha-clique:hover{background:#F4F6F1;}
+tr.linha-clique.marcada{background:rgba(20,49,43,.06);}
+tr.linha-clique.marcada:hover{background:rgba(20,49,43,.1);}
 
 .selo{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;
   border-radius:20px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
@@ -146,7 +158,11 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
       <button class="aba" role="tab" data-aba="estatisticas" aria-selected="false">Estatísticas</button>
     </div>
     <div id="aviso-global"></div>
-    <div id="conteudo"><p class="carregando">Carregando…</p></div>
+    <div id="conteudo">
+      <div class="skeleton skeleton-cartao" style="margin-bottom:8px;"></div>
+      <div class="skeleton skeleton-cartao" style="margin-bottom:8px;"></div>
+      <div class="skeleton skeleton-cartao"></div>
+    </div>
   </div>
 </div>
 
@@ -329,19 +345,19 @@ sb.auth.onAuthStateChange(async (evento) => {
   if(evento !== "PASSWORD_RECOVERY") return;
   const nova = prompt("Digite a nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada. Use ela no próximo acesso.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada. Use ela no próximo acesso.", {tom: error ? "erro" : "ok"});
 });
 
 async function trocarMinhaSenha(){
   const nova = prompt("Nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada.", {tom: error ? "erro" : "ok"});
 }
 $("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
 $("#btn-senha").addEventListener("click", trocarMinhaSenha);
@@ -377,7 +393,7 @@ const ABAS = {};
 // =====================================================================
 ABAS.agenda = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
     const l = await rpc("jantar_listar", {});
 
@@ -476,10 +492,13 @@ ABAS.agenda = async function(){
 // =====================================================================
 let J = null;
 let PROSP = [];
+// Guardado aqui pra reaproveitar em removerJantar() sem bater no banco de
+// novo só pra montar o texto da confirmação.
+let CONVIDADOS_ATUAL = [];
 
 async function abrirJantar(id){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando jantar…</p>`;
+  c.innerHTML = DS.skeletonCartoes(4);
   try{
     const [j] = await rpc("jantar_obter", { p_id: id });
     J = j;
@@ -617,7 +636,7 @@ async function desenharJantar(){
           <button class="btn sec mini" id="cv-exportar" title="Convidados ou só quem compareceu">Exportar mailing</button>
         </div>
       </div>
-      <div id="cv-lista"><p class="carregando">Carregando…</p></div>
+      <div id="cv-lista">${DS.skeletonLinhas(4, 30)}</div>
     </div>`;
 
   $("#voltar").addEventListener("click", ABAS.agenda);
@@ -671,7 +690,13 @@ async function salvarDadosJantar(){
 }
 
 async function removerJantar(){
-  if(!confirm(`Remover o jantar de ${J.patrocinador_nome}?`)) return;
+  const confirmados = CONVIDADOS_ATUAL.filter(c => c.status==="confirmado" || c.status==="compareceu").length;
+  const mensagem = confirmados > 0
+    ? `${confirmados} convidado(s) já confirmado(s) ou presente(s) serão desalocados. O histórico de convite é perdido — isso não pode ser desfeito.`
+    : `O histórico de convite é perdido — isso não pode ser desfeito.`;
+  if(!(await DS.confirmar(mensagem, {
+    titulo:`Remover o jantar de ${J.patrocinador_nome}?`, tom:"perigo", textoConfirmar:"Remover jantar"
+  }))) return;
   try{
     await rpc("jantar_remover", { p_id: J.id });
     ABAS.agenda();
@@ -826,10 +851,10 @@ function desenharProspeccaoJantar(){
 
   box.innerHTML = `
     <div style="margin-top:10px;">
-      <p class="meta" style="margin-bottom:8px;">${dentro.length} empresa(s) · ${nConv} convidado(s) selecionado(s)</p>
+      <p class="meta" id="pr-contagem" style="margin-bottom:8px;">${dentro.length} empresa(s) · ${nConv} convidado(s) selecionado(s)</p>
       <div class="rolagem"><table>
         <tr><th></th><th>Empresa</th><th>Executivos</th><th>Natureza</th><th>Aderência</th><th>Por quê</th></tr>
-        ${PROSP.map((r,i) => `<tr ${r.incluir?"":'style="opacity:.5"'}>
+        ${PROSP.map((r,i) => `<tr class="linha-clique${r.manter?" marcada":""}" data-i="${i}" ${r.incluir?"":'style="opacity:.5"'}>
           <td><input type="checkbox" class="pr-pick" data-i="${i}" ${r.manter?"checked":""}></td>
           <td><strong>${esc(r.empresa)}</strong>
               ${r.ja_convidado_em?`<br><span class="selo alerta">já em ${esc(r.ja_convidado_em)}</span>`:""}</td>
@@ -849,6 +874,17 @@ function desenharProspeccaoJantar(){
 
   $$(".pr-pick").forEach(c => c.addEventListener("change", e => {
     PROSP[e.target.dataset.i].manter = e.target.checked;
+    e.target.closest("tr").classList.toggle("marcada", e.target.checked);
+    const d2 = PROSP.filter(r=>r.manter && r.incluir);
+    $("#pr-contagem").textContent =
+      `${d2.length} empresa(s) · ${d2.reduce((n,r)=>n+assentosDe(r),0)} convidado(s) selecionado(s)`;
+  }));
+  // linha inteira clicável: clicar na caixinha em si não deve alternar duas vezes
+  $$("#pr-resultado tr.linha-clique").forEach(tr => tr.addEventListener("click", e => {
+    if(e.target.type === "checkbox") return;
+    const chk = tr.querySelector(".pr-pick");
+    chk.checked = !chk.checked;
+    chk.dispatchEvent(new Event("change"));
   }));
 
   if(!J.id){
@@ -953,7 +989,7 @@ async function buscarNaBase(){
          </div>
          <div class="rolagem" style="max-height:320px;"><table>
           <tr><th></th><th>Nome</th><th>Empresa</th><th>Cargo</th><th>Segmento</th><th>UF</th></tr>
-          ${l.map(g => `<tr data-id="${esc(g.id)}">
+          ${l.map(g => `<tr class="linha-clique" data-id="${esc(g.id)}">
             <td><input type="checkbox" class="bs-pick"></td>
             <td>${esc(g.nome)}</td>
             <td class="meta">${esc(g.empresa||"—")}</td>
@@ -979,11 +1015,24 @@ async function buscarNaBase(){
       b.textContent = n === 0 ? "Adicionar selecionados" : `Adicionar ${n} selecionado(s)`;
     };
 
-    $$("#bs-resultado .bs-pick").forEach(c => c.addEventListener("change", sincronizar));
+    $$("#bs-resultado .bs-pick").forEach(c => c.addEventListener("change", e => {
+      e.target.closest("tr").classList.toggle("marcada", e.target.checked);
+      sincronizar();
+    }));
     $("#bs-todos").addEventListener("change", e => {
-      $$("#bs-resultado .bs-pick").forEach(c => c.checked = e.target.checked);
+      $$("#bs-resultado .bs-pick").forEach(c => {
+        c.checked = e.target.checked;
+        c.closest("tr").classList.toggle("marcada", e.target.checked);
+      });
       sincronizar();
     });
+    // linha inteira clicável, mesmo padrão da tabela de prospecção
+    $$("#bs-resultado tr.linha-clique").forEach(tr => tr.addEventListener("click", e => {
+      if(e.target.type === "checkbox") return;
+      const chk = tr.querySelector(".bs-pick");
+      chk.checked = !chk.checked;
+      chk.dispatchEvent(new Event("change"));
+    }));
 
     $("#bs-exportar").addEventListener("click", () => exportar(
       l.map(g => ({ ...g, telefone: fone(g.telefone) })), [
@@ -1042,9 +1091,10 @@ const ROTULO_ST = { sugerido:"Sugerido", convidado:"Convidado",
 
 async function carregarConvidados(){
   const box = $("#cv-lista");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+  box.innerHTML = DS.skeletonLinhas(4, 30);
   try{
     const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
+    CONVIDADOS_ATUAL = l;
     box.innerHTML = l.length === 0
       ? `<div class="vazio">Nenhum convidado ainda.</div>`
       : `<div class="rolagem"><table>
@@ -1074,9 +1124,15 @@ async function carregarConvidados(){
     }));
     $$(".remover", box).forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
-      if(!confirm("Remover este convidado?")) return;
-      try{ await rpc("jantar_remover_convidado", { p_id: tr.dataset.id }); carregarConvidados(); }
-      catch(e){ aviso("#aviso-global", explicar(e)); }
+      const nome = tr.querySelector("td")?.textContent.trim() || "este convidado";
+      if(!(await DS.confirmar(`${nome} sai da lista deste jantar.`,
+          {titulo:"Remover convidado?", tom:"perigo", textoConfirmar:"Remover"}))) return;
+      try{
+        tr.style.opacity = ".4";
+        await rpc("jantar_remover_convidado", { p_id: tr.dataset.id });
+        carregarConvidados();
+      }
+      catch(e){ tr.style.opacity = ""; aviso("#aviso-global", explicar(e)); }
     }));
   }catch(e){ aviso(box, explicar(e)); }
 }
@@ -1134,12 +1190,12 @@ async function exportarMailing(){
     let lista = l, sufixo = "convidados";
 
     if(presentes.length > 0){
-      // com gente já presente, perguntar qual das duas listas se quer
-      lista = confirm(
-        `${presentes.length} de ${l.length} fizeram check-in.\n\n` +
-        `OK = exportar só quem compareceu\n` +
-        `Cancelar = exportar todos os convidados`
-      ) ? presentes : l;
+      // com gente já presente, perguntar qual das duas listas se quer —
+      // os botões dizem a própria escolha, em vez de OK/Cancelar genéricos
+      lista = (await DS.confirmar(
+        `${presentes.length} de ${l.length} fizeram check-in. Qual lista você quer exportar?`,
+        {titulo:"Exportar mailing", textoConfirmar:"Só quem compareceu", textoCancelar:"Todos os convidados"}
+      )) ? presentes : l;
       sufixo = lista === presentes ? "presentes" : "convidados";
     }
 
@@ -1237,7 +1293,7 @@ ABAS.sondagem = async function(){
 
 ABAS.estatisticas = async function(){
   const c = $("#conteudo");
-  c.innerHTML = `<p class="carregando">Carregando…</p>`;
+  c.innerHTML = DS.skeletonCartoes(2);
   try{
     const [freq, semConvite] = await Promise.all([
       rpc("jantar_estatisticas_gestores", { p_limite: 200 }),

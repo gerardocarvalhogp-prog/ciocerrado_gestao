@@ -4,16 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Check-in · CIO Cerrado</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="icon" href="assets/icons/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/icons/favicon-16x16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/design-system.js"></script>
 <style>
-:root{
-  --verde:#14312B; --verde-med:#1D6F5C; --ouro:#A8842C;
-  --papel:#FBFAF7; --superficie:#FFFFFF; --linha:#DDE0D8;
-  --texto:#243B35; --suave:#6B7C76; --erro:#9B3226; --raio:6px;
-}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{background:var(--papel);color:var(--texto);
@@ -174,7 +176,11 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
       </div>
     </div>
 
-    <div id="lista"><p class="carregando">Carregando…</p></div>
+    <div id="lista">
+      <div class="skeleton skeleton-cartao" style="margin-bottom:8px;"></div>
+      <div class="skeleton skeleton-cartao" style="margin-bottom:8px;"></div>
+      <div class="skeleton skeleton-cartao"></div>
+    </div>
   </div>
 </div>
 
@@ -332,19 +338,19 @@ sb.auth.onAuthStateChange(async (evento) => {
   if(evento !== "PASSWORD_RECOVERY") return;
   const nova = prompt("Digite a nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada. Use ela no próximo acesso.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada. Use ela no próximo acesso.", {tom: error ? "erro" : "ok"});
 });
 
 async function trocarMinhaSenha(){
   const nova = prompt("Nova senha (mínimo 8 caracteres):");
   if(!nova) return;
-  if(nova.length < 8){ alert("Senha muito curta."); return; }
+  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
-  alert(error ? ("Não consegui trocar a senha: " + error.message)
-              : "Senha alterada.");
+  DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
+              : "Senha alterada.", {tom: error ? "erro" : "ok"});
 }
 $("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
 $("#btn-senha").addEventListener("click", trocarMinhaSenha);
@@ -545,10 +551,13 @@ $("#n-cancelar").addEventListener("click", () => {
   $("#form-novo").classList.add("oculto");
 });
 
+$("#n-nome").addEventListener("input", () => DS.limparInvalido($("#n-nome")));
+
 $("#n-salvar").addEventListener("click", async () => {
   const nome = $("#n-nome").value.trim();
   if(!nome){
-    $("#n-aviso").innerHTML = `<div class="aviso erro">Informe o nome.</div>`;
+    DS.marcarInvalido($("#n-nome"), "Informe o nome.");
+    $("#n-nome").focus();
     return;
   }
 
