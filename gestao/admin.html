@@ -971,18 +971,43 @@ const ROTULO_SUG = {
   dado_divergente:"Dado divergente"
 };
 
+// Nome do campo como a pessoa chama, não como a coluna se chama.
+const CAMPO_HUMANO = {
+  empresa:"a empresa", cargo:"o cargo", email:"o e-mail",
+  telefone:"o telefone", segmento:"o segmento", cidade:"a cidade",
+  estado:"o estado", cnpj:"o CNPJ", perfil:"o perfil",
+  faturamento:"o faturamento", funcionarios:"o nº de funcionários",
+  linkedin:"o LinkedIn"
+};
+
+// "De → para" numa coluna é curto demais para decidir: quem revisa
+// precisa ler a mudança como frase, sem cruzar cabeçalho com célula.
+function frameMudanca(s){
+  const de   = (s.valor_atual   || "").trim();
+  const para = (s.valor_sugerido|| "").trim();
+  const campo = CAMPO_HUMANO[s.campo] || (s.campo ? `o campo ${s.campo}` : "o dado");
+
+  if(s.tipo === "troca_empresa")
+    return de
+      ? `Saiu de <strong>${esc(de)}</strong> e foi para <strong>${esc(para)}</strong>`
+      : `Passou a ter empresa <strong>${esc(para)}</strong>`;
+
+  if(!de)   return `Vai preencher ${campo}, hoje vazio, com <strong>${esc(para)}</strong>`;
+  if(!para) return `Vai apagar ${campo} (hoje <strong>${esc(de)}</strong>)`;
+  return `Muda ${campo} de <strong>${esc(de)}</strong> para <strong>${esc(para)}</strong>`;
+}
+
 async function carregarSugestoes(){
   try{
     const sug = await rpc("admin_listar_sugestoes", { p_status:"pendente" });
     $("#box-sug").innerHTML = sug.length === 0
       ? `<div class="vazio">Nada para revisar agora.</div>`
       : `<table>
-          <tr><th>Tipo</th><th>Quem</th><th>De → para</th><th>Confiança</th><th>Origem</th><th></th></tr>
+          <tr><th>Tipo</th><th>Quem</th><th>O que muda</th><th>Confiança</th><th>Origem</th><th></th></tr>
           ${sug.map(s => `<tr data-id="${esc(s.id)}">
             <td><span class="selo alerta">${esc(ROTULO_SUG[s.tipo]||s.tipo)}</span></td>
-            <td><strong>${esc(s.gestor_nome||s.empresa||"—")}</strong>
-                ${s.campo ? `<br><span class="meta">${esc(s.campo)}</span>` : ""}</td>
-            <td>${esc(s.valor_atual||"—")} → <strong>${esc(s.valor_sugerido||"—")}</strong>
+            <td><strong>${esc(s.gestor_nome||s.empresa||"—")}</strong></td>
+            <td>${frameMudanca(s)}
                 ${s.justificativa ? `<br><span class="meta">${esc(s.justificativa)}</span>` : ""}</td>
             <td class="confianca">${s.confianca != null ? s.confianca+"%" : "—"}</td>
             <td class="meta">${esc(s.fonte||"—")}</td>

@@ -389,7 +389,12 @@ ABAS.agenda = async function(){
             <td><span class="selo ${Number(j.confirmados)>=j.capacidade?"ok":"pend"}">${j.confirmados}/${j.capacidade}</span>
                 ${j.compareceram ? `<br><span class="meta">${j.compareceram} compareceu</span>` : ""}</td>
             <td><span class="selo ${j.status==="realizado"?"ok":j.status==="cancelado"?"erro":"alerta"}">${esc(j.status)}</span></td>
-            <td><button class="btn sec mini abrir" data-id="${esc(j.id)}">Abrir</button></td>
+            <td style="white-space:nowrap;">
+              <button class="btn sec mini abrir" data-id="${esc(j.id)}">Abrir</button>
+              ${(j.status !== "realizado" && j.status !== "cancelado")
+                ? `<button class="btn sec mini cancelar" data-id="${esc(j.id)}"
+                     data-nome="${esc(j.patrocinador)}">Cancelar</button>` : ""}
+            </td>
           </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nenhum jantar ainda.</td></tr>`}
         </table></div>
       </div>`;
@@ -416,6 +421,26 @@ ABAS.agenda = async function(){
     });
 
     $$(".abrir").forEach(b => b.addEventListener("click", () => abrirJantar(b.dataset.id)));
+
+    // cancelar direto da agenda: jantar que nao aconteceu nao deveria
+    // exigir abrir, trocar o seletor e salvar. Remover continua so
+    // dentro do jantar — apagar joga fora o historico de convite, que
+    // e o que alimenta "quem ja foi convidado antes".
+    $$(".cancelar").forEach(b => b.addEventListener("click", async () => {
+      const motivo = prompt(
+        `Cancelar o jantar de ${b.dataset.nome}?\n\n` +
+        `Os convidados e o histórico são preservados — o jantar só sai da agenda ativa.\n\n` +
+        `Motivo (opcional):`);
+      if(motivo === null) return;
+      b.disabled = true; b.textContent = "…";
+      try{
+        await rpc("jantar_cancelar", { p_id: b.dataset.id, p_motivo: motivo || null });
+        ABAS.agenda();
+      }catch(e){
+        aviso("#aviso-global", explicar(e));
+        b.disabled = false; b.textContent = "Cancelar";
+      }
+    }));
   }catch(e){ aviso(c, explicar(e)); }
 };
 
@@ -462,6 +487,15 @@ async function desenharJantar(){
         <div><label>Local</label><input type="text" id="jd-local" value="${esc(J.local||"")}"></div>
         <div style="max-width:110px;"><label>Capacidade</label><input type="text" id="jd-cap" value="${J.capacidade}"></div>
         <div><label>Perfil de convidado desejado</label><input type="text" id="jd-perfil" value="${esc(J.perfil_convidado||"")}"></div>
+      </div>
+      <div class="barra">
+        <div style="min-width:100%;"><label>Link do Sympla (inscrição)</label>
+          <input type="text" id="jd-sympla" placeholder="https://sympla.com.br/..."
+                 value="${esc(J.sympla_url||"")}">
+          ${J.sympla_url ? `<span class="meta">
+            <a href="${esc(J.sympla_url)}" target="_blank" rel="noopener">abrir a página de inscrição</a>
+          </span>` : ""}
+        </div>
       </div>
       <div id="jd-aviso"></div>
       <button class="btn sec" id="jd-salvar">Salvar</button>
@@ -578,7 +612,8 @@ async function salvarDadosJantar(){
       p_patrocinador_site: $("#jd-site").value.trim() || null,
       p_perfil_convidado: $("#jd-perfil").value.trim() || null,
       p_capacidade: parseInt($("#jd-cap").value,10) || 8,
-      p_status: $("#jd-status").value
+      p_status: $("#jd-status").value,
+      p_sympla_url: $("#jd-sympla").value.trim() || null
     });
     aviso("#jd-aviso","Salvo.","ok");
     await abrirJantar(J.id);
