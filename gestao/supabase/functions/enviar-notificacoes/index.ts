@@ -83,8 +83,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const limite = 50;
-    const fila = await rpc("notificacoes_pendentes", { p_limite: limite }, autorizacao);
+    // body.id opcional: envia SO aquela notificacao. Serve para testar
+    // a configuracao sem despejar a fila acumulada em cima de gente
+    // real, e para reenviar uma que falhou.
+    let alvo: string | null = null;
+    try {
+      const body = await req.json();
+      alvo = body?.id ?? null;
+    } catch { /* sem body = fila inteira, comportamento padrao */ }
+
+    const fila = await rpc(
+      "notificacoes_pendentes",
+      { p_limite: 50, p_id: alvo },
+      autorizacao,
+    );
 
     if (!Array.isArray(fila) || fila.length === 0) {
       return json({ ok: true, enviadas: 0, com_erro: 0, mensagem: "Nada na fila." });

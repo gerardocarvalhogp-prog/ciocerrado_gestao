@@ -3726,15 +3726,55 @@ ABAS.equipe = async function(){
       </p>
       <div id="nt-resumo"><p class="carregando">Carregando…</p></div>
       <div id="nt-aviso"></div>
-      <button class="btn" id="nt-enviar">Enviar agora</button>
+      <button class="btn sec" id="nt-teste">Enviar teste para mim</button>
+      <button class="btn" id="nt-enviar" style="margin-left:6px;">Enviar toda a fila</button>
+      <p class="meta" style="margin-top:8px;">
+        O teste manda uma mensagem só para o seu e-mail e não toca no resto da fila —
+        use para conferir a configuração antes de disparar avisos para outras pessoas.
+      </p>
     </div>`;
 
   $("#eq-salvar").addEventListener("click", salvarMembro);
   listarEquipe();
   carregarFilaEmail();
 
+  // Teste isolado: enfileira uma mensagem para o proprio usuario e
+  // dispara SO ela. Sem isso, a unica forma de testar seria mandar a
+  // fila inteira — que pode ter avisos antigos, para gente real.
+  $("#nt-teste").addEventListener("click", async () => {
+    const b = $("#nt-teste");
+    b.disabled = true; b.textContent = "Enviando…";
+    try{
+      const t = await rpc("admin_notificacao_teste");
+      const { data, error } = await sb.functions.invoke("enviar-notificacoes",
+        { body: { id: t.id } });
+      if(error) throw error;
+      if(data?.erro) throw new Error(data.erro);
+      aviso("#nt-aviso", data.enviadas
+        ? `Teste enviado para ${t.destinatario}. Se não chegar em alguns minutos, confira se o domínio está verificado no Resend.`
+        : `Não saiu: ${data.com_erro} com erro. Veja o detalhe na fila.`,
+        data.enviadas ? "ok" : "erro");
+      carregarFilaEmail();
+    }catch(e){
+      const m = explicar(e);
+      aviso("#nt-aviso", m.includes("RESEND")
+        ? "O envio não está configurado: falta a chave do Resend no projeto."
+        : m);
+    }finally{ b.disabled = false; b.textContent = "Enviar teste para mim"; }
+  });
+
   $("#nt-enviar").addEventListener("click", async () => {
     const b = $("#nt-enviar");
+    // a fila pode ter avisos antigos, represados de antes de existir
+    // remetente — disparar tudo manda e-mail sobre fatos de semanas
+    // atras. Vale dizer o tamanho do estrago antes.
+    const r = await rpc("admin_notificacoes_resumo");
+    if(!confirm(
+      `Enviar ${r.enfileiradas} e-mail(s) agora?\n\n` +
+      `Vão para pessoas reais. Se houver avisos antigos na fila, elas receberão ` +
+      `mensagens sobre fatos que já passaram.\n\n` +
+      `Para só conferir a configuração, use "Enviar teste para mim".`
+    )) return;
     b.disabled = true; b.textContent = "Enviando…";
     try{
       const { data, error } = await sb.functions.invoke("enviar-notificacoes", { body: {} });
