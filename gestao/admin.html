@@ -1951,6 +1951,17 @@ async function blocoEvento(){
           <div style="min-width:210px;"><label>Escolha das mesas abre em</label>
             <input type="datetime-local" id="ev-abre" value="${esc(paraInputHora(e.escolha_abre_em))}"></div>
         </div>
+        <div class="barra">
+          <div style="min-width:100%;"><label>Link de inscrição no Sympla</label>
+            <input type="text" id="ev-sympla" placeholder="https://sympla.com.br/..."
+                   value="${esc(e.sympla_url||"")}">
+            <span class="meta">
+              É este link que vai no convite dos indicados aprovados. Sem ele, o convite
+              não é enfileirado — um e-mail mandando se inscrever sem dizer onde é pior
+              que nenhum.
+            </span>
+          </div>
+        </div>
         <div id="ev-aviso"></div>
         <button class="btn" id="ev-salvar">Salvar evento</button>
         <button class="btn sec" id="ev-novo" style="margin-left:6px;">Novo evento</button>
@@ -1959,9 +1970,10 @@ async function blocoEvento(){
 
     $("#ev-novo").addEventListener("click", () => {
       // limpa tudo: se so trocasse o slug, o evento novo nasceria com as
-      // datas e prazos do anterior sem ninguem perceber
+      // datas e prazos do anterior sem ninguem perceber — e, pior, com o
+      // link de inscricao do evento antigo
       ["#ev-slug","#ev-nome","#ev-local","#ev-ini","#ev-fim",
-       "#ev-pc","#ev-pr","#ev-pcan"].forEach(s => $(s).value = "");
+       "#ev-pc","#ev-pr","#ev-pcan","#ev-sympla"].forEach(s => $(s).value = "");
       $("#ev-status").value = "rascunho";
       $("#ev-slug").focus();
       aviso("#ev-aviso",
@@ -1986,7 +1998,8 @@ async function blocoEvento(){
           // sem isso nenhuma janela de cota comeca a contar — e o
           // padrao seguro: o relogio so anda quando alguem diz que
           // a escolha abriu
-          p_escolha_abre_em: $("#ev-abre").value || null
+          p_escolha_abre_em: $("#ev-abre").value || null,
+          p_sympla_url: $("#ev-sympla").value.trim() || null
         });
         const novo = r.slug !== EVENTO;
         await carregarSeletorEventos();
@@ -3703,11 +3716,56 @@ ABAS.equipe = async function(){
     <div class="cartao">
       <h2>Acessos ativos</h2>
       <div id="eq-lista"><p class="carregando">Carregando…</p></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Fila de e-mails</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Avisos de inscrição aprovada, rooming confirmado e convites ficam aqui até serem
+        enviados. O envio usa o Resend e precisa da chave configurada no projeto.
+      </p>
+      <div id="nt-resumo"><p class="carregando">Carregando…</p></div>
+      <div id="nt-aviso"></div>
+      <button class="btn" id="nt-enviar">Enviar agora</button>
     </div>`;
 
   $("#eq-salvar").addEventListener("click", salvarMembro);
   listarEquipe();
+  carregarFilaEmail();
+
+  $("#nt-enviar").addEventListener("click", async () => {
+    const b = $("#nt-enviar");
+    b.disabled = true; b.textContent = "Enviando…";
+    try{
+      const { data, error } = await sb.functions.invoke("enviar-notificacoes", { body: {} });
+      if(error) throw error;
+      if(data?.erro) throw new Error(data.erro);
+      aviso("#nt-aviso",
+        `${data.enviadas} enviado(s)` +
+        (data.com_erro ? ` · ${data.com_erro} com erro` : "") + ".",
+        data.com_erro ? "erro" : "ok");
+      carregarFilaEmail();
+    }catch(e){
+      // erro mais provável aqui é a chave do Resend não estar configurada —
+      // vale dizer isso em vez de repassar a mensagem crua
+      const m = explicar(e);
+      aviso("#nt-aviso", m.includes("RESEND")
+        ? "O envio não está configurado: falta a chave do Resend no projeto."
+        : m);
+    }finally{ b.disabled = false; b.textContent = "Enviar agora"; }
+  });
 };
+
+async function carregarFilaEmail(){
+  try{
+    const r = await rpc("admin_notificacoes_resumo");
+    $("#nt-resumo").innerHTML = `<p class="meta" style="margin:0;">
+      <strong style="font-size:15px;color:var(--ouro);">${r.enfileiradas}</strong> na fila ·
+      ${r.enviadas} enviado(s)${r.com_erro ? ` · <span class="selo erro">${r.com_erro} com erro</span>` : ""}
+    </p>`;
+    $("#nt-enviar").disabled = Number(r.enfileiradas) === 0;
+  }catch(e){ aviso("#nt-resumo", explicar(e)); }
+}
 
 async function listarEquipe(){
   try{
@@ -3727,6 +3785,7 @@ async function listarEquipe(){
           <td class="meta">${dataBR(m.created_at)}</td>
           <td style="white-space:nowrap;">
             <button class="btn sec mini editar">Editar</button>
+            <button class="btn sec mini resetar">Redefinir senha</button>
             ${souEu ? "" : `<button class="btn perigo mini apagar">Remover</button>`}
           </td></tr>`;
       }).join("")}</table>`;
@@ -3738,6 +3797,30 @@ async function listarEquipe(){
       $("#eq-role").value  = tr.dataset.role;
       $("#eq-email").focus();
       window.scrollTo({ top:0, behavior:"smooth" });
+    }));
+
+    // Definir a senha de outra pessoa exigiria a Admin API do Supabase,
+    // que precisa da service_role — e essa chave nunca pode estar num
+    // .html estático (qualquer visitante leria). O caminho seguro é
+    // disparar o e-mail de redefinição: funciona com a chave pública,
+    // e só quem tem acesso à caixa de entrada define a senha nova.
+    $$("#eq-lista .resetar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const email = tr.dataset.email;
+      if(!confirm(
+        `Enviar e-mail de redefinição de senha para ${email}?\n\n` +
+        `A pessoa recebe um link e escolhe a nova senha. Você não vê nem define a senha dela.`
+      )) return;
+      b.disabled = true; b.textContent = "Enviando…";
+      try{
+        const { error } = await sb.auth.resetPasswordForEmail(email, {
+          redirectTo: location.origin + location.pathname
+        });
+        if(error) throw error;
+        aviso("#aviso-global", `Link de redefinição enviado para ${email}.`, "ok");
+      }catch(e){
+        aviso("#aviso-global", explicar(e));
+      }finally{ b.disabled = false; b.textContent = "Redefinir senha"; }
     }));
 
     $$("#eq-lista .apagar").forEach(b => b.addEventListener("click", async () => {
