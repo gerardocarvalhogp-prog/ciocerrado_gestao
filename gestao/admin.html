@@ -1741,7 +1741,10 @@ ABAS.financeiro = async function(){
         <tr><th>Quem</th><th>Tipo</th><th>Itens</th><th>Valor</th>
             <th>Status</th><th>Vencimento</th><th></th></tr>
         ${vis.map(f => `<tr data-id="${esc(f.id)}" data-nome="${esc(f.nome)}"
-                            data-status="${esc(f.status)}">
+                            data-status="${esc(f.status)}"
+                            data-vencimento="${esc(f.vencimento||"")}"
+                            data-forma="${esc(f.forma_pagamento||"")}"
+                            data-obs="${esc(f.observacao||"")}">
           <td><strong>${esc(f.nome)}</strong>
               ${f.empresa && f.empresa !== f.nome
                 ? `<br><span class="meta">${esc(f.empresa)}</span>` : ""}
@@ -1850,12 +1853,12 @@ function abrirMarcar(tr){
               `<option value="${s}" ${s===atual?"selected":""}>${ROTULO_FAT[s]}</option>`).join("")}
           </select></div>
         <div style="max-width:180px;"><label>Vencimento</label>
-          <input type="date" id="fm-venc"></div>
+          <input type="date" id="fm-venc" value="${esc(tr.dataset.vencimento||"")}"></div>
         <div style="max-width:200px;"><label>Forma de pagamento</label>
-          <input type="text" id="fm-forma" placeholder="Pix, boleto, transferência"></div>
+          <input type="text" id="fm-forma" placeholder="Pix, boleto, transferência" value="${esc(tr.dataset.forma||"")}"></div>
       </div>
       <div class="barra">
-        <div><label>Observação</label><input type="text" id="fm-obs"></div>
+        <div><label>Observação</label><input type="text" id="fm-obs" value="${esc(tr.dataset.obs||"")}"></div>
       </div>
       <div id="fm-aviso"></div>
       <button class="btn" id="fm-salvar">Salvar</button>
@@ -1872,6 +1875,16 @@ function abrirMarcar(tr){
     // aqui evita a pessoa preencher e o valor sumir sem explicação
     if(status === "paga" && !$("#fm-forma").value.trim()){
       aviso("#fm-aviso","Informe a forma de pagamento para marcar como paga.");
+      return;
+    }
+
+    // emitir é o ato que vira cobrança; sem vencimento a fatura não
+    // entra em nenhum controle de atraso. O banco também recusa —
+    // aqui é só para o aviso aparecer no formulário, e não como erro
+    // vindo do servidor depois do clique.
+    if(status === "emitida" && !$("#fm-venc").value && !tr.dataset.vencimento){
+      aviso("#fm-aviso","Informe a data de vencimento para emitir a fatura.");
+      $("#fm-venc").focus();
       return;
     }
 
@@ -2514,6 +2527,8 @@ ABAS.patrocinadores = async function(){
               </select></div>
             <div style="max-width:150px;"><label>Cidade</label><input type="text" id="pt-cidade"></div>
             <div style="max-width:80px;"><label>UF</label><input type="text" id="pt-estado"></div>
+            <div style="max-width:130px;"><label>Lounge</label>
+              <input type="text" id="pt-lounge" placeholder="Ex.: 12"></div>
           </div>
           <div class="barra">
             <div><label>O que vende (alimenta o match dos jantares)</label>
@@ -2543,7 +2558,7 @@ ABAS.patrocinadores = async function(){
                                 data-seg="${esc(p.segmento||"")}" data-vende="${esc(p.o_que_vende||"")}"
                                 data-site="${esc(p.site||"")}" data-resumo="${esc(p.resumo||"")}"
                                 data-natureza="${esc(p.natureza||"")}" data-cidade="${esc(p.cidade||"")}"
-                                data-estado="${esc(p.estado||"")}"
+                                data-estado="${esc(p.estado||"")}" data-lounge="${esc(p.lounge||"")}"
                                 data-extras="${p.quartos_extras||0}" data-mesa="${p.vagas_mesa_override??""}">
             <td><strong>${esc(p.empresa)}</strong>
                 ${p.site ? `<br><span class="meta">${esc(p.site)}</span>` : ""}
@@ -2613,6 +2628,7 @@ ABAS.patrocinadores = async function(){
       $("#pt-segmento").value = t.seg;    $("#pt-vende").value = t.vende;
       $("#pt-resumo").value = t.resumo;   $("#pt-natureza").value = t.natureza;
       $("#pt-cidade").value = t.cidade;   $("#pt-estado").value = t.estado;
+      $("#pt-lounge").value = t.lounge;
       $("#pt-extras").value = t.extras;   $("#pt-mesa").value = t.mesa;
       $("#pt-mais").open = true;
       $("#pt-empresa").focus();
@@ -2678,10 +2694,11 @@ async function salvarPatrocinador(){
       p_resumo: $("#pt-resumo").value.trim() || null,
       p_natureza: $("#pt-natureza").value || null,
       p_cidade: $("#pt-cidade").value.trim() || null,
-      p_estado: $("#pt-estado").value.trim().toUpperCase() || null
+      p_estado: $("#pt-estado").value.trim().toUpperCase() || null,
+      p_lounge: $("#pt-lounge").value.trim() || null
     });
     ["#pt-empresa","#pt-cnpj","#pt-segmento","#pt-vende","#pt-extras","#pt-mesa",
-     "#pt-site","#pt-resumo","#pt-cidade","#pt-estado"].forEach(s => $(s).value = "");
+     "#pt-site","#pt-resumo","#pt-cidade","#pt-estado","#pt-lounge"].forEach(s => $(s).value = "");
     $("#pt-natureza").value = "";
     ABAS.patrocinadores();
   }catch(e){ aviso("#pt-aviso", explicar(e)); }
