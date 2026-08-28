@@ -1035,19 +1035,39 @@ async function carregarConvidados(){
 // o filtro é por esse status. Os dados de contato vêm da listagem de
 // convidados, que é onde estão e-mail, telefone e cargo — o check-in
 // registra a presença, não o cadastro.
+// Exporta a lista do jantar. Nasceu como "lista de presentes" (só quem
+// deu check-in), o que faz sentido DEPOIS do jantar — mas antes dele
+// ninguém compareceu, e o botão simplesmente se recusava a exportar.
+// Na prática virava um beco: quem queria a lista para convidar não
+// tinha como tirar.
+//
+// Agora exporta os dois casos, e a coluna Status diz quem é quem.
 async function exportarMailing(){
   try{
     const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
-    const presentes = l.filter(c => c.status === "compareceu");
-    if(presentes.length === 0){
-      aviso("#aviso-global",
-        "Ninguém fez check-in neste jantar ainda — o mailing sairia vazio.");
+    if(l.length === 0){
+      aviso("#aviso-global", "Este jantar ainda não tem convidados.");
       return;
     }
-    exportar(presentes,
+
+    const presentes = l.filter(c => c.status === "compareceu");
+    let lista = l, sufixo = "convidados";
+
+    if(presentes.length > 0){
+      // com gente já presente, perguntar qual das duas listas se quer
+      lista = confirm(
+        `${presentes.length} de ${l.length} fizeram check-in.\n\n` +
+        `OK = exportar só quem compareceu\n` +
+        `Cancelar = exportar todos os convidados`
+      ) ? presentes : l;
+      sufixo = lista === presentes ? "presentes" : "convidados";
+    }
+
+    exportar(lista,
       [["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],["email","E-mail"],
-       ["telefone","Telefone"],["rotulo","Identificação"]],
-      `Mailing_${J.patrocinador_nome.replace(/\\W+/g,"_")}.xlsx`, "Mailing");
+       ["telefone","Telefone"],["rotulo","Identificação"],["status","Status"]],
+      `Mailing_${sufixo}_${(J.patrocinador_nome||"jantar").replace(/\W+/g,"_")}.xlsx`,
+      "Mailing");
   }catch(e){ aviso("#aviso-global", explicar(e)); }
 }
 
