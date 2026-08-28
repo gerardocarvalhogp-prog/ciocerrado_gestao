@@ -191,6 +191,23 @@ async function ia(prompt, { buscarWeb=false, json=false, maxTokens=2000 } = {}){
 }
 const dataBR = d => d ? String(d).split("T")[0].split("-").reverse().join("/") : "—";
 
+// O telefone e digitado a mao na planilha e chega em cinco formatos
+// diferentes: "62985240212", "62 3333-4444", "(62) 99251-8766",
+// "+55 62 99546-9620", "062984953347". Quem recebe o mailing precisa
+// discar, entao sai sempre como (DD) 9NNNN-NNNN.
+//
+// Se nao der para reconhecer o formato, devolve o original em vez de
+// inventar: numero errado no mailing e pior que numero feio.
+function fone(v){
+  if(!v) return "";
+  let d = String(v).replace(/\D/g, "");
+  if(d.length > 11 && d.startsWith("55")) d = d.slice(2);   // +55
+  if(d.length === 12 && d.startsWith("0")) d = d.slice(1);  // 0DD
+  if(d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if(d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return String(v).trim();
+}
+
 function exportar(linhas, colunas, nomeArquivo, nomeAba="Dados"){
   if(!linhas || linhas.length === 0){ aviso("#aviso-global","Não há dados para exportar."); return; }
   const dados = linhas.map(l => { const o={}; colunas.forEach(([c,t])=>o[t]=l[c]??""); return o; });
@@ -521,9 +538,14 @@ async function desenharJantar(){
       </p>
       <div class="barra">
         <div><label>Nome ou empresa</label><input type="text" id="bs-busca" placeholder="Digite para buscar…"></div>
-        <div style="max-width:170px;"><label>Perfil</label><select id="bs-perfil"><option value="">Todos</option></select></div>
-        <div style="max-width:190px;"><label>Segmento</label><select id="bs-segmento"><option value="">Todos</option></select></div>
-        <div style="max-width:100px;"><label>Estado</label><select id="bs-estado"><option value="">Todos</option></select></div>
+        <div style="max-width:190px;"><label>Perfil <span class="meta">(vários)</span></label>
+          <select id="bs-perfil" multiple size="4"></select></div>
+        <div style="max-width:200px;"><label>Segmento <span class="meta">(vários)</span></label>
+          <select id="bs-segmento" multiple size="4"></select></div>
+        <div style="max-width:200px;"><label>Cidade <span class="meta">(vários)</span></label>
+          <select id="bs-cidade" multiple size="4"></select></div>
+        <div style="max-width:110px;"><label>UF <span class="meta">(vários)</span></label>
+          <select id="bs-estado" multiple size="4"></select></div>
         <div style="min-width:auto;"><button class="btn sec" id="bs-buscar">Buscar</button></div>
       </div>
       <div id="bs-aviso"></div>
@@ -615,7 +637,7 @@ async function desenharJantar(){
   $("#bs-buscar").addEventListener("click", buscarNaBase);
   // trocar filtro re-busca na hora: o seletor e uma escolha deliberada,
   // nao vale esperar a pessoa achar o botao
-  ["#bs-perfil","#bs-segmento","#bs-estado"].forEach(s =>
+  ["#bs-perfil","#bs-segmento","#bs-cidade","#bs-estado"].forEach(s =>
     $(s).addEventListener("change", buscarNaBase));
   carregarFiltrosBase();
 
@@ -863,32 +885,48 @@ function desenharProspeccaoJantar(){
 }
 
 // Preenche os seletores com o que existe na base, em vez de lista
-// fixa — segmento e estado vem de dado digitado, entao inventar
-// opcoes daria filtro que nao casa com nada.
+// fixa — cidade e estado vem de dado digitado, entao inventar opcoes
+// daria filtro que nao casa com nada. (Segmento e a excecao: ali a
+// lista e fechada e vem da tabela `segmentos`, com os 14 itens da
+// planilha; o banco devolve inclusive os que ainda nao tem ninguem,
+// senao nunca daria para filtrar por eles.)
+//
+// Cada opcao mostra a contagem — "GOVERNO (275)" ajuda a escolher e
+// denuncia lixo de cadastro com contagem 1.
 async function carregarFiltrosBase(){
   try{
     const f = await rpc("admin_filtros_gestores", {});
     const encher = (sel, valores) => {
       const el = $(sel);
       if(!el) return;
-      el.innerHTML = `<option value="">Todos</option>` +
-        (valores||[]).map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+      el.innerHTML = (valores||[])
+        .map(o => `<option value="${esc(o.v)}">${esc(o.v)} (${o.n})</option>`).join("");
     };
     encher("#bs-perfil", f.perfis);
     encher("#bs-segmento", f.segmentos);
+    encher("#bs-cidade", f.cidades);
     encher("#bs-estado", f.estados);
   }catch(e){ /* filtro e conveniencia: sem ele a busca livre ainda funciona */ }
 }
 
+// Valores marcados num <select multiple>. Devolve [] quando nada esta
+// marcado, e o banco trata [] como "sem filtro".
+function marcados(sel){
+  const el = $(sel);
+  return el ? Array.from(el.selectedOptions).map(o => o.value) : [];
+}
+
 async function buscarNaBase(){
   const termo = $("#bs-busca").value.trim();
-  const perfil = $("#bs-perfil").value || null;
-  const segmento = $("#bs-segmento").value || null;
-  const estado = $("#bs-estado").value || null;
+  const perfis = marcados("#bs-perfil");
+  const segmentos = marcados("#bs-segmento");
+  const cidades = marcados("#bs-cidade");
+  const estados = marcados("#bs-estado");
+  const temFiltro = perfis.length || segmentos.length || cidades.length || estados.length;
 
   // sem nenhum critério a busca traria a base inteira; com filtro,
   // termo curto é legítimo ("todos os CIOs de saúde em GO")
-  if(termo.length < 3 && !perfil && !segmento && !estado){
+  if(termo.length < 3 && !temFiltro){
     $("#bs-resultado").innerHTML = "";
     aviso("#bs-aviso", termo.length ? "Digite ao menos 3 letras ou escolha um filtro." : "");
     return;
@@ -897,8 +935,8 @@ async function buscarNaBase(){
   $("#bs-resultado").innerHTML = `<p class="carregando">Buscando…</p>`;
   try{
     const l = await rpc("admin_listar_gestores", {
-      p_busca: termo || null, p_perfil: perfil,
-      p_segmento: segmento, p_estado: estado,
+      p_busca: termo || null, p_perfis: perfis,
+      p_segmentos: segmentos, p_cidades: cidades, p_estados: estados,
       p_limite: 200, p_offset: 0
     });
     const total = l.length ? Number(l[0].total_geral) : 0;
@@ -947,7 +985,8 @@ async function buscarNaBase(){
       sincronizar();
     });
 
-    $("#bs-exportar").addEventListener("click", () => exportar(l, [
+    $("#bs-exportar").addEventListener("click", () => exportar(
+      l.map(g => ({ ...g, telefone: fone(g.telefone) })), [
       ["nome","Nome"],["empresa","Empresa"],["cargo","Cargo"],["email","E-mail"],
       ["telefone","Telefone"],["segmento","Segmento"],["cidade","Cidade"],["estado","UF"]
     ], "convidados-possiveis.xlsx", "Convidados"));
@@ -1104,8 +1143,9 @@ async function exportarMailing(){
       sufixo = lista === presentes ? "presentes" : "convidados";
     }
 
-    exportar(lista,
-      [["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],["email","E-mail"],
+    exportar(lista.map(c => ({ ...c, telefone: fone(c.telefone) })),
+      [["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],["segmento","Segmento"],
+       ["cidade","Cidade"],["estado","UF"],["email","E-mail"],
        ["telefone","Telefone"],["rotulo","Identificação"],["status","Status"]],
       `Mailing_${sufixo}_${(J.patrocinador_nome||"jantar").replace(/\W+/g,"_")}.xlsx`,
       "Mailing");

@@ -242,6 +242,23 @@ const HOJE_ISO = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
   .toISOString().slice(0, 10);
 
 // Exporta qualquer lista para Excel, mantendo a ordem das colunas.
+// O telefone e digitado a mao na planilha e chega em cinco formatos
+// diferentes: "62985240212", "62 3333-4444", "(62) 99251-8766",
+// "+55 62 99546-9620", "062984953347". Quem recebe a lista precisa
+// discar, entao sai sempre como (DD) 9NNNN-NNNN.
+//
+// Se nao der para reconhecer o formato, devolve o original em vez de
+// inventar: numero errado numa lista de contato e pior que numero feio.
+function fone(v){
+  if(!v) return "";
+  let d = String(v).replace(/\D/g, "");
+  if(d.length > 11 && d.startsWith("55")) d = d.slice(2);   // +55
+  if(d.length === 12 && d.startsWith("0")) d = d.slice(1);  // 0DD
+  if(d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if(d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return String(v).trim();
+}
+
 function exportar(linhas, colunas, nomeArquivo, nomeAba="Dados"){
   if(!linhas || linhas.length === 0){
     aviso("#aviso-global","Não há dados para exportar."); return;
@@ -708,7 +725,8 @@ ABAS.cadastro = async function(){
       <div class="barra">
         <div><label>Nome</label><input type="text" id="emp-nome" placeholder="Nome da empresa"></div>
         <div><label>CNPJ</label><input type="text" id="emp-cnpj"></div>
-        <div><label>Segmento</label><input type="text" id="emp-segmento"></div>
+        <div><label>Segmento</label>
+          <select id="emp-segmento"><option value="">—</option></select></div>
         <div><label>Cidade</label><input type="text" id="emp-cidade"></div>
         <div style="max-width:70px;"><label>UF</label><input type="text" id="emp-estado" maxlength="2"></div>
         <div><label>Site</label><input type="text" id="emp-site" placeholder="https://"></div>
@@ -718,25 +736,57 @@ ABAS.cadastro = async function(){
       <button class="btn" id="emp-salvar">Salvar empresa</button>
       <button class="btn sec" id="emp-cancelar" style="margin-left:6px;display:none;">Cancelar edição</button>
     </div>
+    <p class="sub" style="margin-top:14px;">
+      Os filtros somam: dentro do mesmo campo os valores se juntam (agro <em>ou</em> varejo),
+      entre campos eles restringem (agro <em>e</em> Goiânia). Empresa recém-criada ainda pode
+      estar sem segmento — nesse caso o filtro olha os gestores dela.
+    </p>
     <div class="barra">
       <div><label>Buscar empresa</label><input type="text" id="emp-busca" placeholder="Nome da empresa"></div>
+      <div style="max-width:200px;"><label>Segmento <span class="meta">(vários)</span></label>
+        <select id="emp-f-segmento" multiple size="5"></select></div>
+      <div style="max-width:200px;"><label>Cidade <span class="meta">(vários)</span></label>
+        <select id="emp-f-cidade" multiple size="5"></select></div>
+      <div style="max-width:110px;"><label>UF <span class="meta">(vários)</span></label>
+        <select id="emp-f-estado" multiple size="5"></select></div>
+      <div style="max-width:200px;"><label>Com gestor de perfil <span class="meta">(vários)</span></label>
+        <select id="emp-f-perfil" multiple size="5"></select></div>
+      <div style="min-width:auto;">
+        <label class="check"><input type="checkbox" id="emp-f-comgestor"> Só com gestor</label>
+        <button class="btn sec mini" id="emp-f-limpar" style="margin-top:6px;">Limpar filtros</button>
+      </div>
     </div>
+    <div id="emp-resumo"></div>
     <div class="cartao"><div class="rolagem"><table id="emp-tabela"></table></div></div>
 
     <h2 style="margin-top:22px;">Todos os gestores <span class="escopo-global">todos os eventos</span></h2>
     <p class="sub">Base completa, incluindo fornecedores e quem ainda não tem e-mail cadastrado.</p>
+    <p class="sub">
+      Os filtros somam: dentro do mesmo campo os valores se juntam (agro <em>ou</em> varejo),
+      entre campos eles restringem (agro <em>e</em> Goiânia <em>e</em> perfil Gestor).
+      Segure Ctrl para marcar mais de um; o número ao lado é quanta gente tem aquele valor.
+    </p>
     <div class="barra">
       <div><label>Buscar</label><input type="text" id="g-busca" placeholder="Nome ou empresa"></div>
-      <div style="max-width:200px;"><label>Perfil</label>
-        <select id="g-perfil">
-          <option value="">Todos</option>
-          <option value="GESTOR">Gestor</option>
-          <option value="INFLUENCER">Influencer</option>
-          <option value="ANALISTA">Analista</option>
-          <option value="FORNECEDOR">Fornecedor</option>
-          <option value="ÁREA DE NEGÓCIO">Área de negócio</option>
-          <option value="CIO CERRADO">CIO Cerrado</option>
+      <div style="max-width:190px;"><label>Perfil <span class="meta">(vários)</span></label>
+        <select id="g-perfil" multiple size="5"></select></div>
+      <div style="max-width:200px;"><label>Segmento <span class="meta">(vários)</span></label>
+        <select id="g-segmento" multiple size="5"></select></div>
+      <div style="max-width:200px;"><label>Cidade <span class="meta">(vários)</span></label>
+        <select id="g-cidade" multiple size="5"></select></div>
+      <div style="max-width:110px;"><label>UF <span class="meta">(vários)</span></label>
+        <select id="g-estado" multiple size="5"></select></div>
+      <div style="max-width:170px;"><label>Posição <span class="meta">(vários)</span></label>
+        <select id="g-posicao" multiple size="5"></select></div>
+      <div style="max-width:170px;"><label>E-mail</label>
+        <select id="g-email">
+          <option value="">Tanto faz</option>
+          <option value="sim">Só com e-mail</option>
+          <option value="nao">Só sem e-mail</option>
         </select></div>
+    </div>
+    <div class="barra">
+      <div style="min-width:auto;"><button class="btn sec" id="g-limpar">Limpar filtros</button></div>
       <div style="min-width:auto;"><button class="btn sec" id="g-exportar">Exportar Excel</button></div>
       <div style="min-width:auto;"><button class="btn sec" id="g-etiquetas">Emitir etiquetas</button></div>
     </div>
@@ -914,6 +964,49 @@ ABAS.cadastro = async function(){
   });
 
   // ---------------------------------------------------------------
+  // FILTROS
+  //
+  // As opcoes vem do banco, nao de lista fixa no HTML. O <select> de
+  // perfil era escrito a mao aqui e ja estava incompleto: faltavam
+  // TRANSICAO, CLIENTE e OPORTUNIDADE, que existem na base — quem
+  // filtrasse por eles nao achava ninguem, sem saber por que.
+  //
+  // Segmento e a excecao ao "vem do que existe": ali a lista e fechada
+  // (os 14 itens da planilha, na tabela `segmentos`) e o banco devolve
+  // ate os que ainda nao tem ninguem.
+  // ---------------------------------------------------------------
+  const marcados = sel => {
+    const el = $(sel);
+    return el ? Array.from(el.selectedOptions).map(o => o.value) : [];
+  };
+
+  const carregarFiltros = async () => {
+    try{
+      const f = await rpc("admin_filtros_gestores", {});
+      const encher = (sel, valores) => {
+        const el = $(sel);
+        if(!el) return;
+        el.innerHTML = (valores||[])
+          .map(o => `<option value="${esc(o.v)}">${esc(o.v)} (${o.n})</option>`).join("");
+      };
+      encher("#g-perfil",     f.perfis);
+      encher("#g-segmento",   f.segmentos);
+      encher("#g-cidade",     f.cidades);
+      encher("#g-estado",     f.estados);
+      encher("#g-posicao",    f.posicoes);
+      encher("#emp-f-segmento", f.segmentos);
+      encher("#emp-f-cidade",   f.cidades);
+      encher("#emp-f-estado",   f.estados);
+      encher("#emp-f-perfil",   f.perfis);
+
+      // o formulario da empresa e escolha unica, e aceita vazio
+      const sel = $("#emp-segmento");
+      if(sel) sel.innerHTML = `<option value="">—</option>` +
+        (f.segmentos||[]).map(o => `<option value="${esc(o.v)}">${esc(o.v)}</option>`).join("");
+    }catch(e){ /* filtro e conveniencia: sem ele a busca livre ainda funciona */ }
+  };
+
+  // ---------------------------------------------------------------
   // EMPRESAS
   // ---------------------------------------------------------------
   let EMPRESAS_CACHE = [];
@@ -922,8 +1015,18 @@ ABAS.cadastro = async function(){
     $("#emp-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
     try{
       EMPRESAS_CACHE = await rpc("admin_listar_empresas", {
-        p_busca: $("#emp-busca").value || null, p_limite: 200, p_offset: 0
+        p_busca: $("#emp-busca").value || null,
+        p_segmentos: marcados("#emp-f-segmento"),
+        p_cidades:   marcados("#emp-f-cidade"),
+        p_estados:   marcados("#emp-f-estado"),
+        p_perfis:    marcados("#emp-f-perfil"),
+        p_so_com_gestores: $("#emp-f-comgestor").checked,
+        p_limite: 200, p_offset: 0
       });
+      const totalEmp = EMPRESAS_CACHE.length ? Number(EMPRESAS_CACHE[0].total_geral) : 0;
+      $("#emp-resumo").innerHTML = `<p class="meta">${totalEmp} empresa(s)` +
+        (totalEmp > EMPRESAS_CACHE.length
+          ? ` — mostrando as ${EMPRESAS_CACHE.length} primeiras.` : ".") + `</p>`;
       $("#emp-tabela").innerHTML = `
         <tr><th>Nome</th><th>Segmento</th><th>Cidade/UF</th><th>Gestores</th><th></th></tr>
         ${EMPRESAS_CACHE.map(e => `<tr>
@@ -961,6 +1064,15 @@ ABAS.cadastro = async function(){
   };
 
   $("#emp-busca").addEventListener("input", carregarEmpresas);
+  ["#emp-f-segmento","#emp-f-cidade","#emp-f-estado","#emp-f-perfil","#emp-f-comgestor"]
+    .forEach(s => $(s).addEventListener("change", carregarEmpresas));
+  $("#emp-f-limpar").addEventListener("click", () => {
+    $("#emp-busca").value = "";
+    ["#emp-f-segmento","#emp-f-cidade","#emp-f-estado","#emp-f-perfil"].forEach(s =>
+      Array.from($(s).options).forEach(o => o.selected = false));
+    $("#emp-f-comgestor").checked = false;
+    carregarEmpresas();
+  });
 
   $("#emp-cancelar").addEventListener("click", () => {
     $("#emp-id").value = ""; $("#emp-nome").value = ""; $("#emp-cnpj").value = "";
@@ -992,17 +1104,29 @@ ABAS.cadastro = async function(){
   const G_PASSO = 100;
   let GESTORES_CACHE = [];
 
+  const filtrosGestores = () => ({
+    p_busca: $("#g-busca").value || null,
+    p_perfis:    marcados("#g-perfil"),
+    p_segmentos: marcados("#g-segmento"),
+    p_cidades:   marcados("#g-cidade"),
+    p_estados:   marcados("#g-estado"),
+    p_posicoes:  marcados("#g-posicao"),
+    // tres estados: vazio nao filtra, "sim" so quem tem, "nao" so quem
+    // nao tem — e o null aqui e diferente de false
+    p_com_email: $("#g-email").value === "" ? null : $("#g-email").value === "sim"
+  });
+
   const carregarGestores = async () => {
     $("#g-tabela").innerHTML = `<tr><td class="carregando">Carregando…</td></tr>`;
     try{
       GESTORES_CACHE = await rpc("admin_listar_gestores", {
-        p_busca: $("#g-busca").value || null, p_perfil: $("#g-perfil").value || null,
-        p_limite: G_PASSO, p_offset: G_OFFSET
+        ...filtrosGestores(), p_limite: G_PASSO, p_offset: G_OFFSET
       });
       G_TOTAL = GESTORES_CACHE.length ? Number(GESTORES_CACHE[0].total_geral) : 0;
 
       $("#g-tabela").innerHTML = `
-        <tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th>E-mail</th><th>Perfil</th><th>LinkedIn</th><th></th></tr>
+        <tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th>E-mail</th><th>Perfil</th>
+            <th>Segmento</th><th>Cidade/UF</th><th>LinkedIn</th><th></th></tr>
         ${GESTORES_CACHE.map(g => `<tr data-id="${esc(g.id)}">
           <td>${esc(g.nome)}</td>
           <td class="g-empresa-cel">${esc(g.empresa||"—")}
@@ -1010,12 +1134,14 @@ ABAS.cadastro = async function(){
           <td class="meta">${esc(g.cargo||"—")}</td>
           <td class="meta">${g.email ? esc(g.email) : `<span class="selo pend">sem e-mail</span>`}</td>
           <td class="meta">${esc(g.perfil||"—")}</td>
+          <td class="meta">${esc(g.segmento||"—")}</td>
+          <td class="meta">${esc([g.cidade,g.estado].filter(Boolean).join("/")||"—")}</td>
           <td class="meta">${g.linkedin ? `<a href="${esc(g.linkedin)}" target="_blank" rel="noopener">perfil</a>` : "—"}</td>
           <td><button class="btn sec mini g-vincular">Vincular empresa</button></td>
         </tr>`).join("") ||
-        `<tr><td colspan="7" style="color:var(--suave)">Nenhum gestor com esse filtro.</td></tr>`}`;
+        `<tr><td colspan="9" style="color:var(--suave)">Nenhum gestor com esse filtro.</td></tr>`}`;
 
-      $("#g-resumo").innerHTML = `<p class="meta">${G_TOTAL} gestor(es) no total.</p>`;
+      $("#g-resumo").innerHTML = `<p class="meta">${G_TOTAL} gestor(es) no filtro atual.</p>`;
       $("#g-paginacao").innerHTML = G_TOTAL > G_PASSO
         ? `Mostrando ${G_OFFSET+1}–${Math.min(G_OFFSET+G_PASSO, G_TOTAL)} de ${G_TOTAL}
            <button class="btn sec mini" id="g-anterior" ${G_OFFSET===0?"disabled":""}>Anterior</button>
@@ -1047,7 +1173,14 @@ ABAS.cadastro = async function(){
   };
 
   $("#g-busca").addEventListener("input", () => { G_OFFSET = 0; carregarGestores(); });
-  $("#g-perfil").addEventListener("change", () => { G_OFFSET = 0; carregarGestores(); });
+  ["#g-perfil","#g-segmento","#g-cidade","#g-estado","#g-posicao","#g-email"].forEach(s =>
+    $(s).addEventListener("change", () => { G_OFFSET = 0; carregarGestores(); }));
+  $("#g-limpar").addEventListener("click", () => {
+    $("#g-busca").value = ""; $("#g-email").value = "";
+    ["#g-perfil","#g-segmento","#g-cidade","#g-estado","#g-posicao"].forEach(s =>
+      Array.from($(s).options).forEach(o => o.selected = false));
+    G_OFFSET = 0; carregarGestores();
+  });
 
   $("#g-exportar").addEventListener("click", async () => {
     const btn = $("#g-exportar");
@@ -1056,18 +1189,17 @@ ABAS.cadastro = async function(){
       let todos = [], offset = 0, total = null;
       while(total === null || offset < total){
         const p = await rpc("admin_listar_gestores", {
-          p_busca: $("#g-busca").value || null, p_perfil: $("#g-perfil").value || null,
-          p_limite: 500, p_offset: offset
+          ...filtrosGestores(), p_limite: 500, p_offset: offset
         });
         if(p.length === 0) break;
         if(total === null) total = Number(p[0].total_geral);
         todos = todos.concat(p);
         offset += 500;
       }
-      exportar(todos, [
+      exportar(todos.map(g => ({ ...g, telefone: fone(g.telefone) })), [
         ["nome","Nome"],["empresa","Empresa"],["cargo","Cargo"],["email","E-mail"],
-        ["telefone","Telefone"],["cidade","Cidade"],["estado","Estado"],
-        ["perfil","Perfil"],["linkedin","LinkedIn"]
+        ["telefone","Telefone"],["segmento","Segmento"],["cidade","Cidade"],["estado","UF"],
+        ["perfil","Perfil"],["posicao_gestor","Posição"],["linkedin","LinkedIn"]
       ], "gestores-cio-cerrado.xlsx", "Gestores");
     }finally{ btn.disabled = false; btn.textContent = "Exportar Excel"; }
   });
@@ -1082,6 +1214,10 @@ ABAS.cadastro = async function(){
   });
 
   carregarSugestoes();
+  // os seletores primeiro: as duas listagens leem o que esta marcado
+  // neles, e com <select> vazio a leitura da [] — que o banco entende
+  // como "sem filtro", entao a primeira carga sai correta de todo jeito
+  carregarFiltros();
   carregarEmpresas();
   carregarGestores();
 };
