@@ -133,6 +133,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
   <div class="wrap">
     <div class="abas" role="tablist">
       <button class="aba" role="tab" data-aba="agenda" aria-selected="true">Agenda</button>
+      <button class="aba" role="tab" data-aba="sondagem" aria-selected="false">Sondagem</button>
       <button class="aba" role="tab" data-aba="estatisticas" aria-selected="false">Estatísticas</button>
     </div>
     <div id="aviso-global"></div>
@@ -540,6 +541,10 @@ async function desenharJantar(){
       </p>
       <div class="barra">
         <div><label>Nome ou empresa</label><input type="text" id="bs-busca" placeholder="Digite para buscar…"></div>
+        <div style="max-width:170px;"><label>Perfil</label><select id="bs-perfil"><option value="">Todos</option></select></div>
+        <div style="max-width:190px;"><label>Segmento</label><select id="bs-segmento"><option value="">Todos</option></select></div>
+        <div style="max-width:100px;"><label>Estado</label><select id="bs-estado"><option value="">Todos</option></select></div>
+        <div style="min-width:auto;"><button class="btn sec" id="bs-buscar">Buscar</button></div>
       </div>
       <div id="bs-aviso"></div>
       <div id="bs-resultado"></div>
@@ -591,6 +596,13 @@ async function desenharJantar(){
     clearTimeout(bsDebounce);
     bsDebounce = setTimeout(buscarNaBase, 350);
   });
+  $("#bs-busca").addEventListener("keydown", e => { if(e.key==="Enter") buscarNaBase(); });
+  $("#bs-buscar").addEventListener("click", buscarNaBase);
+  // trocar filtro re-busca na hora: o seletor e uma escolha deliberada,
+  // nao vale esperar a pessoa achar o botao
+  ["#bs-perfil","#bs-segmento","#bs-estado"].forEach(s =>
+    $(s).addEventListener("change", buscarNaBase));
+  carregarFiltrosBase();
 
   const sincHib = () => { $("#pr-hib").disabled = !$("#pr-priv").checked; };
   $("#pr-priv").addEventListener("change", sincHib);
@@ -636,8 +648,11 @@ async function rodarProspeccaoJantar(){
 
   try{
     status("Buscando empresas na base…");
+    // J.id null = sondagem avulsa (aba Sondagem): jantar_base aceita
+    // null e passa a analisar a base inteira, sem excluir "quem ja
+    // esta neste jantar" — que e o certo quando jantar nao existe
     let base = await rpc("jantar_base", {
-      p_jantar_id: J.id,
+      p_jantar_id: J.id || null,
       p_excluir_fornecedores: $("#pr-forn").checked,
       p_excluir_convidados: $("#pr-hist").checked,
       p_limite: 500
@@ -738,10 +753,14 @@ Responda APENAS um array JSON, sem markdown, um objeto por empresa:
     }
     saida.sort((a,b)=>b.score-a.score);
 
-    // vagas restantes = capacidade menos quem ja esta confirmado/compareceu
-    const jaOcupados = (await rpc("jantar_convidados_listar",{p_jantar_id:J.id}))
-      .filter(c => c.status==="confirmado" || c.status==="compareceu").length;
-    const restantes = Math.max(J.capacidade - jaOcupados, 0);
+    // vagas restantes = capacidade menos quem ja esta confirmado/compareceu.
+    // Na sondagem avulsa nao ha jantar nem capacidade: nada limita, o
+    // objetivo e ver o potencial inteiro antes de decidir se cria.
+    const jaOcupados = J.id
+      ? (await rpc("jantar_convidados_listar",{p_jantar_id:J.id}))
+          .filter(c => c.status==="confirmado" || c.status==="compareceu").length
+      : 0;
+    const restantes = J.id ? Math.max(J.capacidade - jaOcupados, 0) : Number.MAX_SAFE_INTEGER;
     const execs = $("#pr-execs").value;
     let vagas=0;
     for(const r of saida){
@@ -753,7 +772,7 @@ Responda APENAS um array JSON, sem markdown, um objeto por empresa:
 
     PROSP = saida;
     $("#pr-status").innerHTML="";
-    if(restantes === 0) aviso("#pr-aviso","O jantar já está com todas as vagas ocupadas — nada foi marcado para manter.","erro");
+    if(J.id && restantes === 0) aviso("#pr-aviso","O jantar já está com todas as vagas ocupadas — nada foi marcado para manter.","erro");
     desenharProspeccaoJantar();
   }catch(e){
     $("#pr-status").innerHTML="";
@@ -783,12 +802,32 @@ function desenharProspeccaoJantar(){
           <td class="meta">${esc(r.just||"—")}</td>
         </tr>`).join("")}
       </table></div>
-      <button class="btn" id="pr-salvar" style="margin-top:10px;">Salvar selecionados como convidados</button>
+      ${J.id
+        ? `<button class="btn" id="pr-salvar" style="margin-top:10px;">Salvar selecionados como convidados</button>`
+        : `<button class="btn sec" id="pr-exportar" style="margin-top:10px;">Exportar relatório</button>
+           <span class="meta" style="margin-left:8px;">
+             Sondagem não grava convidado — crie o jantar na Agenda e traga a seleção de lá.
+           </span>`}
     </div>`;
 
   $$(".pr-pick").forEach(c => c.addEventListener("change", e => {
     PROSP[e.target.dataset.i].manter = e.target.checked;
   }));
+
+  if(!J.id){
+    // sondagem: o produto e o relatorio, nao o convidado gravado
+    $("#pr-exportar").addEventListener("click", () => exportar(
+      PROSP.filter(r => r.manter && r.incluir), [
+        ["empresa","Empresa"],["segmento","Segmento"],["natureza","Natureza"],
+        ["score","Aderência"],["just","Por quê"],
+        ["exec1_nome","Executivo"],["exec1_cargo","Cargo"],
+        ["exec1_email","E-mail"],["exec1_telefone","Telefone"],
+        ["cidade","Cidade"],["estado","UF"],["faturamento","Faturamento"],
+        ["ja_convidado_em","Já convidado em"]
+      ], `sondagem-${(J.patrocinador_nome||"patrocinador").toLowerCase().replace(/[^a-z0-9]+/g,"-")}.xlsx`,
+      "Sondagem"));
+    return;
+  }
 
   $("#pr-salvar").addEventListener("click", async () => {
     const b = $("#pr-salvar");
@@ -808,45 +847,117 @@ function desenharProspeccaoJantar(){
   });
 }
 
+// Preenche os seletores com o que existe na base, em vez de lista
+// fixa — segmento e estado vem de dado digitado, entao inventar
+// opcoes daria filtro que nao casa com nada.
+async function carregarFiltrosBase(){
+  try{
+    const f = await rpc("admin_filtros_gestores", {});
+    const encher = (sel, valores) => {
+      const el = $(sel);
+      if(!el) return;
+      el.innerHTML = `<option value="">Todos</option>` +
+        (valores||[]).map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    };
+    encher("#bs-perfil", f.perfis);
+    encher("#bs-segmento", f.segmentos);
+    encher("#bs-estado", f.estados);
+  }catch(e){ /* filtro e conveniencia: sem ele a busca livre ainda funciona */ }
+}
+
 async function buscarNaBase(){
   const termo = $("#bs-busca").value.trim();
-  if(termo.length < 3){
+  const perfil = $("#bs-perfil").value || null;
+  const segmento = $("#bs-segmento").value || null;
+  const estado = $("#bs-estado").value || null;
+
+  // sem nenhum critério a busca traria a base inteira; com filtro,
+  // termo curto é legítimo ("todos os CIOs de saúde em GO")
+  if(termo.length < 3 && !perfil && !segmento && !estado){
     $("#bs-resultado").innerHTML = "";
-    if(termo.length > 0) aviso("#bs-aviso","Digite ao menos 3 letras.");
-    else aviso("#bs-aviso","");
+    aviso("#bs-aviso", termo.length ? "Digite ao menos 3 letras ou escolha um filtro." : "");
     return;
   }
   aviso("#bs-aviso","");
   $("#bs-resultado").innerHTML = `<p class="carregando">Buscando…</p>`;
   try{
-    const l = await rpc("admin_listar_gestores", { p_busca: termo, p_limite: 15, p_offset: 0 });
+    const l = await rpc("admin_listar_gestores", {
+      p_busca: termo || null, p_perfil: perfil,
+      p_segmento: segmento, p_estado: estado,
+      p_limite: 200, p_offset: 0
+    });
+    const total = l.length ? Number(l[0].total_geral) : 0;
+
     $("#bs-resultado").innerHTML = l.length === 0
-      ? `<div class="vazio">Ninguém encontrado com esse termo.</div>`
-      : `<div class="rolagem" style="max-height:260px;"><table>
-          <tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th></th></tr>
+      ? `<div class="vazio">Ninguém encontrado com esses critérios.</div>`
+      : `<div class="barra" style="margin-top:10px;margin-bottom:6px;">
+           <div style="min-width:auto;"><label class="check">
+             <input type="checkbox" id="bs-todos"> Marcar todos os ${l.length} visíveis</label></div>
+           <div style="min-width:auto;">
+             <button class="btn" id="bs-add-lote" disabled>Adicionar selecionados</button></div>
+           <div style="min-width:auto;">
+             <button class="btn sec" id="bs-exportar">Exportar lista</button></div>
+         </div>
+         <div class="rolagem" style="max-height:320px;"><table>
+          <tr><th></th><th>Nome</th><th>Empresa</th><th>Cargo</th><th>Segmento</th><th>UF</th></tr>
           ${l.map(g => `<tr data-id="${esc(g.id)}">
+            <td><input type="checkbox" class="bs-pick"></td>
             <td>${esc(g.nome)}</td>
             <td class="meta">${esc(g.empresa||"—")}</td>
             <td class="meta">${esc(g.cargo||"—")}</td>
-            <td><button class="btn sec mini bs-add">Adicionar</button></td>
+            <td class="meta">${esc(g.segmento||"—")}</td>
+            <td class="meta">${esc(g.estado||"—")}</td>
           </tr>`).join("")}
         </table></div>
-        ${l.length >= 15 ? `<p class="meta" style="margin-top:6px;">Mostrando os 15 primeiros — refine a busca se não achou.</p>` : ""}`;
+        <p class="meta" style="margin-top:6px;">
+          ${total > l.length
+            ? `Mostrando ${l.length} de ${total} — refine os filtros para ver o resto.`
+            : `${total} encontrado(s).`}</p>`;
 
-    $$("#bs-resultado .bs-add").forEach(b => b.addEventListener("click", async (ev) => {
-      const tr = ev.target.closest("tr");
+    if(l.length === 0) return;
+
+    const marcados = () => $$("#bs-resultado .bs-pick:checked")
+      .map(c => c.closest("tr").dataset.id);
+
+    const sincronizar = () => {
+      const n = marcados().length;
+      const b = $("#bs-add-lote");
+      b.disabled = n === 0;
+      b.textContent = n === 0 ? "Adicionar selecionados" : `Adicionar ${n} selecionado(s)`;
+    };
+
+    $$("#bs-resultado .bs-pick").forEach(c => c.addEventListener("change", sincronizar));
+    $("#bs-todos").addEventListener("change", e => {
+      $$("#bs-resultado .bs-pick").forEach(c => c.checked = e.target.checked);
+      sincronizar();
+    });
+
+    $("#bs-exportar").addEventListener("click", () => exportar(l, [
+      ["nome","Nome"],["empresa","Empresa"],["cargo","Cargo"],["email","E-mail"],
+      ["telefone","Telefone"],["segmento","Segmento"],["cidade","Cidade"],["estado","UF"]
+    ], "convidados-possiveis.xlsx", "Convidados"));
+
+    $("#bs-add-lote").addEventListener("click", async () => {
+      const ids = marcados();
+      if(!ids.length) return;
+      const b = $("#bs-add-lote");
       b.disabled = true; b.textContent = "Adicionando…";
       try{
-        await rpc("jantar_adicionar_convidado_existente", {
-          p_jantar_id: J.id, p_gestor_id: tr.dataset.id, p_rotulo: "CONVIDADO"
+        const r = await rpc("jantar_adicionar_convidados_existentes", {
+          p_jantar_id: J.id, p_gestor_ids: ids, p_rotulo: "CONVIDADO"
         });
-        aviso("#bs-aviso", `${tr.querySelector("td").innerText} adicionado.`, "ok");
         carregarConvidados();
+        // re-buscar primeiro: buscarNaBase limpa o aviso ao começar, então
+        // a confirmação tem que vir depois, senão some antes de ser lida
+        await buscarNaBase();
+        aviso("#bs-aviso",
+          `${r.adicionados} adicionado(s)` +
+          (r.ja_estavam ? ` · ${r.ja_estavam} já estava(m) na lista` : "") + ".", "ok");
       }catch(e){
         aviso("#bs-aviso", explicar(e));
-        b.disabled = false; b.textContent = "Adicionar";
+        sincronizar();
       }
-    }));
+    });
   }catch(e){ aviso("#bs-resultado", explicar(e)); }
 }
 
@@ -943,6 +1054,86 @@ async function exportarMailing(){
 // =====================================================================
 // ABA: ESTATISTICAS
 // =====================================================================
+// =====================================================================
+// ABA: SONDAGEM
+//
+// Prospectar um patrocinador em POTENCIAL, antes de existir jantar.
+// Reaproveita o mesmo caminho da prospecção do jantar (jantar_base +
+// análise por IA), só que com J sintético e sem id — jantar_base
+// aceita null e passa a olhar a base inteira.
+//
+// Não grava convidado: o produto aqui é o relatório que vai para a
+// conversa comercial. Se o jantar acontecer, ele é criado na Agenda e
+// a seleção é refeita lá, já com capacidade de verdade.
+// =====================================================================
+ABAS.sondagem = async function(){
+  $("#conteudo").innerHTML = `
+    <h1>Sondagem de patrocinador</h1>
+    <p class="sub">
+      Roda a mesma análise de aderência da prospecção, sem precisar criar o jantar.
+      Serve para levar número para a conversa: quantas empresas da base combinam
+      com o que esse patrocinador vende.
+    </p>
+
+    <div class="cartao">
+      <div class="barra">
+        <div><label>Patrocinador em potencial</label>
+          <input type="text" id="so-patro" placeholder="Nome da empresa"></div>
+        <div><label>Site (ajuda a IA a entender o que ela vende)</label>
+          <input type="text" id="so-site" placeholder="https://"></div>
+        <div><label>Perfil de convidado desejado</label>
+          <input type="text" id="so-perfil" placeholder="Ex.: CIOs de indústria"></div>
+      </div>
+
+      <div class="barra">
+        <div style="min-width:280px;"><label>Abrangência geográfica</label>
+          <input type="text" id="pr-abr" value="Grande Brasília (DF + entorno)"></div>
+        <div style="max-width:170px;"><label>Faturamento mínimo</label>
+          <input type="text" id="pr-fatmin" placeholder="Ex.: 500 milhões"></div>
+        <div style="max-width:200px;"><label>Executivos por empresa</label>
+          <select id="pr-execs">
+            <option value="1">Só o 1º executivo</option>
+            <option value="2">1º e 2º executivo</option>
+          </select></div>
+      </div>
+      <div class="barra">
+        <div><label class="check"><input type="checkbox" id="pr-priv" checked> Só empresas privadas</label></div>
+        <div><label class="check"><input type="checkbox" id="pr-hib" checked> Incluir híbridas</label></div>
+        <div><label class="check"><input type="checkbox" id="pr-forn" checked> Excluir fornecedores</label></div>
+        <div><label class="check"><input type="checkbox" id="pr-hist"> Excluir quem já foi convidado antes</label></div>
+      </div>
+      <div class="barra">
+        <div style="min-width:100%;"><label>Observações (opcional)</label>
+          <input type="text" id="pr-obs"></div>
+      </div>
+
+      <button class="btn" id="pr-rodar">Analisar</button>
+      <span class="meta" style="margin-left:8px;">Pesquisa o patrocinador na web e pontua cada empresa da base.</span>
+      <div id="pr-aviso"></div>
+      <div id="pr-status"></div>
+      <div id="pr-resultado"></div>
+    </div>`;
+
+  const sincHib = () => { $("#pr-hib").disabled = !$("#pr-priv").checked; };
+  $("#pr-priv").addEventListener("change", sincHib);
+  sincHib();
+
+  $("#pr-rodar").addEventListener("click", () => {
+    const nome = $("#so-patro").value.trim();
+    if(!nome){ aviso("#pr-aviso","Informe o patrocinador que você quer sondar."); return; }
+    // J sintético, sem id: é o que faz jantar_base analisar a base
+    // inteira e o resto do fluxo pular o que depende de jantar
+    J = {
+      id: null,
+      patrocinador_nome: nome,
+      patrocinador_site: $("#so-site").value.trim() || null,
+      perfil_convidado:  $("#so-perfil").value.trim() || null,
+      capacidade: 0
+    };
+    rodarProspeccaoJantar();
+  });
+};
+
 ABAS.estatisticas = async function(){
   const c = $("#conteudo");
   c.innerHTML = `<p class="carregando">Carregando…</p>`;
