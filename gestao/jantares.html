@@ -442,9 +442,14 @@ ABAS.agenda = async function(){
         </table></div>
       </div>`;
 
+    $("#j-patro").addEventListener("input", () => DS.limparInvalido($("#j-patro")));
     $("#j-salvar").addEventListener("click", async () => {
       const nome = $("#j-patro").value.trim();
-      if(!nome){ aviso("#j-aviso","Informe o patrocinador."); return; }
+      if(!nome){
+        DS.marcarInvalido($("#j-patro"), "Informe o patrocinador.");
+        $("#j-patro").focus();
+        return;
+      }
       const b = $("#j-salvar");
       b.disabled = true; b.textContent = "Criando…";
       try{
@@ -640,9 +645,11 @@ async function desenharJantar(){
     </div>`;
 
   $("#voltar").addEventListener("click", ABAS.agenda);
+  $("#jd-patro").addEventListener("input", () => DS.limparInvalido($("#jd-patro")));
   $("#jd-salvar").addEventListener("click", salvarDadosJantar);
   $("#jd-remover").addEventListener("click", removerJantar);
   $("#pr-rodar").addEventListener("click", rodarProspeccaoJantar);
+  $("#av-nome").addEventListener("input", () => DS.limparInvalido($("#av-nome")));
   $("#av-salvar").addEventListener("click", salvarAvulso);
   $("#cv-exportar").addEventListener("click", exportarMailing);
   $("#cv-etiquetas").addEventListener("click", exportarEtiquetasJantar);
@@ -668,12 +675,18 @@ async function desenharJantar(){
 }
 
 async function salvarDadosJantar(){
+  const nome = $("#jd-patro").value.trim();
+  if(!nome){
+    DS.marcarInvalido($("#jd-patro"), "Informe o patrocinador.");
+    $("#jd-patro").focus();
+    return;
+  }
   const b = $("#jd-salvar");
   b.disabled = true; b.textContent = "Salvando…";
   try{
     await rpc("jantar_salvar", {
       p_id: J.id,
-      p_patrocinador_nome: $("#jd-patro").value.trim(),
+      p_patrocinador_nome: nome,
       p_data: $("#jd-data").value || null,
       p_horario: $("#jd-hora").value || null,
       p_local: $("#jd-local").value.trim() || null,
@@ -1066,7 +1079,11 @@ async function buscarNaBase(){
 
 async function salvarAvulso(){
   const nome = $("#av-nome").value.trim();
-  if(!nome){ aviso("#av-aviso","Informe o nome."); return; }
+  if(!nome){
+    DS.marcarInvalido($("#av-nome"), "Informe o nome.");
+    $("#av-nome").focus();
+    return;
+  }
   const b = $("#av-salvar");
   b.disabled = true; b.textContent = "Adicionando…";
   try{
@@ -1275,9 +1292,14 @@ ABAS.sondagem = async function(){
   $("#pr-priv").addEventListener("change", sincHib);
   sincHib();
 
+  $("#so-patro").addEventListener("input", () => DS.limparInvalido($("#so-patro")));
   $("#pr-rodar").addEventListener("click", () => {
     const nome = $("#so-patro").value.trim();
-    if(!nome){ aviso("#pr-aviso","Informe o patrocinador que você quer sondar."); return; }
+    if(!nome){
+      DS.marcarInvalido($("#so-patro"), "Informe o patrocinador que você quer sondar.");
+      $("#so-patro").focus();
+      return;
+    }
     // J sintético, sem id: é o que faz jantar_base analisar a base
     // inteira e o resto do fluxo pular o que depende de jantar
     J = {
