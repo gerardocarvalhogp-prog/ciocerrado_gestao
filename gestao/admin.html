@@ -669,6 +669,22 @@ ABAS.cadastro = async function(){
       <div id="imp-previa"></div>
     </div>
 
+    <div class="cartao">
+      <h2>Importar inscritos do Sympla <span class="escopo-global" style="background:#E4F0EA;color:var(--verde-med);">este evento</span></h2>
+      <p class="sub" style="margin-bottom:12px;">
+        Suba o export <strong>Lista de participantes</strong> do Sympla. São os confirmados de
+        verdade — quem entra aqui passa a aparecer no check-in. Quem está como
+        <strong>Cancelado</strong> no Sympla não é criado; se já existia, é cancelado aqui também.
+        Reimportar o mesmo arquivo atualiza, não duplica.
+      </p>
+      <div class="barra">
+        <div><label>Arquivo (.xlsx ou .csv)</label><input type="file" id="arq-sympla" accept=".xlsx,.xls,.csv"></div>
+        <div style="min-width:auto;"><button class="btn" id="btn-sympla" disabled>Importar inscritos</button></div>
+      </div>
+      <div id="sy-aviso"></div>
+      <div id="sy-previa"></div>
+    </div>
+
     <h2 style="margin-top:22px;">Sugestões para revisar</h2>
     <p class="sub">Trocas de empresa, gestores novos e divergências encontradas na base. Nada é aplicado sem sua aprovação.</p>
     <div class="cartao" id="box-sug"><p class="carregando">Carregando…</p></div>
@@ -789,6 +805,103 @@ ABAS.cadastro = async function(){
     }finally{
       btn.disabled = false; btn.textContent = "Importar";
     }
+  });
+
+  // ---------------------------------------------------------------
+  // IMPORTAR INSCRITOS DO SYMPLA
+  //
+  // O export do Sympla tem ~100 colunas (UTM, user agent, respostas da
+  // pesquisa inteira). Aqui só interessam as que identificam a pessoa
+  // e dizem se a inscrição vale — o resto do questionário entra pela
+  // aba Pesquisa, que é outro fluxo.
+  // ---------------------------------------------------------------
+  let SYMPLA = [];
+
+  // O cabeçalho do Sympla vem com acento, maiúscula e às vezes
+  // corrompido na exportação, então casa por prefixo sem acento.
+  const acha = (linha, ...alternativas) => {
+    const chaves = Object.keys(linha);
+    for(const alvo of alternativas){
+      const a = alvo.toLowerCase();
+      const k = chaves.find(c => c.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+        .replace(/[^a-z0-9]/g,"")
+        .startsWith(a.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"")));
+      if(k && String(linha[k]).trim() !== "") return String(linha[k]).trim();
+    }
+    return "";
+  };
+
+  $("#arq-sympla").addEventListener("change", async ev => {
+    const f = ev.target.files[0];
+    if(!f) return;
+    try{
+      const wb  = XLSX.read(await f.arrayBuffer(), { type:"array" });
+      const cru = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:"" });
+
+      SYMPLA = cru.map(l => ({
+        nome: [acha(l,"Nome"), acha(l,"Sobrenome")].filter(Boolean).join(" ").trim(),
+        email: acha(l,"Email"),
+        email_corporativo: acha(l,"E-MAIL CORPORATIVO","EMAIL CORPORATIVO"),
+        empresa: acha(l,"Empresa"),
+        cargo: acha(l,"Cargo"),
+        telefone: acha(l,"Telefone Celular","Telefone"),
+        cpf: acha(l,"CPF"),
+        cnpj: acha(l,"CNPJ"),
+        sympla_id: acha(l,"N ingresso","Numero ingresso","Ordem de inscricao"),
+        tipo_ingresso: acha(l,"Tipo de ingresso"),
+        estado_pagamento: acha(l,"Estado de pagamento")
+      })).filter(l => l.nome || l.email);
+
+      const aprov = SYMPLA.filter(l => l.estado_pagamento.toLowerCase()==="aprovado").length;
+      const canc  = SYMPLA.filter(l => l.estado_pagamento.toLowerCase()==="cancelado").length;
+      const outros = SYMPLA.length - aprov - canc;
+
+      $("#sy-previa").innerHTML = `
+        <p class="meta" style="margin-top:10px;">
+          ${SYMPLA.length} linha(s) · <strong>${aprov} aprovado(s)</strong>
+          ${canc ? ` · ${canc} cancelado(s)` : ""}${outros ? ` · ${outros} em outro estado` : ""}
+        </p>
+        <div class="rolagem" style="max-height:200px;margin-top:8px;">
+          <table><tr><th>Nome</th><th>E-mail usado</th><th>Empresa</th><th>Pagamento</th></tr>
+          ${SYMPLA.slice(0,15).map(l => `<tr>
+            <td>${esc(l.nome||"—")}</td>
+            <td class="meta">${esc(l.email_corporativo || l.email || "—")}</td>
+            <td class="meta">${esc(l.empresa||"—")}</td>
+            <td><span class="selo ${l.estado_pagamento.toLowerCase()==="aprovado"?"ok":"pend"}">${esc(l.estado_pagamento||"—")}</span></td>
+          </tr>`).join("")}</table>
+        </div>`;
+      $("#btn-sympla").disabled = SYMPLA.length === 0;
+      aviso("#sy-aviso","");
+    }catch(e){
+      aviso("#sy-aviso","Não foi possível ler o arquivo. Confira se é o export do Sympla.");
+    }
+  });
+
+  $("#btn-sympla").addEventListener("click", async () => {
+    const btn = $("#btn-sympla");
+    btn.disabled = true; btn.textContent = "Importando…";
+    try{
+      const r = await rpc("admin_importar_participantes_sympla", {
+        p_evento_slug: EVENTO, p_linhas: SYMPLA });
+      aviso("#sy-aviso",
+        `${r.criados} inscrito(s) novo(s), ${r.atualizados} atualizado(s)` +
+        (r.cancelados ? `, ${r.cancelados} cancelado(s)` : "") +
+        (r.gestores_novos ? ` · ${r.gestores_novos} entraram também no cadastro geral` : "") +
+        (r.erros ? ` · ${r.erros} ignorado(s)` : "") + ".",
+        r.erros ? "erro" : "ok");
+
+      if(r.erros && r.detalhe_erros?.length){
+        $("#sy-previa").innerHTML = `<table style="margin-top:10px;">
+          <tr><th>Linha</th><th>Nome</th><th>Motivo</th></tr>
+          ${r.detalhe_erros.map(d => `<tr>
+            <td class="meta">${d.linha}</td><td>${esc(d.nome||"—")}</td>
+            <td><span class="selo erro">${esc(d.motivo)}</span></td></tr>`).join("")}</table>`;
+      }
+      carregarGestores();
+      atualizarContadores();
+    }catch(e){ aviso("#sy-aviso", explicar(e)); }
+    finally{ btn.disabled = false; btn.textContent = "Importar inscritos"; }
   });
 
   // ---------------------------------------------------------------
@@ -2206,7 +2319,7 @@ function lerMapaResort(wb){
   const cats = new Map();
   const quartos = [];
   const semAcento = t => String(t ?? "").normalize("NFD")
-    .replace(/[̀-ͯ]/g,"").toUpperCase();
+    .replace(/[\u0300-\u036f]/g,"").toUpperCase();
 
   wb.SheetNames.forEach(nome => {
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[nome], { header:1, defval:"" });
