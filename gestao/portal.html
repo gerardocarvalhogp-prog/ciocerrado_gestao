@@ -43,8 +43,9 @@ button{font-family:inherit;cursor:pointer;}
   display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
   font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;
 }
-.topo-dir{display:flex;align-items:center;gap:12px;font-size:13px;}
-.topo-dir .quem{font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.85;}
+.topo-dir{display:flex;align-items:center;gap:12px;font-size:13px;flex-wrap:wrap;}
+.topo-dir .quem{font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.85;
+  overflow-wrap:anywhere;min-width:0;}
 .sair{
   background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
   border-radius:var(--raio);padding:5px 11px;font-size:12px;
