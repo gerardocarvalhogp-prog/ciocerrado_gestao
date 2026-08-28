@@ -12,10 +12,9 @@
 // — melhor falhar visivel do que fingir que enviou):
 //
 //   supabase secrets set RESEND_API_KEY=re_...
-//   supabase secrets set REMETENTE="CIO Cerrado <eventos@ciocerrado.com.br>"
 //
-// O dominio precisa estar verificado no Resend, senao o Resend aceita a
-// chamada e o e-mail nao chega.
+// So isso: o remetente (contato@ciocerrado.com.br) ja e o padrao no
+// codigo. A conta do Resend e a do gerardocarvalhogp@gmail.com.
 //
 // COMO CHAMAR
 //
@@ -29,7 +28,16 @@
 // =====================================================================
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const REMETENTE  = Deno.env.get("REMETENTE") ?? "CIO Cerrado <onboarding@resend.dev>";
+
+// Remetente oficial. Fica como padrao no codigo para nao depender de
+// mais um secret — REMETENTE so precisa existir se um dia mudar.
+//
+// ATENCAO: ciocerrado.com.br precisa estar VERIFICADO no Resend (os
+// registros SPF/DKIM no DNS). Sem isso o Resend aceita a chamada,
+// devolve 200, e o e-mail nao chega em ninguem — falha silenciosa, a
+// pior de todas. O dominio fica na Skymail, entao os registros entram
+// no painel de DNS de la, nao no Google.
+const REMETENTE  = Deno.env.get("REMETENTE") ?? "CIO Cerrado <contato@ciocerrado.com.br>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
