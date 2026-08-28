@@ -24,7 +24,7 @@ button{font-family:inherit;cursor:pointer;}
 :focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
 
 .topo{background:var(--verde);color:#fff;padding:12px 16px;
-  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
   position:sticky;top:0;z-index:10;}
 .marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;}
 .marca span{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
@@ -46,6 +46,14 @@ button{font-family:inherit;cursor:pointer;}
 
 /* busca grande: uso no balcão, muitas vezes no celular */
 .busca{position:sticky;top:56px;background:var(--papel);padding:10px 0;z-index:9;}
+/* abaixo de 640px o cabeçalho quebra em 2-3 linhas (nav + usuário) — a altura
+   real deixa de bater com os 56px fixos aqui em cima, e a busca sobrepõe o
+   cabeçalho ao rolar. Mais simples que medir altura em JS: o cabeçalho para
+   de ser sticky e a busca assume o topo sozinha. */
+@media (max-width:640px){
+  .topo{position:static;}
+  .busca{top:0;}
+}
 #termo{width:100%;padding:13px 14px;border:2px solid var(--linha);
   border-radius:var(--raio);font-family:inherit;font-size:17px;
   background:var(--superficie);color:var(--texto);}
