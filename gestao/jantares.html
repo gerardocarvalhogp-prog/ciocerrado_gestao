@@ -512,6 +512,27 @@ async function abrirJantar(id){
   }catch(e){ aviso(c, explicar(e)); }
 }
 
+// Convidados vindos do export do Sympla daquele jantar especifico ---
+// mesmo formato de planilha do importador do evento principal (aba
+// Cadastro do admin.html), mesma logica de casamento por e-mail.
+let JANTAR_SYMPLA = [];
+
+// O cabecalho do Sympla vem com acento, maiuscula e as vezes corrompido
+// na exportacao, entao casa por prefixo sem acento.
+const DIACRITICOS = new RegExp(String.fromCharCode(91) + String.fromCharCode(768) + String.fromCharCode(45) + String.fromCharCode(879) + String.fromCharCode(93), "g");
+const achaSympla = (linha, ...alternativas) => {
+  const chaves = Object.keys(linha);
+  for(const alvo of alternativas){
+    const a = alvo.toLowerCase();
+    const k = chaves.find(c => c.toLowerCase()
+      .normalize("NFD").replace(DIACRITICOS,"")
+      .replace(/[^a-z0-9]/g,"")
+      .startsWith(a.normalize("NFD").replace(DIACRITICOS,"").replace(/[^a-z0-9]/g,"")));
+    if(k && String(linha[k]).trim() !== "") return String(linha[k]).trim();
+  }
+  return "";
+};
+
 async function desenharJantar(){
   const c = $("#conteudo");
   c.innerHTML = `
@@ -552,6 +573,21 @@ async function desenharJantar(){
       <div id="jd-aviso"></div>
       <button class="btn sec" id="jd-salvar">Salvar</button>
       <button class="btn perigo" id="jd-remover" style="margin-left:6px;">Remover jantar</button>
+    </div>
+
+    <div class="cartao">
+      <h2>Importar convidados do Sympla</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Exporte os inscritos da página de inscrição deste jantar (link acima) direto do
+        Sympla e suba a planilha aqui. Mesmo formato do importador do evento principal —
+        só quem está "Aprovado" entra confirmado; "Cancelado" tira quem já estava.
+      </p>
+      <div class="barra">
+        <div><label>Arquivo (.xlsx ou .csv)</label><input type="file" id="js-arquivo" accept=".xlsx,.xls,.csv"></div>
+        <div style="min-width:auto;"><button class="btn" id="js-importar" disabled>Importar convidados</button></div>
+      </div>
+      <div id="js-aviso"></div>
+      <div id="js-previa"></div>
     </div>
 
     <div class="cartao">
@@ -649,6 +685,8 @@ async function desenharJantar(){
   $("#jd-patro").addEventListener("input", () => DS.limparInvalido($("#jd-patro")));
   $("#jd-salvar").addEventListener("click", salvarDadosJantar);
   $("#jd-remover").addEventListener("click", removerJantar);
+  $("#js-arquivo").addEventListener("change", lerPlanilhaSympla);
+  $("#js-importar").addEventListener("click", importarConvidadosSympla);
   $("#pr-rodar").addEventListener("click", rodarProspeccaoJantar);
   $("#av-nome").addEventListener("input", () => DS.limparInvalido($("#av-nome")));
   $("#av-salvar").addEventListener("click", salvarAvulso);
@@ -701,6 +739,81 @@ async function salvarDadosJantar(){
     await abrirJantar(J.id);
   }catch(e){ aviso("#jd-aviso", explicar(e)); }
   finally{ b.disabled = false; b.textContent = "Salvar"; }
+}
+
+async function lerPlanilhaSympla(ev){
+  const f = ev.target.files[0];
+  if(!f) return;
+  try{
+    const wb  = XLSX.read(await f.arrayBuffer(), { type:"array" });
+    const cru = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:"" });
+
+    JANTAR_SYMPLA = cru.map(l => ({
+      nome: [achaSympla(l,"Nome"), achaSympla(l,"Sobrenome")].filter(Boolean).join(" ").trim(),
+      email: achaSympla(l,"Email"),
+      email_corporativo: achaSympla(l,"E-MAIL CORPORATIVO","EMAIL CORPORATIVO"),
+      empresa: achaSympla(l,"Empresa"),
+      cargo: achaSympla(l,"Cargo"),
+      telefone: achaSympla(l,"Telefone Celular","Telefone"),
+      cpf: achaSympla(l,"CPF"),
+      cnpj: achaSympla(l,"CNPJ"),
+      sympla_id: achaSympla(l,"N ingresso","Numero ingresso","Ordem de inscricao"),
+      estado_pagamento: achaSympla(l,"Estado de pagamento")
+    })).filter(l => l.nome || l.email);
+
+    const aprov = JANTAR_SYMPLA.filter(l => l.estado_pagamento.toLowerCase()==="aprovado").length;
+    const canc  = JANTAR_SYMPLA.filter(l => l.estado_pagamento.toLowerCase()==="cancelado").length;
+    const outros = JANTAR_SYMPLA.length - aprov - canc;
+
+    $("#js-previa").innerHTML = `
+      <p class="meta" style="margin-top:10px;">
+        ${JANTAR_SYMPLA.length} linha(s) · <strong>${aprov} aprovado(s)</strong>
+        ${canc ? ` · ${canc} cancelado(s)` : ""}${outros ? ` · ${outros} em outro estado` : ""}
+      </p>
+      <div class="rolagem" style="max-height:200px;margin-top:8px;">
+        <table><tr><th>Nome</th><th>E-mail usado</th><th>Empresa</th><th>Pagamento</th></tr>
+        ${JANTAR_SYMPLA.slice(0,15).map(l => `<tr>
+          <td>${esc(l.nome||"—")}</td>
+          <td class="meta">${esc(l.email_corporativo || l.email || "—")}</td>
+          <td class="meta">${esc(l.empresa||"—")}</td>
+          <td><span class="selo ${l.estado_pagamento.toLowerCase()==="aprovado"?"ok":"pend"}">${esc(l.estado_pagamento||"—")}</span></td>
+        </tr>`).join("")}</table>
+      </div>`;
+    $("#js-importar").disabled = JANTAR_SYMPLA.length === 0;
+    aviso("#js-aviso","");
+  }catch(e){
+    aviso("#js-aviso","Não foi possível ler o arquivo. Confira se é o export do Sympla.");
+  }
+}
+
+async function importarConvidadosSympla(){
+  const btn = $("#js-importar");
+  btn.disabled = true; btn.textContent = "Importando…";
+  try{
+    const r = await rpc("jantar_importar_convidados_sympla", {
+      p_jantar_id: J.id, p_linhas: JANTAR_SYMPLA });
+    aviso("#js-aviso",
+      `${r.criados} convidado(s) novo(s), ${r.atualizados} atualizado(s)` +
+      (r.recusados ? `, ${r.recusados} cancelado(s)` : "") +
+      (r.gestores_novos ? ` · ${r.gestores_novos} entraram também no cadastro geral` : "") +
+      (r.erros ? ` · ${r.erros} ignorado(s)` : "") +
+      ` · ${r.ocupados_agora} de ${r.capacidade} vaga(s) ocupada(s) agora.`,
+      r.ocupados_agora > r.capacidade ? "alerta" : (r.erros ? "erro" : "ok"));
+
+    if(r.erros && r.detalhe_erros?.length){
+      $("#js-previa").innerHTML = `<table style="margin-top:10px;">
+        <tr><th>Linha</th><th>Nome</th><th>Motivo</th></tr>
+        ${r.detalhe_erros.map(d => `<tr>
+          <td class="meta">${d.linha}</td><td>${esc(d.nome||"—")}</td>
+          <td><span class="selo erro">${esc(d.motivo)}</span></td></tr>`).join("")}</table>`;
+    } else {
+      $("#js-previa").innerHTML = "";
+    }
+    $("#js-arquivo").value = "";
+    JANTAR_SYMPLA = [];
+    carregarConvidados();
+  }catch(e){ aviso("#js-aviso", explicar(e)); }
+  finally{ btn.disabled = false; btn.textContent = "Importar convidados"; }
 }
 
 async function removerJantar(){
