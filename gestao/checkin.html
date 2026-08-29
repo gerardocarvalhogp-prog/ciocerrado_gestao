@@ -31,6 +31,12 @@ button{font-family:inherit;cursor:pointer;}
   font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
 .sair{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
   border-radius:var(--raio);padding:4px 10px;font-size:12px;}
+.topo-dir{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.sel-evento{
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);
+  color:#fff;border-radius:var(--raio);padding:5px 9px;font-size:12.5px;
+  font-family:inherit;max-width:220px;}
+.sel-evento option{color:var(--texto);}
 
 .wrap{max-width:640px;margin:0 auto;padding:16px 16px 80px;}
 
@@ -139,8 +145,23 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
   <header class="topo">
     <div class="marca">CIO Cerrado<span>Check-in</span></div>
     <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html">Painel</a><a href="jantares.html">Jantares</a><a href="checkin.html" aria-current="page">Check-in</a></nav>
-    <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>
-    <button class="sair" id="btn-sair">Sair</button>
+    <script>
+      // Link de pagina cheia, nao SPA: sem isto, clicar em Painel/Jantares/
+      // Check-in perde o "?evento=" da URL atual e volta pro evento padrao.
+      // Roda de novo em trocarEvento() (abaixo) — sem isso o link fica
+      // preso no evento que a pagina tinha ao carregar, ignorando trocas
+      // feitas so pelo seletor, sem reload.
+      function atualizarLinksNav(){
+        document.querySelectorAll(".ir-para a").forEach(a =>
+          a.href = a.getAttribute("href").split("?")[0] + location.search);
+      }
+      atualizarLinksNav();
+    </script>
+    <div class="topo-dir">
+      <select id="sel-evento" class="sel-evento" title="Evento ativo"></select>
+      <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>
+      <button class="sair" id="btn-sair">Sair</button>
+    </div>
   </header>
 
   <div class="wrap">
@@ -198,7 +219,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
 // =====================================================================
 const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
-const EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+let EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
 const LOCAL  = new URLSearchParams(location.search).get("local")  || null;
 // modo jantar: ?jantar=<uuid> troca o escopo inteiro. Jantar nao tem
 // evento_id (design deliberado — jantares sao standalone), entao
@@ -397,6 +418,49 @@ async function iniciar(){
   });
   $("#f-todos").addEventListener("click", () => trocarFiltro(false));
   $("#f-pend").addEventListener("click",  () => trocarFiltro(true));
+
+  await carregarSeletorEventos();
+  await carregar(); await placar();
+}
+
+// Sem isto, o balcao operava sempre num evento fixo, sem aviso, mesmo
+// quando havia mais de um evento "aberto" ao mesmo tempo (achado real
+// do QA de usabilidade — mesmo padrao do seletor em admin.html).
+async function carregarSeletorEventos(){
+  const sel = $("#sel-evento");
+  try{
+    const evs = await rpc("admin_listar_eventos");
+
+    if(evs.length === 0){
+      sel.innerHTML = `<option>Nenhum evento</option>`;
+      sel.disabled = true;
+      return;
+    }
+
+    if(!evs.some(e => e.slug === EVENTO)) EVENTO = evs[0].slug;
+
+    const rotulo = { rascunho:"rascunho", aberto:"aberto", encerrado:"encerrado" };
+    sel.innerHTML = evs.map(e => `
+      <option value="${esc(e.slug)}" ${e.slug === EVENTO ? "selected" : ""}>
+        ${esc(e.nome)} · ${rotulo[e.status] || e.status}
+      </option>`).join("");
+    sel.disabled = false;
+
+    sel.addEventListener("change", () => trocarEvento(sel.value));
+  }catch(e){
+    sel.innerHTML = `<option>${esc(EVENTO)}</option>`;
+    sel.disabled = true;
+  }
+}
+
+async function trocarEvento(slug){
+  EVENTO = slug;
+
+  // mantem o link compartilhavel: quem copiar a URL abre no mesmo evento
+  const u = new URL(location.href);
+  u.searchParams.set("evento", slug);
+  history.replaceState(null, "", u);
+  atualizarLinksNav();
 
   await carregar(); await placar();
 }

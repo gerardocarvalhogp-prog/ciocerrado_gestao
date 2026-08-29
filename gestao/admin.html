@@ -473,12 +473,45 @@ async function iniciar(){
     ABAS[ABA_ATUAL]();
   }));
 
+  await aplicarRestricoesPapel();
   await carregarSeletorEventos();
   ABAS.painel();
   atualizarContadores();
 }
 
 let ABA_ATUAL = "painel";
+let SOU_ADMIN = false;
+
+// O backend ja recusa corretamente escrita fora do papel (_exige_admin
+// na primeira linha de cada funcao) — isto e so a tela deixar de
+// mostrar o que a pessoa nao pode usar. Staff via o menu inteiro
+// (Financeiro, Precos, Equipe, a base real de Cadastro...) sem
+// conseguir escrever em nada disso: achado real do QA de usabilidade.
+const ABAS_SO_ADMIN = new Set([
+  "aprovacoes","cadastro","patrocinadores","estrutura",
+  "financeiro","precos","pesquisa","prospeccao","equipe"
+]);
+
+async function aplicarRestricoesPapel(){
+  try{
+    SOU_ADMIN = await rpc("is_admin");
+  }catch(e){
+    SOU_ADMIN = false;
+  }
+  if(SOU_ADMIN) return;
+
+  ABAS_SO_ADMIN.forEach(nome => {
+    const b = $(`.aba[data-aba="${nome}"]`);
+    if(b) b.classList.add("oculto");
+  });
+
+  // grupo sem nenhuma aba visivel fica sem sentido — some o grupo
+  // inteiro (rotulo incluso) em vez de deixar um titulo sem nada embaixo
+  $$(".aba-grupo").forEach(grupo => {
+    const temVisivel = $$(".aba", grupo).some(b => !b.classList.contains("oculto"));
+    grupo.classList.toggle("oculto", !temVisivel);
+  });
+}
 
 async function carregarSeletorEventos(){
   const sel = $("#sel-evento");
@@ -1656,6 +1689,56 @@ ABAS.brindes = async function(){
 // =====================================================================
 // ABA: MESAS E JANTARES
 // =====================================================================
+// Painel "Gerar sessões" — mesmo espírito do "Gerar quartos das cotas"
+// em Patrocinadores: cria 1 sessão por patrocinador ativo que tem
+// direito àquele tipo (composição da cota), pulando quem já tem uma.
+// Sem isso não existia NENHUM jeito de criar sessão pela UI — achado
+// real do QA de usabilidade (Cowork).
+function painelGerarSessoes(){
+  return `
+    <div class="cartao">
+      <h2>Gerar sessões</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Cria uma sessão por patrocinador ativo que tem direito ao tipo escolhido
+        (conforme a composição da cota dele) — quem já tem sessão daquele tipo/data é pulado.
+      </p>
+      <div class="barra">
+        <div style="max-width:200px;"><label>Tipo</label>
+          <select id="sg-tipo">
+            <option value="mesa_redonda">Mesa redonda</option>
+            <option value="jantar">Jantar</option>
+            <option value="reuniao_exclusiva">Reunião exclusiva</option>
+          </select></div>
+        <div style="max-width:150px;"><label>Data</label><input type="date" id="sg-data"></div>
+        <div style="max-width:120px;"><label>Horário</label><input type="time" id="sg-horario"></div>
+        <div><label>Local</label><input type="text" id="sg-local" placeholder="Opcional"></div>
+        <div style="min-width:auto;"><button class="btn" id="sg-gerar">Gerar sessões</button></div>
+      </div>
+      <div id="sg-aviso"></div>
+    </div>`;
+}
+
+function ligarGerarSessoes(){
+  $("#sg-gerar").addEventListener("click", async () => {
+    const b = $("#sg-gerar");
+    b.disabled = true; b.textContent = "Gerando…";
+    try{
+      const r = await rpc("admin_gerar_sessoes", {
+        p_evento_slug: EVENTO,
+        p_tipo: $("#sg-tipo").value,
+        p_data: $("#sg-data").value || null,
+        p_horario: $("#sg-horario").value || null,
+        p_local: $("#sg-local").value.trim() || null
+      });
+      aviso("#sg-aviso", `${r.criadas} sessão(ões) criada(s).`, "ok");
+      ABAS.sessoes();
+    }catch(e){
+      aviso("#sg-aviso", explicar(e));
+      b.disabled = false; b.textContent = "Gerar sessões";
+    }
+  });
+}
+
 ABAS.sessoes = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
@@ -1664,12 +1747,15 @@ ABAS.sessoes = async function(){
 
     if(sessoes.length === 0){
       c.innerHTML = `<h1>Mesas e jantares</h1>
+        ${painelGerarSessoes()}
         <div class="vazio">Nenhuma sessão cadastrada para este evento.</div>`;
+      ligarGerarSessoes();
       return;
     }
 
     c.innerHTML = `
       <h1>Mesas e jantares</h1>
+      ${painelGerarSessoes()}
       <p class="sub">Na ordem de prioridade das cotas. Abra uma sessão para ver quem está dentro e sugerir nomes.</p>
       <div class="cartao"><table id="s-tabela"></table></div>
       <div id="s-detalhe"></div>`;
@@ -1689,6 +1775,8 @@ ABAS.sessoes = async function(){
       const tr = b.closest("tr");
       abrirSessao(tr.dataset.id, sessoes.find(s => s.sessao_id === tr.dataset.id));
     }));
+
+    ligarGerarSessoes();
   }catch(e){ aviso(c, explicar(e)); }
 };
 
