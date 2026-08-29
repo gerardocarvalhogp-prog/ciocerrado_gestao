@@ -75,7 +75,7 @@ select f.id as fat from faturas f where f.participante_id = :'p'::uuid
 
 set role authenticated;
 set request.jwt.claims = '{"email":"gerardocarvalhogp@gmail.com","role":"authenticated"}';
-select admin_marcar_fatura(:'fat'::uuid,'emitida') -> 'para' as agora;
+select admin_marcar_fatura(:'fat'::uuid,'emitida',null,null,'2027-08-01'::date) -> 'para' as agora;
 reset role;
 
 set role authenticated;
