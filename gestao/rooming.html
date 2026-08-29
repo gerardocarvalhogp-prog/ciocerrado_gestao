@@ -240,11 +240,14 @@ function aviso(alvo, texto, tipo="erro"){
 
 function explicar(e){
   const m = e?.message || String(e);
+  if(m.includes("Email not confirmed"))
+    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
+  if(m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
   if(m.includes("Rooming liberado"))  return "O rooming abre depois que seu contrato for assinado.";
   if(m.includes("Prazo de rooming"))  return m + " Fale com a organização para ajustar.";
   if(m.includes("data de nascimento das criancas"))
     return "Informe a data de nascimento das crianças — ela define a cobrança e o crachá.";
-  if(m.includes("nascimento no futuro")) return "Confira a data de nascimento: está no futuro.";
+  if(m.includes("depois do início do evento")) return "Confira a data de nascimento: é depois do início do evento.";
   if(m.includes("acompanhante precisa de nome")) return "Todo acompanhante precisa de nome.";
   if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
   return m;

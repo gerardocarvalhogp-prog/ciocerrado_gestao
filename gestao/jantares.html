@@ -194,6 +194,9 @@ function aviso(alvo, texto, tipo="erro"){
 }
 function explicar(e){
   const m = e?.message || String(e);
+  if(m.includes("Email not confirmed"))
+    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
+  if(m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
   if(m.includes("Acesso restrito a administradores"))
     return "Esta ação exige perfil de administrador.";
   if(m.includes("Acesso restrito")) return "Seu e-mail não está cadastrado na equipe.";
