@@ -473,16 +473,34 @@ async function iniciar(){
   $("#app").classList.remove("oculto");
   $("#quem").textContent = user.email;
 
-  $$(".aba").forEach(b => b.addEventListener("click", () => {
-    $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
-    ABA_ATUAL = b.dataset.aba;
-    ABAS[ABA_ATUAL]();
-  }));
+  $$(".aba").forEach(b => b.addEventListener("click", () => irParaAba(b.dataset.aba, true)));
+
+  // Voltar do navegador so mudava a URL — o conteudo ficava parado na
+  // ultima aba, porque trocar de aba nunca empilhava historico nenhum.
+  // Achado real do QA de usabilidade (Cowork, 29/08/2026).
+  window.addEventListener("popstate", () => {
+    irParaAba(location.hash.replace("#", "") || "painel", false);
+  });
 
   await aplicarRestricoesPapel();
   await carregarSeletorEventos();
-  ABAS.painel();
+  irParaAba(location.hash.replace("#", "") || "painel", false);
   atualizarContadores();
+}
+
+// empilhar=true: veio de clique, cria uma parada nova no historico.
+// empilhar=false: veio do proprio historico (voltar/avancar) ou da
+// carga inicial — so troca o que esta na tela, sem empilhar de novo.
+function irParaAba(nome, empilhar){
+  if(typeof ABAS[nome] !== "function") nome = "painel";
+  ABA_ATUAL = nome;
+  $$(".aba").forEach(x => x.setAttribute("aria-selected", String(x.dataset.aba === nome)));
+  if(empilhar){
+    const u = new URL(location.href);
+    u.hash = nome;
+    history.pushState(null, "", u);
+  }
+  ABAS[nome]();
 }
 
 let ABA_ATUAL = "painel";
