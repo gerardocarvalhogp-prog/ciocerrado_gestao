@@ -146,6 +146,12 @@ tr.linha-clique.marcada:hover{background:rgba(56,120,40,.14);}
   <header class="topo">
     <div class="marca">CIO Cerrado<span>Jantares</span></div>
     <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html">Painel</a><a href="jantares.html" aria-current="page">Jantares</a><a href="checkin.html">Check-in</a></nav>
+    <script>
+      // Link de pagina cheia, nao SPA: sem isto, clicar em Painel/Jantares/
+      // Check-in perde o "?evento=" da URL atual e volta pro evento padrao.
+      document.querySelectorAll(".ir-para a").forEach(a =>
+        a.href = a.getAttribute("href").split("?")[0] + location.search);
+    </script>
     <div class="topo-dir">
       <span class="quem" id="quem"></span>
       <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>

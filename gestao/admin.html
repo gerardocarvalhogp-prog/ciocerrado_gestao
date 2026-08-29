@@ -156,6 +156,12 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
   <header class="topo">
     <div class="marca">CIO Cerrado<span>Painel da organização</span></div>
     <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html" aria-current="page">Painel</a><a href="jantares.html">Jantares</a><a href="checkin.html">Check-in</a></nav>
+    <script>
+      // Link de pagina cheia, nao SPA: sem isto, clicar em Painel/Jantares/
+      // Check-in perde o "?evento=" da URL atual e volta pro evento padrao.
+      document.querySelectorAll(".ir-para a").forEach(a =>
+        a.href = a.getAttribute("href").split("?")[0] + location.search);
+    </script>
     <div class="topo-dir">
       <select id="sel-evento" class="sel-evento" title="Evento ativo"></select>
       <span class="quem" id="quem"></span>
