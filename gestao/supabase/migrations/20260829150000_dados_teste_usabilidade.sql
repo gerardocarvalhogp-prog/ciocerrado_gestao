@@ -59,7 +59,7 @@ select admin_salvar_evento(
 
 reset role;
 reset request.jwt.claims;
-insert into _seed_ids select 'evento', id from eventos where slug = 'usabilidade-teste';
+insert into _seed_ids (chave, valor) select 'evento'::text, id from eventos where slug = 'usabilidade-teste';
 
 -- 3. cota — vaga de mesa redonda e jantar ligados, pra fila e o
 --    portal terem o que mostrar
@@ -90,8 +90,8 @@ select admin_salvar_patrocinador(
 
 reset role;
 reset request.jwt.claims;
-insert into _seed_ids
-  select 'patrocinador', id from patrocinadores
+insert into _seed_ids (chave, valor)
+  select 'patrocinador'::text, id from patrocinadores
    where empresa = 'Empresa Teste Cowork'
      and evento_id = (select valor from _seed_ids where chave = 'evento');
 
@@ -125,8 +125,8 @@ select admin_importar_participantes_sympla('usabilidade-teste', jsonb_build_arra
 
 reset role;
 reset request.jwt.claims;
-insert into _seed_ids
-  select 'participante', pa.id from participantes pa
+insert into _seed_ids (chave, valor)
+  select 'participante'::text, pa.id from participantes pa
     join gestores g on g.id = pa.gestor_id
    where g.email_norm = norm_doc('gerardocarvalhogp+cio@gmail.com')
      and pa.evento_id = (select valor from _seed_ids where chave = 'evento');
