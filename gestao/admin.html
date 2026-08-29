@@ -40,9 +40,12 @@ button{font-family:inherit;cursor:pointer;}
   color:#fff;border-radius:var(--raio);padding:5px 9px;font-size:12.5px;
   font-family:inherit;max-width:260px;}
 .sel-evento option{color:var(--texto);}
+/* padrão = escopo "todos os eventos": mudança aqui vaza pra base toda,
+   por isso o tom de --alerta (não --ouro, que tem significado próprio) —
+   ver auditoria de UX (retorno de QA, 29/08/2026) */
 .escopo-global{
   font-family:'IBM Plex Mono',monospace;font-size:10.5px;
-  background:#EFEFEA;color:var(--suave);border-radius:20px;
+  background:var(--alerta-bg,#FBF0DC);color:var(--alerta,#9C6413);border-radius:20px;
   padding:2px 9px;margin-left:8px;text-transform:uppercase;letter-spacing:.04em;}
 
 .wrap{max-width:1120px;margin:0 auto;padding:22px 20px 80px;}
@@ -1539,7 +1542,7 @@ ABAS.etiquetas = async function(){
     // apto vazio em vez de nulo: a planilha de impressão espera a
     // coluna presente, mesmo quando não há hospedagem
     ETIQ.map(e => ({ ...e, apto: e.apto || "" })),
-    [["apto","APTO"],["nome","NOME"],["empresa","EMPRESA"],["categoria","TIPO"]],
+    [["apto","APTO"],["nome","NOME"],["empresa","EMPRESA"],["categoria","CATEGORIA"]],
     "etiquetas-cio-cerrado.xlsx", "Etiquetas"));
 
   carregar();
@@ -4042,6 +4045,7 @@ ABAS.equipe = async function(){
         enviados. O envio usa o Resend e precisa da chave configurada no projeto.
       </p>
       <div id="nt-resumo">${DS.skeletonCartoes(2)}</div>
+      <div id="nt-erros"></div>
       <div id="nt-aviso"></div>
       <button class="btn sec" id="nt-teste">Enviar teste para mim</button>
       <button class="btn" id="nt-enviar" style="margin-left:6px;">Enviar toda a fila</button>
@@ -4120,6 +4124,25 @@ async function carregarFilaEmail(){
       ${r.enviadas} enviado(s)${r.com_erro ? ` · <span class="selo erro">${r.com_erro} com erro</span>` : ""}
     </p>`;
     $("#nt-enviar").disabled = Number(r.enfileiradas) === 0;
+
+    if(Number(r.com_erro) > 0){
+      const erros = await rpc("admin_notificacoes_com_erro", { p_limite: 20 });
+      $("#nt-erros").innerHTML = `
+        <div class="cartao" style="margin-top:10px;">
+          <div class="rolagem"><table>
+            <tr><th>Quando</th><th>Para</th><th>Tipo</th><th>Tentativas</th><th>Erro</th></tr>
+            ${erros.map(n => `<tr>
+              <td class="meta">${dataBR(n.created_at)}</td>
+              <td>${esc(n.destinatario)}</td>
+              <td class="meta">${esc(n.tipo)}</td>
+              <td class="meta">${n.tentativas}</td>
+              <td>${esc(n.erro || "—")}</td>
+            </tr>`).join("")}
+          </table></div>
+        </div>`;
+    } else {
+      $("#nt-erros").innerHTML = "";
+    }
   }catch(e){ aviso("#nt-resumo", explicar(e)); }
 }
 

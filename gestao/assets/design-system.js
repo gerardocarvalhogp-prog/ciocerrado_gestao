@@ -35,7 +35,14 @@
     }, duracao);
   }
 
+  // Clique duplo num botão que abre confirmar() dispara o listener duas
+  // vezes antes do primeiro clique sequer desabilitar o botão — sem essa
+  // trava, cada chamada empilhava um <div class="ds-backdrop"> novo.
+  let modalAberto = false;
+
   function confirmar(mensagem, opcoes) {
+    if (modalAberto) return Promise.resolve(false);
+    modalAberto = true;
     opcoes = opcoes || {};
     const titulo = opcoes.titulo || "Confirmar";
     const tom = opcoes.tom || "normal";
@@ -60,6 +67,7 @@
       function fechar(resultado) {
         backdrop.classList.remove("aberto");
         document.removeEventListener("keydown", aoTeclar);
+        modalAberto = false;
         setTimeout(() => {
           backdrop.remove();
           if (focoAnterior && focoAnterior.focus) focoAnterior.focus();
