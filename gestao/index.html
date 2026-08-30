@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Gestão · CIO Cerrado</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="icon" href="assets/icons/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/icons/favicon-16x16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/design-system.css">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--papel);color:var(--texto);
+  font-family:'Public Sans',system-ui,sans-serif;font-size:14.5px;line-height:1.5;
+  min-height:100vh;
+}
+.topo{background:var(--verde);color:#fff;padding:13px 20px;}
+.topo strong{font-family:'Archivo',sans-serif;font-size:var(--tx-lg);}
+main{max-width:640px;margin:0 auto;padding:var(--sp-6) var(--sp-4) var(--sp-6);}
+h1{font-family:'Archivo',sans-serif;font-size:var(--tx-xl);margin:0 0 var(--sp-2);}
+p.lede{color:var(--suave);margin:0 0 var(--sp-6);}
+.grade{display:grid;gap:var(--sp-3);}
+a.tela{
+  display:flex;align-items:center;gap:var(--sp-4);
+  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio);
+  padding:var(--sp-4);text-decoration:none;color:var(--texto);
+}
+a.tela:hover{border-color:var(--verde);}
+a.tela .rotulo{font-weight:600;font-size:var(--tx-md);}
+a.tela .desc{color:var(--suave);font-size:var(--tx-sm);margin-top:2px;}
+a.tela .icone{font-size:24px;line-height:1;}
+:focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
+</style>
+</head>
+<body>
+<div class="topo"><strong>CIO Cerrado</strong> · Sistema de Gestão</div>
+<main>
+  <h1>Qual é a sua tela?</h1>
+  <p class="lede">Entre com o e-mail e a senha (ou link mágico) do seu perfil.</p>
+  <div class="grade">
+    <a class="tela" href="admin.html">
+      <span class="icone">🗂️</span>
+      <span><span class="rotulo">Organizador / Equipe</span><br><span class="desc">Painel administrativo — admin.html</span></span>
+    </a>
+    <a class="tela" href="portal.html">
+      <span class="icone">🏢</span>
+      <span><span class="rotulo">Patrocinador</span><br><span class="desc">Cota, fatura, convidados e quartos — portal.html</span></span>
+    </a>
+    <a class="tela" href="rooming.html">
+      <span class="icone">🛏️</span>
+      <span><span class="rotulo">CIO convidado</span><br><span class="desc">Hospedagem, transfer e fatura — rooming.html</span></span>
+    </a>
+    <a class="tela" href="checkin.html">
+      <span class="icone">✅</span>
+      <span><span class="rotulo">Check-in</span><br><span class="desc">Recepção no evento — checkin.html</span></span>
+    </a>
+    <a class="tela" href="jantares.html">
+      <span class="icone">🍽️</span>
+      <span><span class="rotulo">Jantares avulsos</span><br><span class="desc">Fora do fluxo do evento principal — jantares.html</span></span>
+    </a>
+  </div>
+</main>
+</body>
+</html>
