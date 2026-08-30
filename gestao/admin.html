@@ -221,6 +221,10 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
         <span class="aba-grupo-rotulo" aria-hidden="true">Equipe</span>
         <button class="aba" role="tab" data-aba="equipe" aria-selected="false">Equipe</button>
       </div>
+      <div class="aba-grupo">
+        <span class="aba-grupo-rotulo" aria-hidden="true">Integrações</span>
+        <button class="aba" role="tab" data-aba="integracao-app" aria-selected="false">App do evento</button>
+      </div>
     </div>
     <div id="aviso-global"></div>
     <div id="conteudo">
@@ -527,7 +531,7 @@ let SOU_ADMIN = false;
 // conseguir escrever em nada disso: achado real do QA de usabilidade.
 const ABAS_SO_ADMIN = new Set([
   "aprovacoes","cadastro","patrocinadores","estrutura",
-  "financeiro","precos","pesquisa","prospeccao","equipe"
+  "financeiro","precos","pesquisa","prospeccao","equipe","integracao-app"
 ]);
 
 async function aplicarRestricoesPapel(){
@@ -4787,6 +4791,174 @@ async function salvarMembro(){
   }catch(e){ aviso("#eq-aviso", explicar(e)); }
   finally{ btn.disabled = false; btn.textContent = "Salvar"; }
 }
+
+// =====================================================================
+// ABA: INTEGRACAO COM O APP DO EVENTO (Cenario A — arquivo melhorado)
+//
+// O app do parceiro so importa planilha hoje: nao tem API, nem
+// endpoint de consulta de empresa_id, nem upsert (reenviar um e-mail
+// existente e rejeitado, nao atualizado) — levantamento do Cowork,
+// 30/08/2026. Enquanto isso nao muda do lado deles, o que da pra fazer
+// aqui e gerar a planilha certa, no formato exato que o app aceita, com
+// a traducao empresa -> empresa_id feita a partir de um mapa mantido a
+// mao (o app nao expoe os IDs que gera, entao alguem precisa ir la
+// depois de importar e trazer o numero pra ca).
+// =====================================================================
+ABAS["integracao-app"] = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = DS.skeletonCartoes(3);
+
+  let idApp = null;
+  try{
+    const evs = await rpc("admin_listar_eventos");
+    idApp = evs.find(e => e.slug === EVENTO)?.id_app ?? null;
+  }catch(e){ aviso(c, explicar(e)); return; }
+
+  c.innerHTML = `
+    <h1>App do evento</h1>
+    <p class="sub">
+      O app (adm.ciocerrado.com.br) só importa planilha hoje — sem API, sem consulta de
+      empresa, sem atualização por e-mail. Isto gera a planilha no formato exato que ele
+      aceita. A tradução de empresa para o ID numérico do app precisa ser preenchida à
+      mão abaixo, depois que você importar Empresas lá e olhar os IDs gerados.
+    </p>
+
+    <div class="cartao">
+      <h2 style="margin-top:0;">ID deste evento no app</h2>
+      <div class="linha">
+        <div style="max-width:160px;"><label>ID no app</label>
+          <input type="number" id="ia-id-evento" value="${idApp ?? ""}" placeholder="ex.: 12"></div>
+        <div style="align-self:flex-end;"><button class="btn sec" id="ia-salvar-evento">Salvar</button></div>
+      </div>
+      <p class="meta" style="margin-top:8px;margin-bottom:0;">
+        Olhe na URL ou na tela do evento dentro do admin do app — a gestão não tem como
+        descobrir isso sozinha.
+      </p>
+    </div>
+
+    <div class="cartao">
+      <h2 style="margin-top:0;">Mapear empresas</h2>
+      <p class="meta" style="margin-top:0;">
+        Toda empresa (CIO ou patrocinadora) precisa de um ID do app antes de entrar na
+        planilha de Usuários — é assim que o app sabe a qual empresa vincular a pessoa.
+      </p>
+      <div id="ia-mapa"></div>
+    </div>
+
+    <div class="cartao">
+      <h2 style="margin-top:0;">Exportar para o app</h2>
+      <div id="ia-export-resumo"></div>
+      <button class="btn sec" id="ia-exp-empresas" style="margin-top:8px;">Exportar Empresas</button>
+      <button class="btn sec" id="ia-exp-usuarios" style="margin-top:8px;margin-left:6px;">Exportar Usuários</button>
+      <p class="meta" style="margin-top:8px;">
+        Ordem recomendada: exporte Empresas primeiro, importe no app, volte aqui e
+        preencha os IDs gerados no mapa acima — só depois exporte Usuários.
+      </p>
+    </div>`;
+
+  $("#ia-salvar-evento").addEventListener("click", async () => {
+    const btn = $("#ia-salvar-evento");
+    const valor = $("#ia-id-evento").value;
+    btn.disabled = true;
+    try{
+      await rpc("admin_definir_id_app_evento", {
+        p_evento_slug: EVENTO, p_id_app: valor === "" ? null : Number(valor)
+      });
+      DS.avisar("ID do evento salvo.", {tom:"ok"});
+    }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+    finally{ btn.disabled = false; }
+  });
+
+  const carregarMapa = async () => {
+    const box = $("#ia-mapa");
+    box.innerHTML = DS.skeletonLinhas(3);
+    try{
+      const mapa = await rpc("admin_listar_mapa_empresas_app", { p_evento_slug: EVENTO });
+      const pendentes = mapa.filter(m => !m.empresa_id_app).length;
+
+      box.innerHTML = `
+        ${pendentes ? `<p class="meta" style="color:var(--alerta);margin-top:0;">
+             ${pendentes} empresa(s) ainda sem ID do app.</p>` : ""}
+        <div class="rolagem"><table>
+          <tr><th>Empresa</th><th>Tipo</th><th>ID no app</th><th></th></tr>
+          ${mapa.map(m => `<tr data-empresa="${esc(m.empresa_id||"")}" data-patrocinador="${esc(m.patrocinador_id||"")}">
+            <td>${esc(m.nome)}</td>
+            <td class="meta">${m.tipo === "patrocinador" ? "Patrocinador" : "CIO"}</td>
+            <td><input type="number" class="ia-id-input" style="width:100px;" value="${m.empresa_id_app ?? ""}"></td>
+            <td><button class="btn sec mini ia-mapa-salvar">Salvar</button></td>
+          </tr>`).join("") || `<tr><td colspan="4" style="color:var(--suave)">Nenhuma empresa neste evento ainda.</td></tr>`}
+        </table></div>`;
+
+      $$(".ia-mapa-salvar").forEach(b => b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        const valor = tr.querySelector(".ia-id-input").value;
+        if(valor === ""){ DS.avisar("Informe o ID do app.", {tom:"erro"}); return; }
+        b.disabled = true;
+        try{
+          await rpc("admin_salvar_mapa_empresa_app", {
+            p_evento_slug: EVENTO,
+            p_empresa_id: tr.dataset.empresa || null,
+            p_patrocinador_id: tr.dataset.patrocinador || null,
+            p_empresa_id_app: Number(valor)
+          });
+          DS.avisar("Mapeado.", {tom:"ok"});
+          carregarMapa();
+          atualizarResumoExport();
+        }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); b.disabled = false; }
+      }));
+    }catch(e){ aviso(box, explicar(e)); }
+  };
+
+  const atualizarResumoExport = async () => {
+    try{
+      const [emp, usu] = await Promise.all([
+        rpc("admin_exportar_empresas_app", { p_evento_slug: EVENTO }),
+        rpc("admin_exportar_usuarios_app", { p_evento_slug: EVENTO })
+      ]);
+      const empPend = emp.filter(e => !e.mapeado).length;
+      const usuPend = usu.filter(u => !u.mapeado).length;
+      $("#ia-export-resumo").innerHTML = `<p class="meta" style="margin:0;">
+        ${emp.length} empresa(s) prontas ${empPend ? `· <strong style="color:var(--alerta);">${empPend} sem ID do app</strong>` : ""} ·
+        ${usu.length} usuário(s) prontos ${usuPend ? `· <strong style="color:var(--alerta);">${usuPend} sem empresa mapeada</strong>` : ""}
+      </p>`;
+    }catch(e){ aviso("#ia-export-resumo", explicar(e)); }
+  };
+
+  $("#ia-exp-empresas").addEventListener("click", async () => {
+    const btn = $("#ia-exp-empresas");
+    btn.disabled = true; btn.textContent = "Gerando…";
+    try{
+      const dados = await rpc("admin_exportar_empresas_app", { p_evento_slug: EVENTO });
+      exportar(dados, [
+        ["nome","nome"],["cnpj","cnpj"],["site","site"],["segmento","segmento"],
+        ["resumo","resumo"],["nivel","nivel"],["patrocinador","patrocinador"],["evento_id","evento_id"]
+      ], `empresas-app-${EVENTO}.xlsx`, "Empresas");
+    }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+    finally{ btn.disabled = false; btn.textContent = "Exportar Empresas"; }
+  });
+
+  $("#ia-exp-usuarios").addEventListener("click", async () => {
+    const btn = $("#ia-exp-usuarios");
+    btn.disabled = true; btn.textContent = "Gerando…";
+    try{
+      const dados = await rpc("admin_exportar_usuarios_app", { p_evento_slug: EVENTO });
+      const semMapa = dados.filter(d => !d.mapeado).length;
+      if(semMapa && !(await DS.confirmar(
+          `${semMapa} pessoa(s) vão sair sem empresa vinculada no arquivo — a linha entra, só o vínculo com a empresa fica em branco. Prefere mapear antes?`,
+          {titulo:"Exportar mesmo assim?", textoConfirmar:"Exportar assim mesmo"}))) return;
+      exportar(dados, [
+        ["name","name"],["cargo","cargo"],["email","email"],["cidade","cidade"],
+        ["estado","estado"],["linkedin","linkedin"],["segmento","segmento"],
+        ["telefone","telefone"],["empresa_id","empresa_id"],
+        ["ramo_atividade","ramo_atividade"],["evento_id","evento_id"]
+      ], `usuarios-app-${EVENTO}.xlsx`, "Usuarios");
+    }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+    finally{ btn.disabled = false; btn.textContent = "Exportar Usuários"; }
+  });
+
+  carregarMapa();
+  atualizarResumoExport();
+};
 
 </script>
 </body>
