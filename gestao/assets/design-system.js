@@ -134,6 +134,83 @@
     if (primeiro) primeiro.focus();
   }
 
+  // Leitor de QR por camera — usado no check-in geral e na presenca por
+  // atividade. Le o codigo, para a camera e fecha sozinho; devolve o
+  // texto bruto do QR (o pessoa_key), quem chamou decide o que fazer
+  // com ele. Depende de window.jsQR (carregado via script no <head>
+  // de quem usa isto — checkin.html e admin.html).
+  function lerQR(onLido) {
+    if (typeof window.jsQR !== "function") {
+      avisar("Leitor de QR não carregou. Recarregue a página.", { tom: "erro" });
+      return;
+    }
+
+    const backdrop = elemento(`
+      <div class="ds-backdrop">
+        <div class="ds-modal ds-modal-qr">
+          <h2>Ler crachá</h2>
+          <p>Aponte a câmera para o QR do crachá.</p>
+          <div class="ds-qr-video-wrap">
+            <video autoplay playsinline muted></video>
+          </div>
+          <p class="ds-qr-erro"></p>
+          <div class="ds-modal-acoes">
+            <button type="button" class="btn sec" data-acao="cancelar">Cancelar</button>
+          </div>
+        </div>
+      </div>`);
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(() => backdrop.classList.add("aberto"));
+
+    const video = backdrop.querySelector("video");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    let stream = null;
+    let rafId = null;
+    let parou = false;
+
+    function parar() {
+      if (parou) return;
+      parou = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      backdrop.classList.remove("aberto");
+      setTimeout(() => backdrop.remove(), 150);
+    }
+
+    function tick() {
+      if (parou) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const codigo = window.jsQR(img.data, img.width, img.height);
+        if (codigo && codigo.data) {
+          parar();
+          onLido(codigo.data);
+          return;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    backdrop.querySelector('[data-acao="cancelar"]').addEventListener("click", parar);
+    backdrop.addEventListener("click", e => { if (e.target === backdrop) parar(); });
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(s => {
+        if (parou) { s.getTracks().forEach(t => t.stop()); return; }
+        stream = s;
+        video.srcObject = s;
+        rafId = requestAnimationFrame(tick);
+      })
+      .catch(() => {
+        backdrop.querySelector(".ds-qr-erro").textContent =
+          "Não consegui acessar a câmera. Verifique a permissão do navegador, ou digite o código manualmente.";
+      });
+  }
+
   window.DS = {
     confirmar,
     avisar,
@@ -142,5 +219,6 @@
     marcarInvalido,
     limparInvalido,
     focarPrimeiroInvalido,
+    lerQR,
   };
 })();

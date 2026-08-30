@@ -15,6 +15,8 @@
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="assets/design-system.js"></script>
 <style>
 *{box-sizing:border-box;}
@@ -201,6 +203,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
         <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
         <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
         <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
+        <button class="aba" role="tab" data-aba="atividades" aria-selected="false">Atividades</button>
         <button class="aba" role="tab" data-aba="estrutura" aria-selected="false">Estrutura</button>
       </div>
       <div class="aba-grupo">
@@ -1776,6 +1779,7 @@ ABAS.etiquetas = async function(){
           <option value="patrocinador">Só equipe de patrocinador</option>
         </select></div>
       <div style="min-width:auto;"><button class="btn sec" id="e-exportar">Exportar Excel</button></div>
+      <div style="min-width:auto;"><button class="btn" id="e-imprimir">Imprimir crachás com QR</button></div>
     </div>
     <div class="cartao"><div class="rolagem"><table id="e-tabela"></table></div></div>`;
 
@@ -1820,8 +1824,82 @@ ABAS.etiquetas = async function(){
     [["apto","APTO"],["nome","NOME"],["empresa","EMPRESA"],["categoria","CATEGORIA"]],
     "etiquetas-cio-cerrado.xlsx", "Etiquetas"));
 
+  $("#e-imprimir").addEventListener("click", async () => {
+    if(!ETIQ.length){ DS.avisar("Nada para imprimir com esse filtro.", {tom:"erro"}); return; }
+    const btn = $("#e-imprimir");
+    btn.disabled = true; btn.textContent = "Gerando…";
+    try{ await imprimirCrachas(ETIQ); }
+    finally{ btn.disabled = false; btn.textContent = "Imprimir crachás com QR"; }
+  });
+
   carregar();
 };
+
+// Gera o QR de cada cracha na propria pagina (biblioteca ja carregada
+// aqui) e manda so a imagem pronta (data URL) pra janela de impressao —
+// assim a janela nova nao depende de carregar script nenhum, so imprime.
+async function imprimirCrachas(lista){
+  if(typeof window.QRCode !== "function"){
+    DS.avisar("Gerador de QR não carregou. Recarregue a página.", {tom:"erro"});
+    return;
+  }
+  const temp = document.createElement("div");
+  temp.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
+  document.body.appendChild(temp);
+
+  const cartoes = [];
+  for(const e of lista){
+    const div = document.createElement("div");
+    temp.appendChild(div);
+    // eslint-disable-next-line no-new
+    new QRCode(div, { text: e.pessoa_key, width: 130, height: 130, correctLevel: QRCode.CorrectLevel.M });
+    // qrcodejs desenha de forma sincrona em canvas na maioria dos
+    // navegadores; um tick garante que o canvas ja existe antes do toDataURL
+    await new Promise(r => setTimeout(r, 0));
+    const canvasEl = div.querySelector("canvas");
+    const src = canvasEl ? canvasEl.toDataURL("image/png") : div.querySelector("img")?.src;
+    cartoes.push({ ...e, qr: src });
+  }
+  temp.remove();
+
+  const win = window.open("", "_blank");
+  if(!win){ DS.avisar("O navegador bloqueou a janela de impressão — permita pop-ups para este site.", {tom:"erro"}); return; }
+
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8">
+    <title>Crachás — CIO Cerrado</title>
+    <style>
+      body{font-family:'Public Sans',Arial,sans-serif;margin:0;padding:16px;}
+      .grade{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+      .cracha{
+        border:1px solid #ccc;border-radius:8px;padding:14px;
+        display:flex;align-items:center;gap:12px;break-inside:avoid;
+        page-break-inside:avoid;
+      }
+      .cracha img{width:80px;height:80px;flex:none;}
+      .cracha .info{overflow:hidden;}
+      .cracha .nome{font-weight:700;font-size:15px;margin:0 0 2px;}
+      .cracha .empresa{font-size:12.5px;color:#555;margin:0 0 4px;}
+      .cracha .categoria{font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+        color:#387828;font-weight:600;}
+      .cracha .apto{font-size:11px;color:#888;}
+      @media print{ .grade{gap:6px;} .cracha{border-color:#999;} }
+    </style></head><body>
+    <div class="grade">
+      ${cartoes.map(c => `<div class="cracha">
+        ${c.qr ? `<img src="${c.qr}" alt="">` : ""}
+        <div class="info">
+          <p class="nome">${esc(c.nome)}</p>
+          <p class="empresa">${esc(c.empresa||"")}</p>
+          <p class="categoria">${esc(c.categoria)}</p>
+          ${c.apto ? `<p class="apto">Apto ${esc(c.apto)}</p>` : ""}
+        </div>
+      </div>`).join("")}
+    </div>
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 300);
+}
 
 // =====================================================================
 // ABA: BRINDES
@@ -2144,6 +2222,203 @@ async function abrirSessao(id, s){
     }));
   }catch(e){ aviso(box, explicar(e)); }
 }
+
+// =====================================================================
+// ABA: ATIVIDADES (presenca) — exclusivo do evento grande. Fica
+// desligado por padrao (eventos.usa_atividades); jantar e eventos
+// menores nao usam isso, e a tela nem mostra a opcao de ligar sem
+// entrar aqui e pedir.
+// =====================================================================
+ABAS.atividades = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = DS.skeletonCartoes(2);
+
+  let ligado = false;
+  try{
+    const evs = await rpc("admin_listar_eventos");
+    ligado = !!(evs.find(e => e.slug === EVENTO)?.usa_atividades);
+  }catch(e){ aviso(c, explicar(e)); return; }
+
+  if(!ligado){
+    c.innerHTML = `
+      <h1>Atividades</h1>
+      <div class="cartao">
+        <p>Este evento não usa controle de presença por atividade — é o caso da
+           maioria dos eventos. Ligue só se for acompanhar quem passou em cada
+           atividade do dia (workshop, palestra, mesa redonda com lista própria).</p>
+        <button class="btn" id="at-ligar">Ligar atividades para este evento</button>
+      </div>`;
+    $("#at-ligar").addEventListener("click", async () => {
+      try{
+        await rpc("admin_definir_usa_atividades", { p_evento_slug: EVENTO, p_ligado: true });
+        ABAS.atividades();
+      }catch(e){ aviso(c, explicar(e)); }
+    });
+    return;
+  }
+
+  c.innerHTML = `
+    <h1>Atividades</h1>
+    <p class="sub">Uma atividade por linha do dia. Cada uma tem sua própria lista de presença.</p>
+
+    <div class="cartao">
+      <h2 style="margin-top:0;">Nova atividade</h2>
+      <div class="linha">
+        <div><label>Nome</label><input type="text" id="at-nome" placeholder="Workshop de IA"></div>
+        <div style="max-width:160px;"><label>Data</label><input type="date" id="at-data"></div>
+      </div>
+      <div class="linha">
+        <div style="max-width:140px;"><label>Início</label><input type="time" id="at-inicio"></div>
+        <div style="max-width:140px;"><label>Fim</label><input type="time" id="at-fim"></div>
+        <div><label>Local</label><input type="text" id="at-local" placeholder="Salão A"></div>
+      </div>
+      <div id="at-aviso"></div>
+      <button class="btn" id="at-salvar" style="margin-top:8px;">Adicionar</button>
+      <button class="btn sec" id="at-desligar" style="margin-top:8px;margin-left:6px;">
+        Desligar atividades deste evento</button>
+    </div>
+
+    <div id="at-lista"></div>
+    <div id="at-presenca"></div>`;
+
+  const carregarLista = async () => {
+    $("#at-lista").innerHTML = DS.skeletonLinhas(2);
+    try{
+      const lista = await rpc("admin_listar_atividades", { p_evento_slug: EVENTO });
+      $("#at-lista").innerHTML = lista.length ? `
+        <div class="cartao"><div class="rolagem"><table>
+          <tr><th>Atividade</th><th>Quando</th><th>Local</th><th>Presença</th><th></th></tr>
+          ${lista.map(a => `<tr data-id="${esc(a.id)}" data-nome="${esc(a.nome)}">
+            <td><strong>${esc(a.nome)}</strong></td>
+            <td class="meta">${a.data ? dataBR(a.data) : "—"}
+                ${a.horario_inicio ? ` · ${a.horario_inicio.slice(0,5)}${a.horario_fim ? "–"+a.horario_fim.slice(0,5) : ""}` : ""}</td>
+            <td class="meta">${esc(a.local||"—")}</td>
+            <td><span class="selo ${Number(a.presentes) ? "ok" : "pend"}">${a.presentes} / ${a.esperados}</span></td>
+            <td style="white-space:nowrap;">
+              <button class="btn sec mini at-presenca">Presença</button>
+              <button class="btn perigo mini at-remover">Remover</button>
+            </td>
+          </tr>`).join("")}
+        </table></div></div>`
+        : `<div class="cartao"><p class="meta" style="margin:0;">Nenhuma atividade cadastrada ainda.</p></div>`;
+
+      $$(".at-presenca").forEach(b => b.addEventListener("click", () => {
+        const tr = b.closest("tr");
+        abrirPresenca(tr.dataset.id, tr.dataset.nome);
+      }));
+      $$(".at-remover").forEach(b => b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        if(!(await DS.confirmar(`Remove também o histórico de presença dela.`,
+            {titulo:`Remover "${tr.dataset.nome}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+        try{ await rpc("admin_remover_atividade", { p_atividade_id: tr.dataset.id }); carregarLista(); }
+        catch(e){ aviso("#at-aviso", explicar(e)); }
+      }));
+    }catch(e){ aviso("#at-lista", explicar(e)); }
+  };
+
+  $("#at-salvar").addEventListener("click", async () => {
+    const nome = $("#at-nome").value.trim();
+    if(!nome){ aviso("#at-aviso", "Informe o nome da atividade."); return; }
+    const btn = $("#at-salvar");
+    btn.disabled = true; btn.textContent = "Salvando…";
+    try{
+      await rpc("admin_salvar_atividade", {
+        p_id: null, p_evento_slug: EVENTO, p_nome: nome,
+        p_data: $("#at-data").value || null,
+        p_horario_inicio: $("#at-inicio").value || null,
+        p_horario_fim: $("#at-fim").value || null,
+        p_local: $("#at-local").value.trim() || null
+      });
+      ["#at-nome","#at-data","#at-inicio","#at-fim","#at-local"].forEach(s => $(s).value = "");
+      aviso("#at-aviso", "");
+      carregarLista();
+    }catch(e){ aviso("#at-aviso", explicar(e)); }
+    finally{ btn.disabled = false; btn.textContent = "Adicionar"; }
+  });
+
+  $("#at-desligar").addEventListener("click", async () => {
+    if(!(await DS.confirmar(
+        "As atividades cadastradas e o histórico de presença continuam salvos — só a aba fica inativa pra este evento.",
+        {titulo:"Desligar atividades deste evento?"}))) return;
+    try{
+      await rpc("admin_definir_usa_atividades", { p_evento_slug: EVENTO, p_ligado: false });
+      ABAS.atividades();
+    }catch(e){ aviso("#at-aviso", explicar(e)); }
+  });
+
+  const abrirPresenca = async (atividadeId, nome) => {
+    const box = $("#at-presenca");
+    box.innerHTML = DS.skeletonLinhas(3);
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    const desenhar = async () => {
+      try{
+        const lista = await rpc("atividade_checkin_listar", {
+          p_atividade_id: atividadeId,
+          p_termo: $("#pr-busca")?.value.trim() || null,
+          p_so_pendentes: $("#pr-pendentes")?.checked || false,
+          p_limite: 300
+        });
+        $("#pr-tabela").innerHTML = lista.length ? `
+          <tr><th>Nome</th><th>Empresa</th><th>Status</th><th></th></tr>
+          ${lista.map(p => `<tr data-key="${esc(p.pessoa_key)}" data-checkin="${esc(p.checkin_id||"")}">
+            <td>${esc(p.nome)}</td>
+            <td class="meta">${esc(p.empresa||"—")}</td>
+            <td>${p.checkin_id
+                 ? `<span class="selo ok">Presente</span> <span class="meta">${dataBR(p.registrado_em)}</span>`
+                 : `<span class="selo pend">Pendente</span>`}</td>
+            <td>${p.checkin_id
+                 ? `<button class="btn sec mini pr-desfazer">Desfazer</button>`
+                 : `<button class="btn mini pr-marcar">Marcar presença</button>`}</td>
+          </tr>`).join("")}`
+          : `<tr><td colspan="4" style="color:var(--suave)">Nada com esse filtro.</td></tr>`;
+
+        $$(".pr-marcar").forEach(b => b.addEventListener("click", async () => {
+          const tr = b.closest("tr");
+          b.disabled = true;
+          try{ await rpc("atividade_checkin_registrar", { p_atividade_id: atividadeId, p_pessoa_key: tr.dataset.key }); desenhar(); }
+          catch(e){ DS.avisar(explicar(e), {tom:"erro"}); b.disabled = false; }
+        }));
+        $$(".pr-desfazer").forEach(b => b.addEventListener("click", async () => {
+          const tr = b.closest("tr");
+          b.disabled = true;
+          try{ await rpc("checkin_desfazer", { p_checkin_id: tr.dataset.checkin }); desenhar(); }
+          catch(e){ DS.avisar(explicar(e), {tom:"erro"}); b.disabled = false; }
+        }));
+      }catch(e){ aviso("#pr-tabela", explicar(e)); }
+    };
+
+    box.innerHTML = `
+      <div class="cartao">
+        <h2 style="margin-top:0;">Presença — ${esc(nome)}</h2>
+        <div class="barra">
+          <div><label>Buscar</label><input type="text" id="pr-busca" placeholder="Nome ou empresa"></div>
+          <div style="min-width:auto;align-self:flex-end;">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:normal;">
+              <input type="checkbox" id="pr-pendentes"> Só pendentes</label></div>
+          <div style="min-width:auto;align-self:flex-end;">
+            <button class="btn" id="pr-ler-qr">Ler QR do crachá</button></div>
+        </div>
+        <div class="rolagem"><table id="pr-tabela"><tr><td>${DS.skeletonLinhas(2)}</td></tr></table></div>
+      </div>`;
+
+    $("#pr-busca").addEventListener("input", () => { clearTimeout(window._prTimer); window._prTimer = setTimeout(desenhar, 300); });
+    $("#pr-pendentes").addEventListener("change", desenhar);
+    $("#pr-ler-qr").addEventListener("click", () => {
+      DS.lerQR(async (pessoaKey) => {
+        try{
+          const r = await rpc("atividade_checkin_registrar", { p_atividade_id: atividadeId, p_pessoa_key: pessoaKey });
+          DS.avisar(r.ja_estava ? `${r.nome} já estava presente.` : `${r.nome} — presença marcada.`, {tom:"ok"});
+          desenhar();
+        }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+      });
+    });
+
+    desenhar();
+  };
+
+  carregarLista();
+};
 
 // =====================================================================
 // ABA: RELATORIOS

@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="assets/design-system.js"></script>
 <style>
 *{box-sizing:border-box;}
@@ -172,6 +173,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
       <div class="filtros">
         <button class="chip" id="f-todos" aria-pressed="true">Todos</button>
         <button class="chip" id="f-pend"  aria-pressed="false">Só pendentes</button>
+        <button class="btn sec mini" id="ler-qr" style="margin-left:auto;">Ler QR</button>
       </div>
     </div>
 
@@ -579,6 +581,25 @@ async function carregar(){
     $$(".marcar").forEach(b => b.addEventListener("click", () => marcar(b)));
     $$(".desfazer").forEach(b => b.addEventListener("click", () => desfazer(b)));
   }catch(e){ aviso(explicar(e)); }
+}
+
+// QR so vale pro check-in geral — o de jantar usa convidado_id, outro
+// identificador, e nao tem cracha com QR pra ler
+if(!JANTAR){
+  $("#ler-qr").addEventListener("click", () => {
+    DS.lerQR(async (pessoaKey) => {
+      try{
+        const r = await rpc("checkin_registrar", {
+          p_evento_slug: EVENTO, p_pessoa_key: pessoaKey, p_local: LOCAL });
+        aviso(r.ja_estava
+          ? `${r.nome} já tinha feito check-in às ${hora(r.registrado_em)}.`
+          : `${r.nome} · check-in registrado.`, "ok");
+        await carregar(); await placar();
+      }catch(e){ aviso(explicar(e)); }
+    });
+  });
+}else{
+  $("#ler-qr").classList.add("oculto");
 }
 
 async function marcar(btn){
