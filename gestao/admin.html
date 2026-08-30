@@ -48,6 +48,16 @@ button{font-family:inherit;cursor:pointer;}
   background:var(--alerta-bg,#FBF0DC);color:var(--alerta,#9C6413);border-radius:20px;
   padding:2px 9px;margin-left:8px;text-transform:uppercase;letter-spacing:.04em;}
 
+/* modal de cobranca: DS.confirmar() e so pra sim/nao, aqui precisa de
+   assunto+corpo editaveis — max-width proprio, maior que o .ds-modal padrao */
+.ac-modal{
+  background:var(--superficie);border-radius:10px;max-width:560px;width:100%;
+  padding:22px 24px;box-shadow:0 20px 50px rgba(20,49,43,.25);
+  max-height:85vh;overflow-y:auto;
+}
+.ac-modal h2{font-family:'Archivo',sans-serif;font-size:var(--tx-lg);margin:0 0 8px;color:var(--texto);}
+.ac-modal textarea{font-family:inherit;font-size:var(--tx-base);resize:vertical;}
+
 .wrap{max-width:1120px;margin:0 auto;padding:22px 20px 80px;}
 .abas{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--linha);
   margin-bottom:22px;overflow-x:auto;}
@@ -177,6 +187,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
       <div class="aba-grupo">
         <span class="aba-grupo-rotulo" aria-hidden="true">Visão geral</span>
         <button class="aba" role="tab" data-aba="painel" aria-selected="true">Painel</button>
+        <button class="aba" role="tab" data-aba="acompanhamento" aria-selected="false">Acompanhamento</button>
       </div>
       <div class="aba-grupo">
         <span class="aba-grupo-rotulo" aria-hidden="true">Cadastro &amp; aprovação</span>
@@ -680,6 +691,252 @@ ABAS.painel = async function(){
 
     desenhar();
   }catch(e){ aviso(c, explicar(e)); }
+};
+
+// =====================================================================
+// ABA: ACOMPANHAMENTO
+// =====================================================================
+const ROTULO_PUBLICO = { participante: "CIO", patrocinador: "Patrocinador" };
+const ROTULO_NIVEL = { ok: "Em dia", atencao: "Atenção", atrasado: "Atrasado" };
+
+ABAS.acompanhamento = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Acompanhamento</h1>
+    <p class="sub">
+      Quem está esperando o quê, e há quanto tempo. A decisão de cobrar é sempre sua —
+      o sistema só prepara a mensagem; quem dispara é você.
+    </p>
+    <div id="ac-resumo">${DS.skeletonLinhas(3)}</div>
+
+    <div class="barra" style="margin-top:18px;">
+      <div style="max-width:150px;"><label>Nível</label>
+        <select id="ac-nivel">
+          <option value="">Todos pendentes</option>
+          <option value="atrasado">Atrasado</option>
+          <option value="atencao">Atenção</option>
+        </select></div>
+      <div style="max-width:170px;"><label>Público</label>
+        <select id="ac-publico">
+          <option value="">Todos</option>
+          <option value="participante">CIO</option>
+          <option value="patrocinador">Patrocinador</option>
+        </select></div>
+      <div style="max-width:240px;"><label>Etapa</label>
+        <select id="ac-etapa"><option value="">Todas</option></select></div>
+      <div style="min-width:auto;align-self:flex-end;">
+        <button class="btn sec mini" id="ac-prazos-toggle">Configurar prazos</button></div>
+    </div>
+
+    <div id="ac-prazos" class="oculto"></div>
+
+    <div id="ac-aviso"></div>
+    <div class="cartao"><div class="rolagem"><table id="ac-tabela"></table></div></div>`;
+
+  const carregarResumo = async () => {
+    $("#ac-resumo").innerHTML = DS.skeletonLinhas(3);
+    try{
+      const resumo = await rpc("admin_pendencias_resumo", { p_evento_slug: EVENTO });
+      const sel = $("#ac-etapa");
+      const atual = sel.value;
+      sel.innerHTML = `<option value="">Todas</option>` + resumo.map(r =>
+        `<option value="${esc(r.etapa_chave)}">${esc(r.etapa_rotulo)} (${ROTULO_PUBLICO[r.publico]})</option>`
+      ).join("");
+      sel.value = atual;
+
+      $("#ac-resumo").innerHTML = resumo.length ? `
+        <div class="cartao"><div class="rolagem"><table>
+          <tr><th>Etapa</th><th>Público</th><th>Em dia</th><th>Atenção</th><th>Atrasado</th></tr>
+          ${resumo.map(r => `<tr>
+            <td>${esc(r.etapa_rotulo)}</td>
+            <td class="meta">${ROTULO_PUBLICO[r.publico]}</td>
+            <td><span class="selo ok">${r.ok}</span></td>
+            <td>${Number(r.atencao) ? `<span class="selo alerta">${r.atencao}</span>` : `<span class="meta">0</span>`}</td>
+            <td>${Number(r.atrasado) ? `<span class="selo erro">${r.atrasado}</span>` : `<span class="meta">0</span>`}</td>
+          </tr>`).join("")}
+        </table></div></div>`
+        : `<div class="cartao"><p class="meta" style="margin:0;">
+             Nenhuma etapa configurada pra este evento ainda —
+             clique em "Configurar prazos" e depois em "Aplicar padrão".</p></div>`;
+    }catch(e){ aviso("#ac-resumo", explicar(e)); }
+  };
+
+  const carregarLista = async () => {
+    $("#ac-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(3)}</td></tr>`;
+    try{
+      const lista = await rpc("admin_pendencias_lista", {
+        p_evento_slug: EVENTO,
+        p_nivel: $("#ac-nivel").value || null,
+        p_publico: $("#ac-publico").value || null,
+        p_etapa_chave: $("#ac-etapa").value || null,
+        p_limite: 300, p_offset: 0
+      });
+
+      $("#ac-tabela").innerHTML = lista.length ? `
+        <tr><th>Quem</th><th>Público</th><th>Etapa</th><th>Aberta em</th>
+            <th>Dias em aberto</th><th>Nível</th><th></th></tr>
+        ${lista.map(l => `<tr data-sujeito="${esc(l.sujeito_id)}" data-etapa="${esc(l.etapa_chave)}"
+                             data-etapa-rotulo="${esc(l.etapa_rotulo)}"
+                             data-quem="${esc(l.sujeito_nome || l.sujeito_empresa || "")}">
+          <td><strong>${esc(l.sujeito_nome || l.sujeito_empresa || "—")}</strong>
+              ${l.sujeito_nome && l.sujeito_empresa ? `<br><span class="meta">${esc(l.sujeito_empresa)}</span>` : ""}</td>
+          <td class="meta">${ROTULO_PUBLICO[l.publico]}</td>
+          <td>${esc(l.etapa_rotulo)}</td>
+          <td class="meta">${dataBR(l.aberta_em)}</td>
+          <td class="meta">${l.dias_em_aberto ?? "—"}</td>
+          <td><span class="selo ${l.nivel === "atrasado" ? "erro" : l.nivel === "atencao" ? "alerta" : "ok"}">
+                ${ROTULO_NIVEL[l.nivel]}</span></td>
+          <td><button class="btn sec mini ac-cobrar">Preparar cobrança</button></td>
+        </tr>`).join("")}`
+        : `<tr><td colspan="7" style="color:var(--suave)">Nada pendente com esse filtro.</td></tr>`;
+
+      $$(".ac-cobrar").forEach(b => b.addEventListener("click", () => {
+        const tr = b.closest("tr");
+        abrirCobranca(tr.dataset.sujeito, tr.dataset.etapa, tr.dataset.quem, tr.dataset.etapaRotulo);
+      }));
+    }catch(e){ aviso("#ac-tabela", explicar(e)); }
+  };
+
+  const abrirCobranca = async (sujeitoId, etapaChave, quem, etapaRotulo) => {
+    let draft;
+    try{
+      draft = await rpc("admin_preparar_cobranca", { p_sujeito_id: sujeitoId, p_etapa_chave: etapaChave });
+    }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); return; }
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "ds-backdrop";
+    const semDestinatario = !draft.destinatarios || draft.destinatarios.length === 0;
+    backdrop.innerHTML = `
+      <div class="ac-modal">
+        <h2>Cobrar: ${esc(etapaRotulo)}</h2>
+        <p class="meta" style="margin:0 0 14px;">
+          ${esc(quem)}${draft.dias_em_aberto != null ? ` · ${draft.dias_em_aberto} dia(s) em aberto` : ""}
+        </p>
+        ${semDestinatario
+          ? `<p style="color:var(--erro);">Nenhum e-mail de contato ativo encontrado para cobrar diretamente.</p>`
+          : `
+            <p class="meta">Para: ${draft.destinatarios.map(esc).join(", ")}</p>
+            ${draft.ja_enviado_recentemente
+              ? `<p class="meta" style="color:var(--alerta);">
+                   Já foi cobrado nos últimos 3 dias (${dataBR(draft.ultimo_envio)}). Enviar de novo mesmo assim?
+                 </p>` : ""}
+            <label>Assunto</label>
+            <input type="text" id="ac-m-assunto" value="${esc(draft.assunto)}">
+            <label style="margin-top:10px;display:block;">Mensagem</label>
+            <textarea id="ac-m-corpo" rows="6" style="width:100%;">${esc(draft.corpo)}</textarea>`}
+        <div class="ds-modal-acoes" style="margin-top:16px;">
+          <button type="button" class="btn sec" data-acao="cancelar">Cancelar</button>
+          ${semDestinatario ? "" : `<button type="button" class="btn" data-acao="enviar">Enviar agora</button>`}
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(() => backdrop.classList.add("aberto"));
+
+    const fechar = () => {
+      backdrop.classList.remove("aberto");
+      setTimeout(() => backdrop.remove(), 150);
+    };
+    backdrop.addEventListener("click", e => { if(e.target === backdrop) fechar(); });
+    backdrop.querySelector('[data-acao="cancelar"]').addEventListener("click", fechar);
+
+    const btnEnviar = backdrop.querySelector('[data-acao="enviar"]');
+    if(btnEnviar) btnEnviar.addEventListener("click", async () => {
+      const assunto = backdrop.querySelector("#ac-m-assunto").value.trim();
+      const corpo = backdrop.querySelector("#ac-m-corpo").value.trim();
+      if(!assunto || !corpo){ DS.avisar("Preencha assunto e mensagem.", {tom:"erro"}); return; }
+      btnEnviar.disabled = true; btnEnviar.textContent = "Enviando…";
+      try{
+        const r = await rpc("admin_disparar_cobranca", {
+          p_sujeito_id: sujeitoId, p_etapa_chave: etapaChave,
+          p_assunto: assunto, p_corpo: corpo, p_forcar: !!draft.ja_enviado_recentemente
+        });
+        DS.avisar(
+          `Enfileirado para ${r.enfileiradas} destinatário(s).` +
+          (r.bloqueadas ? ` ${r.bloqueadas} bloqueado(s) por reenvio recente.` : ""),
+          { tom: "ok" });
+        fechar();
+        carregarLista();
+      }catch(e){
+        DS.avisar(explicar(e), {tom:"erro"});
+        btnEnviar.disabled = false; btnEnviar.textContent = "Enviar agora";
+      }
+    });
+  };
+
+  const carregarPrazos = async () => {
+    const box = $("#ac-prazos");
+    box.innerHTML = DS.skeletonLinhas(3);
+    try{
+      const prazos = await rpc("admin_listar_prazos", { p_evento_slug: EVENTO });
+      box.innerHTML = `
+        <div class="cartao" style="margin-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <h2 style="margin:0;">Prazos deste evento</h2>
+            <button class="btn sec mini" id="ac-prazos-padrao">Aplicar padrão nas etapas sem prazo</button>
+          </div>
+          <p class="meta" style="margin-top:0;">
+            Etapa desmarcada em "Ativa" não aparece pra ninguém neste evento — é assim que
+            um evento sem hospedagem, por exemplo, fica sem a etapa de rooming.
+          </p>
+          <div class="rolagem"><table>
+            <tr><th>Etapa</th><th>Público</th><th>Atenção (dias)</th><th>Atrasado (dias)</th><th>Ativa</th><th></th></tr>
+            ${prazos.map(p => `<tr data-etapa="${esc(p.etapa_chave)}">
+              <td>${esc(p.etapa_rotulo)}</td>
+              <td class="meta">${ROTULO_PUBLICO[p.publico]}</td>
+              <td><input type="number" min="0" class="pz-atencao" style="width:70px;"
+                         value="${p.dias_atencao ?? ""}"
+                         ${p.etapa_chave === "fatura_paga" ? "disabled placeholder=\"vencimento\"" : ""}></td>
+              <td><input type="number" min="0" class="pz-atrasado" style="width:70px;"
+                         value="${p.dias_atrasado ?? ""}"
+                         ${p.etapa_chave === "fatura_paga" ? "disabled placeholder=\"vencimento\"" : ""}></td>
+              <td><input type="checkbox" class="pz-ativo" ${p.ativo ? "checked" : ""}></td>
+              <td><button class="btn sec mini pz-salvar">Salvar</button></td>
+            </tr>`).join("")}
+          </table></div>
+        </div>`;
+
+      $("#ac-prazos-padrao").addEventListener("click", async () => {
+        try{
+          const r = await rpc("admin_gerar_prazos_padrao", { p_evento_slug: EVENTO });
+          DS.avisar(`${r.criados} prazo(s) criado(s) com o padrão.`, {tom:"ok"});
+          carregarPrazos(); carregarResumo();
+        }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+      });
+
+      $$(".pz-salvar").forEach(b => b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        const atencao = tr.querySelector(".pz-atencao").value;
+        const atrasado = tr.querySelector(".pz-atrasado").value;
+        b.disabled = true;
+        try{
+          await rpc("admin_salvar_prazo", {
+            p_evento_slug: EVENTO, p_etapa_chave: tr.dataset.etapa,
+            p_dias_atencao: atencao === "" ? null : Number(atencao),
+            p_dias_atrasado: atrasado === "" ? null : Number(atrasado),
+            p_ativo: tr.querySelector(".pz-ativo").checked
+          });
+          DS.avisar("Prazo salvo.", {tom:"ok"});
+          carregarResumo(); carregarLista();
+        }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+        finally{ b.disabled = false; }
+      }));
+    }catch(e){ aviso(box, explicar(e)); }
+  };
+
+  $("#ac-prazos-toggle").addEventListener("click", () => {
+    const box = $("#ac-prazos");
+    const abrindo = box.classList.contains("oculto");
+    box.classList.toggle("oculto");
+    if(abrindo && !box.dataset.carregado){
+      box.dataset.carregado = "1";
+      carregarPrazos();
+    }
+  });
+
+  ["#ac-nivel","#ac-publico","#ac-etapa"].forEach(s => $(s).addEventListener("change", carregarLista));
+
+  await carregarResumo();
+  carregarLista();
 };
 
 // =====================================================================
