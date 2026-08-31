@@ -520,12 +520,19 @@ function irParaAba(nome, empilhar){
     history.pushState(null, "", u);
   }
 
-  // Esconder o botao do menu (aplicarRestricoesPapel) nunca foi controle
-  // de acesso — so deixa de mostrar o link. Quem digita o hash direto
-  // (achado real do relatorio de seguranca, 31/08/2026) chegava na
-  // tela mesmo assim, com formulario de verdade na frente, e so
-  // descobria a recusa ao tentar salvar. O backend ja recusava a
-  // escrita certo; o que faltava era a tela nem tentar carregar.
+  desenharAba(nome);
+}
+
+// Esconder o botao do menu (aplicarRestricoesPapel) nunca foi controle
+// de acesso — so deixa de mostrar o link. Quem digita o hash direto
+// (achado real do relatorio de seguranca, 31/08/2026) chegava na tela
+// mesmo assim, com formulario de verdade na frente, e so descobria a
+// recusa ao tentar salvar. O backend ja recusava a escrita certo; o
+// que faltava era a tela nem tentar carregar — em TODO lugar que pode
+// desenhar uma aba, nao so em irParaAba: trocarEvento tambem chamava
+// ABAS[ABA_ATUAL]() direto, um segundo caminho que nao passava por
+// nenhum guard.
+function desenharAba(nome){
   if(ABAS_SO_ADMIN.has(nome) && !SOU_ADMIN){
     $("#conteudo").innerHTML =
       `<div class="vazio">Esta ação exige perfil de administrador. Seu acesso é de staff.</div>`;
@@ -609,7 +616,7 @@ function trocarEvento(slug){
 
   // as duas abas globais nao mudam de conteudo ao trocar de evento;
   // redesenhar seria so um piscar sem sentido
-  if(!ABAS_GLOBAIS.includes(ABA_ATUAL)) ABAS[ABA_ATUAL]();
+  if(!ABAS_GLOBAIS.includes(ABA_ATUAL)) desenharAba(ABA_ATUAL);
   atualizarContadores();
 }
 
