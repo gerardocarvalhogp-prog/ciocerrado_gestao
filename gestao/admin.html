@@ -200,6 +200,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
       <div class="aba-grupo">
         <span class="aba-grupo-rotulo" aria-hidden="true">Logística</span>
         <button class="aba" role="tab" data-aba="quartos" aria-selected="false">Quartos</button>
+        <button class="aba" role="tab" data-aba="organizacao" aria-selected="false">Organização</button>
         <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
         <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
         <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
@@ -530,7 +531,7 @@ let SOU_ADMIN = false;
 // (Financeiro, Precos, Equipe, a base real de Cadastro...) sem
 // conseguir escrever em nada disso: achado real do QA de usabilidade.
 const ABAS_SO_ADMIN = new Set([
-  "aprovacoes","cadastro","patrocinadores","estrutura",
+  "aprovacoes","cadastro","patrocinadores","estrutura","organizacao",
   "financeiro","precos","pesquisa","prospeccao","equipe","integracao-app"
 ]);
 
@@ -1752,6 +1753,197 @@ async function alocar(el, liberar=false){
     aviso("#aviso-global", explicar(e));
     el.disabled = false;
   }
+}
+
+// =====================================================================
+// ABA: ORGANIZAÇÃO (quartos para staff, fora do fluxo de patrocinador)
+// =====================================================================
+ABAS.organizacao = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = DS.skeletonCartoes(2);
+  try{
+    const lista = await rpc("admin_listar_quartos_equipe", { p_evento_slug: EVENTO });
+
+    c.innerHTML = `
+      <h1>Organização</h1>
+      <p class="sub">
+        Quartos da equipe e do staff do evento — não entram na cota de nenhum
+        patrocinador. O número do quarto se atribui na aba Quartos, junto com o resto.
+      </p>
+
+      <div class="cartao">
+        <h2>Adicionar ou alterar</h2>
+        <div class="barra">
+          <div style="min-width:220px;"><label>Time ou responsável</label>
+            <input type="text" id="og-rotulo" placeholder="Coordenação, Segurança, Fotografia…"></div>
+          <div style="max-width:150px;"><label>Tipo</label>
+            <select id="og-tipo">
+              <option value="single">Single</option>
+              <option value="duplo" selected>Duplo</option>
+              <option value="triplo">Triplo</option>
+            </select></div>
+          <div style="min-width:auto;"><button class="btn" id="og-salvar">Salvar</button></div>
+        </div>
+        <div id="og-aviso"></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Cadastrados</h2>
+        ${lista.length ? `<div class="rolagem"><table>
+          <tr><th>Time / responsável</th><th>Tipo</th><th>Pessoas</th><th>Quarto</th><th></th></tr>
+          ${lista.map(r => `<tr data-id="${esc(r.reserva_id)}" data-rotulo="${esc(r.rotulo||"")}" data-tipo="${esc(r.tipo)}">
+            <td><strong>${esc(r.rotulo||"—")}</strong></td>
+            <td class="meta" style="text-transform:capitalize">${esc(r.tipo)}</td>
+            <td>${r.ocupantes.length
+              ? r.ocupantes.map(o => esc(o.nome)).join("<br>")
+              : `<span class="meta">ninguém ainda</span>`}</td>
+            <td>${r.quarto_id
+              ? `<span class="selo ok">${esc(r.quarto_numero||"s/n")}</span>`
+              : `<span class="meta">sem número</span>`}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn sec mini og-pessoas">Pessoas</button>
+              <button class="btn sec mini og-editar">Editar</button>
+              <button class="btn perigo mini og-apagar">Remover</button>
+            </td></tr>`).join("")}</table></div>`
+          : `<div class="vazio">Nenhum quarto de equipe cadastrado.</div>`}
+      </div>
+      <div id="og-detalhe"></div>`;
+
+    $("#og-salvar").addEventListener("click", salvarQuartoEquipe);
+
+    $$(".og-editar").forEach(b => b.addEventListener("click", () => {
+      const t = b.closest("tr").dataset;
+      $("#og-rotulo").value = t.rotulo;
+      $("#og-tipo").value = t.tipo;
+      $("#og-salvar").dataset.editando = t.id;
+      $("#og-rotulo").focus();
+      window.scrollTo({ top:0, behavior:"smooth" });
+    }));
+
+    $$(".og-apagar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!(await DS.confirmar("Esta ação não pode ser desfeita.",
+          {titulo:`Remover "${tr.dataset.rotulo}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+      b.disabled = true;
+      try{ await rpc("admin_remover_quarto_equipe", { p_reserva_id: tr.dataset.id }); ABAS.organizacao(); }
+      catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+
+    $$(".og-pessoas").forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      const reg = lista.find(r => r.reserva_id === tr.dataset.id);
+      abrirPessoasEquipe(reg);
+    }));
+  }catch(e){ aviso(c, explicar(e)); }
+};
+
+async function salvarQuartoEquipe(){
+  const rotulo = $("#og-rotulo").value.trim();
+  if(!rotulo){
+    DS.marcarInvalido($("#og-rotulo"), "Informe o time ou responsável.");
+    $("#og-rotulo").focus();
+    return;
+  }
+  DS.limparInvalido($("#og-rotulo"));
+
+  const b = $("#og-salvar");
+  const editando = b.dataset.editando || null;
+  b.disabled = true; b.textContent = "Salvando…";
+  try{
+    await rpc("admin_salvar_quarto_equipe", {
+      p_evento_slug: EVENTO,
+      p_reserva_id: editando,
+      p_rotulo: rotulo,
+      p_tipo: $("#og-tipo").value
+    });
+    $("#og-rotulo").value = "";
+    delete b.dataset.editando;
+    ABAS.organizacao();
+  }catch(e){ aviso("#og-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Salvar"; }
+}
+
+// Painel de pessoas de um quarto de equipe — mesmo espírito do rooming do
+// patrocinador (nome, CPF, transfer por pessoa), só que quem edita é o
+// admin, direto, sem depender do quarto já ter número.
+function abrirPessoasEquipe(reg){
+  const box = $("#og-detalhe");
+  const CAP = 4;
+  let pessoas = reg.ocupantes.length
+    ? reg.ocupantes.map(o => ({...o}))
+    : [{ nome:"", cpf:"", telefone:"", usa_transfer:false, transfer_origem:null }];
+
+  const desenhar = () => {
+    box.innerHTML = `
+      <div class="cartao">
+        <h2>Pessoas · ${esc(reg.rotulo||"—")}</h2>
+        <p class="sub" style="margin-bottom:10px;">Até ${CAP} pessoa(s) por quarto.</p>
+        ${pessoas.map((p,i) => `
+          <div class="barra" data-i="${i}">
+            <div style="min-width:180px;"><label>Nome</label>
+              <input type="text" class="og-p-nome" value="${esc(p.nome||"")}"></div>
+            <div style="max-width:150px;"><label>CPF</label>
+              <input type="text" class="og-p-cpf" value="${esc(p.cpf||"")}"></div>
+            <div style="max-width:150px;"><label>Telefone</label>
+              <input type="text" class="og-p-tel" value="${esc(p.telefone||"")}"></div>
+            <div class="check" style="align-self:end;padding-bottom:8px;">
+              <input type="checkbox" class="og-p-transfer" ${p.usa_transfer ? "checked":""}> Usa transfer</div>
+            <div style="max-width:140px;"><label>Origem</label>
+              <select class="og-p-origem" ${p.usa_transfer ? "" : "disabled"}>
+                <option value="">—</option>
+                <option value="GYN" ${p.transfer_origem==="GYN"?"selected":""}>Goiânia</option>
+                <option value="BSB" ${p.transfer_origem==="BSB"?"selected":""}>Brasília</option>
+              </select></div>
+            <div style="min-width:auto;align-self:end;">
+              <button class="btn perigo mini og-p-remover">Remover</button></div>
+          </div>`).join("")}
+        <button class="btn sec mini" id="og-p-add" ${pessoas.length >= CAP ? "disabled" : ""}>+ Pessoa</button>
+        <div id="og-p-aviso" style="margin-top:8px;"></div>
+        <button class="btn" id="og-p-salvar" style="margin-top:8px;">Salvar pessoas</button>
+      </div>`;
+
+    $$(".og-p-transfer", box).forEach(el => el.addEventListener("change", e => {
+      const sel = e.target.closest(".barra").querySelector(".og-p-origem");
+      sel.disabled = !e.target.checked;
+      if(!e.target.checked) sel.value = "";
+    }));
+
+    $$(".og-p-remover", box).forEach(el => el.addEventListener("click", () => {
+      const i = Number(el.closest(".barra").dataset.i);
+      pessoas.splice(i,1);
+      if(pessoas.length === 0) pessoas.push({ nome:"", cpf:"", telefone:"", usa_transfer:false, transfer_origem:null });
+      desenhar();
+    }));
+
+    $("#og-p-add").addEventListener("click", () => {
+      pessoas.push({ nome:"", cpf:"", telefone:"", usa_transfer:false, transfer_origem:null });
+      desenhar();
+    });
+
+    $("#og-p-salvar").addEventListener("click", async () => {
+      const linhas = [...box.querySelectorAll(".barra")].map(l => ({
+        nome: l.querySelector(".og-p-nome").value.trim(),
+        cpf: l.querySelector(".og-p-cpf").value.trim() || null,
+        telefone: l.querySelector(".og-p-tel").value.trim() || null,
+        usa_transfer: l.querySelector(".og-p-transfer").checked,
+        transfer_origem: l.querySelector(".og-p-origem").value || null
+      })).filter(p => p.nome);
+
+      const b = $("#og-p-salvar");
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        await rpc("admin_salvar_ocupantes_equipe", {
+          p_reserva_id: reg.reserva_id,
+          p_ocupantes: linhas
+        });
+        aviso("#aviso-global", `Pessoas de "${reg.rotulo}" salvas.`, "ok");
+        ABAS.organizacao();
+      }catch(e){ aviso("#og-p-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar pessoas"; }
+    });
+  };
+
+  desenhar();
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
 }
 
 // =====================================================================
