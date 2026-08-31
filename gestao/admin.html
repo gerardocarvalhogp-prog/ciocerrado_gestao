@@ -519,6 +519,18 @@ function irParaAba(nome, empilhar){
     u.hash = nome;
     history.pushState(null, "", u);
   }
+
+  // Esconder o botao do menu (aplicarRestricoesPapel) nunca foi controle
+  // de acesso — so deixa de mostrar o link. Quem digita o hash direto
+  // (achado real do relatorio de seguranca, 31/08/2026) chegava na
+  // tela mesmo assim, com formulario de verdade na frente, e so
+  // descobria a recusa ao tentar salvar. O backend ja recusava a
+  // escrita certo; o que faltava era a tela nem tentar carregar.
+  if(ABAS_SO_ADMIN.has(nome) && !SOU_ADMIN){
+    $("#conteudo").innerHTML =
+      `<div class="vazio">Esta ação exige perfil de administrador. Seu acesso é de staff.</div>`;
+    return;
+  }
   ABAS[nome]();
 }
 
