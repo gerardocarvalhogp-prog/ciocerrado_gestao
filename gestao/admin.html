@@ -4802,6 +4802,7 @@ ABAS.equipe = async function(){
       <h2>Acessos ativos</h2>
       <div id="eq-lista">${DS.skeletonCartoes(2)}</div>
     </div>
+    <div id="eq-detalhe"></div>
 
     <div class="cartao">
       <h2>Fila de e-mails</h2>
@@ -4929,6 +4930,7 @@ async function listarEquipe(){
           <td class="meta">${dataBR(m.created_at)}</td>
           <td style="white-space:nowrap;">
             <button class="btn sec mini editar">Editar</button>
+            ${m.role === "staff" ? `<button class="btn sec mini eventos">Eventos</button>` : ""}
             <button class="btn sec mini resetar">Redefinir senha</button>
             ${souEu ? "" : `<button class="btn perigo mini apagar">Remover</button>`}
           </td></tr>`;
@@ -4977,7 +4979,51 @@ async function listarEquipe(){
         listarEquipe();
       }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
     }));
+
+    $$("#eq-lista .eventos").forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      abrirEventosMembro(tr.dataset.id, tr.dataset.nome || tr.dataset.email);
+    }));
   }catch(e){ aviso("#eq-lista", explicar(e)); }
+}
+
+// Quais eventos esta pessoa da staff acompanha — sem isso ela nao ve
+// nenhum (admin sempre ve tudo, essa tela nem aparece pra ela). Mesmo
+// espirito do "Pessoas" da aba Organização: painel que abre embaixo da
+// linha, sem navegar pra outro lugar.
+async function abrirEventosMembro(id, nome){
+  const box = $("#eq-detalhe");
+  box.innerHTML = DS.skeletonCartoes(1);
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+  try{
+    const l = await rpc("admin_listar_eventos_membro", { p_admin_id: id });
+    box.innerHTML = `
+      <div class="cartao">
+        <h2>Eventos · ${esc(nome)}</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Sem nenhum marcado, esta conta não enxerga participante, quarto nem check-in de evento nenhum.
+        </p>
+        ${l.length ? l.map(e => `
+          <label class="check" style="display:flex;margin-bottom:6px;">
+            <input type="checkbox" class="ev-check" value="${esc(e.evento_id)}" ${e.associado ? "checked" : ""}>
+            ${esc(e.evento_nome)}
+          </label>`).join("") : `<div class="vazio">Nenhum evento cadastrado ainda.</div>`}
+        <div id="eq-ev-aviso" style="margin-top:8px;"></div>
+        <button class="btn" id="eq-ev-salvar" style="margin-top:6px;">Salvar eventos</button>
+      </div>`;
+
+    $("#eq-ev-salvar").addEventListener("click", async () => {
+      const ids = $$(".ev-check", box).filter(c => c.checked).map(c => c.value);
+      const b = $("#eq-ev-salvar");
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        await rpc("admin_definir_eventos_membro", { p_admin_id: id, p_evento_ids: ids });
+        aviso("#aviso-global", `Eventos de "${nome}" atualizados: ${ids.length} associado(s).`, "ok");
+      }catch(e){ aviso("#eq-ev-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Salvar eventos"; }
+    });
+  }catch(e){ aviso(box, explicar(e)); }
 }
 
 async function salvarMembro(){

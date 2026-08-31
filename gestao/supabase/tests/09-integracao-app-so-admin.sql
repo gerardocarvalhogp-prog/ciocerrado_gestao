@@ -65,12 +65,13 @@ reset request.jwt.claims;
 
 \echo ''
 \echo '#############################################'
-\echo '# STAFF: admin_listar_eventos continua liberado (intencional)'
+\echo '# STAFF: admin_listar_eventos so mostra evento associado'
+\echo '# (mudou em 20260831160000 — antes era liberado pra qualquer evento)'
 \echo '#############################################'
 set role authenticated;
 set request.jwt.claims = '{"email":"staff-seg-teste@teste.invalido","role":"authenticated"}';
 
-select count(*) > 0 as staff_ainda_ve_eventos from admin_listar_eventos();
+select count(*) as staff_sem_associacao_nao_ve_nada from admin_listar_eventos();
 
 reset role;
 reset request.jwt.claims;
