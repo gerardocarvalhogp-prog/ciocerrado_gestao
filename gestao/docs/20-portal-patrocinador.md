@@ -5,24 +5,27 @@ para quem está pagando por ele: acabamento e clareza aqui valem tanto quanto
 função.
 
 Acesso por magic link, com opção de criar senha. **Uma empresa pode ter vários
-usuários com login**, todos com a mesma visão dos dados da empresa.
+usuários com login**, todos com a mesma visão dos dados da empresa — modelado
+em `usuarios_patrocinador`, sem limite de linhas por `patrocinador_id`.
 
-Um **aviso de pendências no topo** mostra o que falta a empresa preencher.
+**Sete abas**, não cinco: Quartos, Mesa redonda, Indicações, Brindes,
+**Convidados**, Financeiro, **Manual** — as duas em negrito não estavam no
+rascunho.
 
 ---
 
 ## Regra crítica: isolamento
 
-O patrocinador vê exclusivamente os dados da própria empresa. Isso precisa valer
-em toda superfície:
+Conferido em `70-modelo-de-dados.md`, seção "Acesso e isolamento": nenhuma das
+21 funções `patro_*` chamadas por esta tela devolve dado sem checar
+`_exige_patrocinador`/`meus_patrocinadores()` primeiro — inclusive quando a
+própria tela manda `p_patrocinador_id` como parâmetro (o que o cliente manda
+não é confiado; a função confere de novo do lado do servidor, contra o e-mail
+do JWT).
 
-- listas e formulários das abas
-- URL manipulada com identificador de outra empresa
-- resultados de busca
-- arquivos exportados
-- lista de convidados de mesa redonda e de jantar
-
-Vazamento entre patrocinadores é falha crítica, não cosmética.
+O patrocinador vê exclusivamente os dados da própria empresa. Confirmado nas
+sete abas — nenhuma delas expõe e-mail nem telefone de convidado que a própria
+empresa não tenha ela mesma escolhido (ver aba Convidados, abaixo).
 
 ---
 
@@ -30,57 +33,95 @@ Vazamento entre patrocinadores é falha crítica, não cosmética.
 
 ### Quartos
 
-Quartos que a cota dá direito e definição de quem ocupa cada um.
+Quartos que a cota dá direito, e o quarto extra à parte.
 
-- Tipo de acomodação por quarto.
-- Ocupantes, dentro do limite da cota.
-- *A confirmar: o patrocinador pode pedir quarto adicional pelo portal, e isso
-  gera cobrança automática?*
+- Cartão por quarto, com ocupante(s), CPF, e transfer por pessoa (cada
+  ocupante do mesmo quarto pode sair de origem diferente — GYN ou BSB).
+- **Quarto adicional gera cobrança, confirmada antes de reservar**: o bloco
+  "Quartos disponíveis" mostra disponibilidade em tempo real por tipo, com
+  preço; clicar em "Reservar" abre uma confirmação explícita com o valor
+  ("Custo: R$ X, que entra na sua fatura") antes de qualquer coisa ser criada.
+  Isso responde a pergunta represada do rascunho.
+- Quarto extra pode ser cancelado pelo próprio portal — volta para a
+  disponibilidade do hotel.
 
-**Gotcha conhecido da operação:** no processo antigo em planilha, patrocinadores
-preenchiam o campo de associação com o **nome da empresa** em vez do número,
-agrupando tudo indevidamente. O sistema precisa impedir esse tipo de entrada
-livre onde deveria haver seleção.
+**Sobre o gotcha da planilha antiga** (campo de associação preenchido com nome
+da empresa em vez do número): não se aplica mais como risco — o portal não tem
+nenhum campo de "escolha sua empresa"; a identidade vem do login
+(`PATRO.patrocinador_id`), não de entrada livre. O problema era do processo em
+planilha; a tela atual não reabre esse buraco.
 
 ### Mesa redonda
 
-Vagas de convidado que a cota dá direito e escolha de quem ocupa cada uma.
+Vagas de convidado que a cota dá direito, dentro de uma fila de escolha por
+`sessao`.
 
-**Regras:**
-- O número de vagas vem da cota (Esmeralda → Prata, em ordem decrescente).
-- O patrocinador pode indicar convidados próprios; o restante é alocado pela
-  organização por porte e afinidade comercial.
-- Indicação do patrocinador tem precedência sobre a alocação automática.
-- Depois de o material estar impresso, mudanças são acomodadas alterando o
-  mínimo possível das demais mesas.
+- Fila por `ordem_prioridade` da cota (Esmeralda → Prata) — `v_ordem_escolha`.
+- Vaga não pode exceder a cota: `patro_escolher_convidados` recusa
+  (`'Cota de % vaga(s); voce ja tem % e tentou somar %'`) — **bloqueio, não
+  aviso nem cobrança automática.**
+- Prazo por vez na fila: passado o prazo da cota, a vez passa para a próxima
+  (`'O prazo da sua cota terminou em %...'`) — mensagem visível na tela
+  (`notaPrazo`).
+- Convidado não se repete em outra sessão do mesmo tipo (mesma checagem de
+  `70-modelo-de-dados.md`).
 
-*A confirmar: o portal mostra ao patrocinador a lista final da mesa dele, e em
-que momento ela é liberada.*
+*A confirmar: em que momento a lista final da mesa é considerada liberada
+para o patrocinador — não encontrei um estado explícito de "lista fechada"
+nesta aba, só o prazo da fila de escolha.*
 
-### Indicar CIO
+### Indicações (rótulo do rascunho: "Indicar CIO")
 
-Indicação de executivos que o patrocinador quer ver convidados ao evento.
+Formulário simples (nome, empresa, cargo, e-mail, telefone, observação) — só
+nome é obrigatório.
 
-**Regra:** indicação não é convite. Ela entra numa fila de avaliação da
-organização e só vira convidado após aprovação. O portal precisa deixar isso
-explícito para não criar expectativa com o cliente do patrocinador.
-
-*A confirmar: o patrocinador acompanha o status da indicação (pendente,
-aprovada, recusada, inscrita)?*
+**Status da indicação, visível ao patrocinador, confirmado no código:**
+`nova` ("Aguardando convite"), `convidado` ("Convidado"), `inscrito`
+("Inscrito"), `recusado` ("Não seguiu"), `duplicado` ("Já na base"). Isto
+responde a pergunta represada do rascunho — o portal acompanha, sim, o status,
+com esses cinco rótulos.
 
 ### Brindes
 
-Registro do brinde que o patrocinador vai distribuir.
+Um formulário por empresa, não por quarto — texto explícito na tela: *"Um
+brinde por empresa, não um por quarto."*
 
-*A confirmar: o que é coletado — descrição, quantidade, data de entrega,
-dimensões, imagem? Há prazo limite?*
+**Coletado, confirmado no código:** descrição, quantidade, destino (`stand`
+ou `quarto` — entregar no quarto dos convidados custa mais, valor mostrado na
+tela) e, depois de marcado "vamos levar", transportadora + código de rastreio.
+**Não coletado:** data de entrega, dimensões, imagem. **Não encontrado:** prazo
+limite explícito nesta aba.
+
+### Convidados
+
+**Não estava no rascunho.** Lista consolidada de quem a empresa efetivamente
+tem confirmado — só quem está **aprovado E com contrato assinado**
+(`patro_convidados_confirmados`). Comentário no próprio código explica a
+decisão de design: presença ainda não confirmada não deveria aparecer como se
+fosse, e a lista **não traz e-mail nem telefone** de propósito — contato só
+depois de o patrocinador efetivamente escolher o convidado (mailing da
+sessão), não antes.
 
 ### Financeiro
 
-Valor da cota, situação de pagamento e eventuais adicionais.
+**Não é fatura de cota** — é `patro_minha_fatura`, os itens adicionais
+(quarto extra, brinde no quarto etc.) que a empresa gerou, com total,
+vencimento, data de pagamento se já paga, e observação da organização.
+Estados `estimada` (muda sozinha se o patrocinador mexer em quarto/brinde) e
+fechado (organização travou o valor).
 
-*A confirmar: há nota fiscal, boleto ou comprovante disponível no portal, ou
-apenas o status?*
+**Confirmado: não há nota fiscal, boleto nem comprovante no portal — só
+status e itens discriminados.** Texto na própria tela orienta "fale com a
+organização" para dúvida de lançamento.
+
+*Isto não cobre o valor da cota em si — só adicionais. Se a cota tem tela de
+pagamento própria em algum outro lugar, não encontrei nesta aba.*
+
+### Manual
+
+**Não estava no rascunho.** Nome, local, datas do evento e os prazos que
+afetam o CIO inscrito por essa empresa (prazo de contrato, de rooming, de
+cancelamento) — informativo, sem ação.
 
 ---
 
@@ -96,14 +137,34 @@ defeito reportável, não como implicância:
 - estados vazios sem explicação ("nada aqui" sem dizer o que fazer)
 - comportamento diferente no celular
 
+*Não verificado nesta passagem — exige uso da tela, não leitura de código.*
+
 ---
+
+## Perguntas do rascunho, respondidas pelo código
+
+- **O patrocinador pode pedir quarto adicional pelo portal, e isso gera
+  cobrança automática?** Sim, com confirmação explícita do valor antes de
+  reservar.
+- **O que acontece quando excede o limite da cota (mesa redonda)?**
+  Bloqueio — a função recusa com mensagem, não aceita e cobra.
+- **O patrocinador acompanha o status da indicação?** Sim, cinco estados
+  visíveis.
+- **O que é coletado em Brindes?** Descrição, quantidade, destino, rastreio —
+  sem data de entrega, dimensões nem imagem.
+- **Há nota fiscal/boleto/comprovante no Financeiro?** Não — só status e
+  itens.
 
 ## A confirmar com o organizador
 
-- Como um segundo usuário da mesma empresa é criado: pelo próprio patrocinador
-  ou só pelo admin?
-- O que acontece quando o patrocinador excede o limite da cota — bloqueio, aviso,
-  ou aceita e gera cobrança?
-- Há prazo de corte por aba? O portal fecha edição depois de uma data?
-- O patrocinador consegue exportar a própria lista de participantes?
-- Existe registro visível de quando cada dado foi salvo e por qual usuário?
+- Como um segundo usuário da mesma empresa é criado — não encontrei tela de
+  autoatendimento para isso em `portal.html`; parece ser só pelo admin.
+- Em que momento a lista de mesa redonda é considerada "liberada" para o
+  patrocinador ver o resultado final.
+- Se existe prazo de corte por aba além do prazo de fila da mesa redonda — não
+  encontrei um bloqueio geral de edição por data nas demais abas.
+- **O patrocinador consegue exportar a própria lista?** Não encontrei nenhuma
+  chamada de exportação em `portal.html` — se existe, não é nesta tela.
+- Existe registro visível (na tela, não só no banco) de quando cada dado foi
+  salvo e por qual usuário, quando há mais de um login na mesma empresa?
+- Onde a cota em si é paga/registrada — a aba Financeiro cobre só adicionais.
