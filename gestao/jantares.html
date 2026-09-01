@@ -1436,28 +1436,101 @@ ABAS.sondagem = async function(){
   });
 };
 
+// =====================================================================
+// ABA: ESTATISTICAS
+//
+// Nasceu da analise da planilha antiga (aba "Convite Jantares", 44
+// jantares, 893 pessoas): 77 pessoas convidadas 3+ vezes com ZERO
+// confirmacoes, um padrao que o card antigo ("Quem mais foi
+// convidado") nao conseguia mostrar — ele so contava quem tinha
+// confirmado ou comparecido, entao quem nunca confirma nem aparecia
+// na lista. jantar_estatisticas_confirmacao conta os convites TODOS
+// (convidado/confirmado/compareceu/recusado), nao so os que deram
+// certo.
+//
+// n_sem_comparecimento e a pergunta que a planilha antiga tinha um
+// status pra fazer ("50 - NAO COMPARECEU") mas parou de preencher: aqui
+// e calculado ao vivo — confirmou, o jantar ja aconteceu, e o check-in
+// nunca marcou "compareceu".
+// =====================================================================
 ABAS.estatisticas = async function(){
   const c = $("#conteudo");
-  c.innerHTML = DS.skeletonCartoes(2);
+  c.innerHTML = DS.skeletonCartoes(3);
   try{
-    const [freq, semConvite] = await Promise.all([
-      rpc("jantar_estatisticas_gestores", { p_limite: 200 }),
+    const [panorama, conf, semConvite] = await Promise.all([
+      rpc("jantar_estatisticas_panorama", {}),
+      rpc("jantar_estatisticas_confirmacao", { p_limite: 300 }),
       rpc("jantar_empresas_sem_convite", { p_limite: 200 })
     ]);
 
+    const nuncaConfirma = conf.filter(f => f.n_convites >= 3 && f.n_confirmados === 0)
+      .sort((a,b) => b.n_convites - a.n_convites);
+    const semComparecimento = conf.filter(f => f.n_sem_comparecimento > 0)
+      .sort((a,b) => b.n_sem_comparecimento - a.n_sem_comparecimento);
+
+    const linhaVazia = (n, msg) => `<tr><td colspan="${n}" style="color:var(--suave)">${msg}</td></tr>`;
+    const seloTaxa = t => t >= 60 ? "ok" : t >= 30 ? "alerta" : "erro";
+
     c.innerHTML = `
       <h1>Estatísticas</h1>
-      <p class="sub">Frequência de convite, para não repetir sempre os mesmos nomes.</p>
+      <p class="sub">Frequência de convite e confirmação, para não repetir sempre os mesmos nomes.</p>
+
+      <div class="barra" style="margin-bottom:18px;">
+        <div class="cartao" style="flex:1;text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:600;">${panorama.total_jantares}</div>
+          <div class="meta">jantares registrados</div></div>
+        <div class="cartao" style="flex:1;text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:600;">${panorama.total_pessoas}</div>
+          <div class="meta">pessoas já convidadas</div></div>
+        <div class="cartao" style="flex:1;text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:600;">${panorama.total_convites}</div>
+          <div class="meta">convites emitidos</div></div>
+        <div class="cartao" style="flex:1;text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:600;">${panorama.total_convites ? Math.round(100*panorama.total_confirmados/panorama.total_convites) : 0}%</div>
+          <div class="meta">taxa geral de confirmação</div></div>
+      </div>
 
       <div class="cartao">
-        <div class="cartao-cab"><h2 style="margin:0;">Quem mais foi convidado</h2>
-          <button class="btn sec mini" id="ex-freq">Exportar</button></div>
+        <div class="cartao-cab"><h2 style="margin:0;">Convidados sempre, confirmam nunca</h2>
+          <button class="btn sec mini" id="ex-nunca-confirma">Exportar</button></div>
+        <p class="sub">Convidados 3 vezes ou mais, sem confirmar uma vez sequer. Vale repensar o canal
+          de convite ou trocar de contato na mesma empresa antes de continuar chamando.</p>
         <div class="rolagem"><table>
-          <tr><th>Nome</th><th>Empresa</th><th>Vezes</th><th>Última vez</th></tr>
-          ${freq.map(f => `<tr><td>${esc(f.nome)}</td><td>${esc(f.empresa||"—")}</td>
-            <td><span class="selo ${f.vezes>=3?"alerta":"pend"}">${f.vezes}</span></td>
+          <tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th>Convites</th><th>Última vez</th></tr>
+          ${nuncaConfirma.map(f => `<tr><td>${esc(f.nome)}</td><td class="meta">${esc(f.empresa||"—")}</td>
+            <td class="meta">${esc(f.cargo||"—")}</td>
+            <td><span class="selo erro">${f.n_convites}</span></td>
             <td class="meta">${dataBR(f.ultima_vez)}</td></tr>`).join("") ||
-            `<tr><td colspan="4" style="color:var(--suave)">Sem histórico ainda.</td></tr>`}
+            linhaVazia(5, "Ninguém nesse padrão — ou ainda não há histórico suficiente.")}
+        </table></div>
+      </div>
+
+      <div class="cartao">
+        <div class="cartao-cab"><h2 style="margin:0;">Confirmaram e não apareceram</h2>
+          <button class="btn sec mini" id="ex-sem-comparecimento">Exportar</button></div>
+        <p class="sub">Confirmou presença, o jantar já aconteceu, e o check-in nunca marcou a
+          chegada. A planilha antiga não tinha como responder isso; o check-in ao vivo tem.</p>
+        <div class="rolagem"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Confirmou e faltou</th><th>Última vez</th></tr>
+          ${semComparecimento.map(f => `<tr><td>${esc(f.nome)}</td><td class="meta">${esc(f.empresa||"—")}</td>
+            <td><span class="selo alerta">${f.n_sem_comparecimento}</span></td>
+            <td class="meta">${dataBR(f.ultima_vez)}</td></tr>`).join("") ||
+            linhaVazia(4, "Ninguém nesse padrão — ou os jantares registrados ainda não aconteceram.")}
+        </table></div>
+      </div>
+
+      <div class="cartao">
+        <div class="cartao-cab"><h2 style="margin:0;">Quem é chamado com mais frequência</h2>
+          <button class="btn sec mini" id="ex-freq">Exportar</button></div>
+        <p class="sub">Sem filtro de resposta — equipe do CIO Cerrado já fica de fora, por comparecer
+          aos próprios eventos que organiza.</p>
+        <div class="rolagem"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Convites</th><th>Confirmados</th><th>Taxa</th><th>Última vez</th></tr>
+          ${conf.slice(0,100).map(f => `<tr><td>${esc(f.nome)}</td><td class="meta">${esc(f.empresa||"—")}</td>
+            <td>${f.n_convites}</td><td class="meta">${f.n_confirmados}</td>
+            <td><span class="selo ${seloTaxa(f.taxa)}">${f.taxa}%</span></td>
+            <td class="meta">${dataBR(f.ultima_vez)}</td></tr>`).join("") ||
+            linhaVazia(6, "Sem histórico ainda.")}
         </table></div>
       </div>
 
@@ -1469,12 +1542,19 @@ ABAS.estatisticas = async function(){
           <tr><th>Empresa</th><th>Segmento</th><th>Contatos na base</th></tr>
           ${semConvite.map(e => `<tr><td>${esc(e.empresa)}</td>
             <td class="meta">${esc(e.segmento||"—")}</td><td>${e.contatos}</td></tr>`).join("") ||
-            `<tr><td colspan="3" style="color:var(--suave)">Nenhuma — todas já foram convidadas.</td></tr>`}
+            linhaVazia(3, "Nenhuma — todas já foram convidadas.")}
         </table></div>
       </div>`;
 
-    $("#ex-freq").addEventListener("click", () => exportar(freq,
-      [["nome","Nome"],["empresa","Empresa"],["vezes","Vezes convidado"],["ultima_vez","Última vez"]],
+    $("#ex-nunca-confirma").addEventListener("click", () => exportar(nuncaConfirma,
+      [["nome","Nome"],["empresa","Empresa"],["cargo","Cargo"],["n_convites","Convites"],["ultima_vez","Última vez"]],
+      "nunca-confirmam.xlsx", "Nunca confirmam"));
+    $("#ex-sem-comparecimento").addEventListener("click", () => exportar(semComparecimento,
+      [["nome","Nome"],["empresa","Empresa"],["n_sem_comparecimento","Confirmou e faltou"],["ultima_vez","Última vez"]],
+      "confirmou-e-faltou.xlsx", "Confirmou e faltou"));
+    $("#ex-freq").addEventListener("click", () => exportar(conf,
+      [["nome","Nome"],["empresa","Empresa"],["n_convites","Convites"],["n_confirmados","Confirmados"],
+       ["taxa","Taxa %"],["ultima_vez","Última vez"]],
       "frequencia-convites.xlsx", "Frequência"));
     $("#ex-nunca").addEventListener("click", () => exportar(semConvite,
       [["empresa","Empresa"],["segmento","Segmento"],["contatos","Contatos na base"]],
