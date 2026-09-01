@@ -1,119 +1,124 @@
 # Módulos previstos, ainda não disponíveis
 
-Nada aqui existe na interface. Registrado como especificação para que o time não
-procure tela que não foi construída — e para que a construção não invente regra.
+**Os três módulos que este arquivo descrevia como "nada existe na interface"
+já estão construídos, com tela, em produção.** Achado central desta apuração
+— ver `10-admin.md`, `40-checkin.md` e `80-integracoes.md` para onde cada
+pedaço foi movido. O que resta aqui é só a fração de cada módulo que
+continua genuinamente bloqueada por algo fora do código.
 
 ---
 
-## 1. Acompanhamento e cobrança de pendências
+## 1. Acompanhamento e cobrança de pendências — **construído**
 
-**Prioridade de construção.** É o buraco mais sentido hoje: o sistema coleta,
-mas não mostra quem está atrasado nem ajuda a cobrar.
+Aba **Acompanhamento**, em `admin.html`. Movido para `10-admin.md`.
 
-### O que a tela mostra
+Tudo que a especificação original pedia está lá: pendência por etapa e por
+pessoa/empresa, tempo em aberto, atraso contra o prazo configurado, decisão de
+cobrança sempre humana (rascunho de e-mail preparado, organizador revisa e
+confirma o envio, "Enviar agora" por pessoa — nunca "cobrar todos").
 
-Por pendência, por pessoa ou empresa:
-
-- qual etapa está aberta
-- há quanto tempo está aberta (tempo de espera)
-- atraso em relação ao prazo, quando existe prazo
-- data da última cobrança
-- quantas cobranças já foram feitas
-
-Vale para os dois perfis (CIO e patrocinador) e para os dois tipos de evento
-(grande e jantar). Etapas que não se aplicam ao tipo de evento não aparecem.
-
-### Como a cobrança funciona
-
-**Regra central: a cobrança é decisão humana.** Não há disparo automático.
-
-1. O sistema identifica a pendência e prepara o e-mail.
-2. O organizador abre a tela de conferência e revisa o conteúdo.
-3. O organizador confirma o envio, pessoa a pessoa.
-4. O sistema registra o envio e incrementa o contador de cobranças.
-
-Não existe "cobrar todos". O que o sistema faz é tornar o disparo individual
-rápido, não removê-lo.
-
-*A confirmar: os textos de cobrança são modelos editáveis? Passam pela Fernanda
-antes, por saírem com a voz da comunicação do CIO Cerrado?*
+**O que não pude confirmar:** se os textos de cobrança são editáveis como
+modelo reutilizável, ou digitados na hora a cada envio — o modal mostra um
+rascunho pré-preenchido e editável por aquele envio, não achei um cadastro de
+"modelos" à parte. Ver `PERGUNTAS.md`.
 
 ---
 
-## 2. Presença, QR code e WhatsApp
+## 2. Presença, QR code e WhatsApp — **construído em duas partes, uma ainda bloqueada**
 
-**Exclusivo do evento grande de junho.**
+### Atividades e presença — construído
 
-### Atividades e presença
+Aba **Atividades**, em `admin.html`. Cadastro de atividade por evento, liga/
+desliga por evento, check-in específico por atividade — movido para
+`10-admin.md`.
 
-- Atividades cadastradas por evento, tipicamente duas por dia: manhã e
-  pós-almoço.
-- Presença registrada por atividade, não só a chegada ao evento.
+### QR code — construído
 
-### QR code
+`checkin.html` já lê QR pela câmera do celular (`jsQR`), botão "Ler QR" —
+movido para `40-checkin.md`. **Não confirmado:** se o mesmo leitor já troca de
+contexto entre chegada geral e presença por atividade, como a especificação
+original pedia — o código de `checkin.html` lido nesta passagem cobre chegada
+geral; o check-in por atividade em `admin.html` usa suas próprias funções
+(`atividade_checkin_registrar`), e não confirmei se compartilha o mesmo
+componente de leitura ou se são dois leitores distintos.
 
-- Crachá com QR **opaco** (não legível a olho nu, sem dado exposto no impresso).
-- Leitura pela câmera do celular do staff.
-- **Mesmo leitor** para chegada e para presença por atividade — o que muda é o
-  contexto, que precisa estar explícito na tela para quem está bipando.
+### WhatsApp — genuinamente ainda não disponível, mas o código existe
 
-### WhatsApp
+Continua **previsto, não disponível** — nisso o rascunho estava certo. O que
+mudou: a Edge Function `enviar-whatsapp` já existe, pronta, e recusa rodar
+com uma mensagem clara do motivo (mesmo padrão de `enviar-notificacoes`,
+que recusa sem `RESEND_API_KEY`). Falta, fora de código:
 
-Integração com a **API oficial** do WhatsApp para quem não chegou.
+1. Verificação de negócio no WhatsApp Business Platform (Meta Business
+   Manager).
+2. Número de telefone dedicado aprovado dentro dessa conta.
+3. Pelo menos um template de mensagem aprovado pela Meta — fora da janela de
+   24h aberta pelo destinatário, toda mensagem tem que ser um template
+   pré-aprovado, não existe texto livre para cobrança proativa.
+4. Opt-in explícito de quem recebe (LGPD + política do WhatsApp).
 
-| Momento | Mensagem | Disparo |
-|---|---|---|
-| ~15 min de atraso | leve, operacional ("já estamos começando") | automático |
-| 1–2 h de atraso | pessoal, de cuidado | só com confirmação do organizador |
+Nenhuma das quatro depende deste repositório. O primeiro aviso automático de
+atraso (~15 min, "já estamos começando") e o aviso pessoal com confirmação do
+organizador (1–2h) seguem como desenho, não implementação — a fila de
+notificação (`notificacoes.canal`) já aceita `whatsapp` como valor, mas nada
+dispara enquanto a conta não existir.
 
-O primeiro aviso é a **única exceção** à regra de decisão humana em todo o
-sistema, e é exceção por ser operacional e de baixo risco.
-
-### Dependências externas — começar cedo
-
-- Verificação da conta WhatsApp Business.
-- Aprovação de template de mensagem pela Meta.
-
-Ambas dependem de terceiro e têm prazo próprio. São o caminho crítico deste
-módulo, não a programação.
+*A confirmar: andamento da verificação da conta WhatsApp Business — é
+dependência externa com prazo próprio, não rastreável pelo código.*
 
 ---
 
-## 3. Integração com o app do evento
+## 3. Integração com o app do evento — **parcialmente construído, o resto genuinamente bloqueado pelo parceiro**
 
-### Como é hoje
+### Cenário A (arquivo melhorado) — construído
 
-Por arquivo. Dois modelos exportados do sistema — **usuários** e **empresas** —
-importados manualmente no app.
+Dentro da aba **Equipe**, seção "App do evento", em `admin.html`. Movido para
+`10-admin.md` e `80-integracoes.md`.
 
-Regras já estabelecidas do processo manual:
-- registros sem e-mail são excluídos da importação
-- o identificador de empresa é conferido contra a lista de empresas já
-  cadastradas na plataforma
-- registros novos entram ao final do arquivo
+- `eventos.id_app`: ID do evento no admin do parceiro, preenchido à mão (o
+  app não expõe consulta).
+- `mapa_empresa_app`: de-para entre empresa/patrocinador interno e o
+  `empresa_id_app` numérico do parceiro, também preenchido à mão.
+- Com isso, o sistema gera a planilha de usuários e de empresas **já no
+  formato exato que o app aceita**, incluindo o ID certo por linha — a
+  melhoria real possível sem depender do parceiro construir nada.
 
-### O que se quer
+Regras do processo mantidas: registros sem e-mail são excluídos da
+importação; registros novos entram ao final do arquivo.
 
-O app é de um parceiro externo, e o que não existe pode ser construído —
-inclusive envio automático e retorno de dados do app para o sistema.
+### Cenário B/C (API de verdade) — continua bloqueado, e por razão confirmada
 
-**A definição que destrava tudo é a chave de identificação estável entre os dois
-lados.** Sem um identificador que sobreviva a mudança de nome, de e-mail e de
-empresa, qualquer integração vira reconciliação manual — o problema que se quer
-eliminar.
+**Não é falta de tempo deste lado — o app do parceiro não tem API.**
+Levantamento próprio confirmou: sem consulta de empresa por ID, sem upsert
+(reenviar e-mail já existente é rejeitado, não atualizado), só importação de
+planilha. Enquanto isso não mudar do lado do parceiro, envio automático e
+retorno de dados para o sistema seguem impossíveis — não é uma prioridade a
+reordenar, é uma dependência externa sem solução deste lado.
 
-Enquanto essa chave não estiver acordada com o parceiro, não vale construir a
-integração.
+A "chave de identificação estável" que destravaria isso é exatamente o que
+`mapa_empresa_app` já resolve manualmente — se o parceiro abrir uma API um
+dia, a peça que falta é só o lado de fora.
 
-*A confirmar: o que o parceiro oferece hoje de API, e qual identificador ele
-consegue aceitar e devolver.*
+---
+
+## Resumo do que ainda é "previsto, não disponível" de verdade
+
+| Item | Situação |
+|---|---|
+| WhatsApp (envio) | Código pronto, bloqueado por verificação de conta + template, ambos com a Meta |
+| Integração automática com o app do evento (API) | Bloqueada pelo parceiro, que não tem API — não há o que fazer deste lado agora |
+| QR com contexto trocável (chegada vs. atividade) | Não confirmado se já funciona assim ou se são dois componentes separados |
+
+Tudo o que este arquivo descrevia além disso já está em produção.
 
 ---
 
 ## A confirmar com o organizador
 
-- Ordem de construção dos três módulos e se algum pode esperar o próximo ciclo.
-- Prazos por etapa que alimentam o cálculo de atraso do módulo de cobrança.
-- Quem, além do organizador, pode confirmar um disparo de cobrança.
-- Se a presença por atividade precisa de relatório próprio ou entra no relatório
-  geral do evento.
+- Se o modal de cobrança da aba Acompanhamento deveria ter modelos salvos e
+  reutilizáveis, em vez de rascunho editável a cada envio.
+- Andamento da verificação da conta WhatsApp Business.
+- Se há qualquer sinalização recente do parceiro do app sobre construir uma
+  API — se não, não há necessidade de revisitar isto tão cedo.
+- Se o QR de `checkin.html` e o check-in por atividade de `admin.html`
+  deveriam compartilhar o mesmo componente de leitura.
