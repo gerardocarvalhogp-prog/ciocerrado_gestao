@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Manual do Sistema de Gestão — CIO Cerrado</title>
+<style>
+  @page {
+    size: Letter;
+    margin: 20mm 18mm 20mm 18mm;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family: Georgia, "Times New Roman", serif;
+    color: #1C2A22;
+    font-size: 11.5pt;
+    line-height: 1.55;
+  }
+  .corpo{ font-family: -apple-system, "Segoe UI", Arial, sans-serif; }
+
+  h1,h2,h3{ font-family: Georgia, "Times New Roman", serif; font-weight: 700; color: #1F5C3F; }
+  h1{ font-size: 21pt; margin: 0 0 10pt; }
+  h2{ font-size: 16pt; margin: 22pt 0 8pt; border-bottom: 1pt solid #DED5BE; padding-bottom: 5pt; }
+  h3{ font-size: 12.5pt; color: #A87D2E; margin: 14pt 0 5pt; }
+  p{ font-family: -apple-system, "Segoe UI", Arial, sans-serif; font-size: 10.8pt; margin: 0 0 9pt; text-align: justify; }
+  ul{ font-family: -apple-system, "Segoe UI", Arial, sans-serif; font-size: 10.8pt; margin: 0 0 10pt; padding-left: 16pt; }
+  li{ margin-bottom: 5pt; }
+  strong{ color: #1C2A22; }
+
+  .capa{
+    height: 250mm; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    page-break-after: always;
+  }
+  .capa .marca{ font-size: 30pt; color: #1F5C3F; font-weight: 700; margin-bottom: 14pt; }
+  .capa .titulo{ font-size: 19pt; color: #1C2A22; margin-bottom: 40pt; }
+  .capa .sub{ font-size: 12pt; font-style: italic; color: #6B6B6B; font-family: -apple-system, sans-serif; margin-bottom: 60pt; max-width: 110mm; }
+  .capa .data{ font-size: 10.5pt; color: #8B9189; font-family: -apple-system, sans-serif; }
+
+  .capitulo{ page-break-before: always; }
+  .capitulo:first-of-type{ page-break-before: avoid; }
+
+  .callout{
+    border-left: 3pt solid #1F5C3F;
+    background: #F7F5EF;
+    border-radius: 0 3pt 3pt 0;
+    padding: 9pt 13pt;
+    margin: 10pt 0 14pt;
+  }
+  .callout .rotulo{
+    font-family: -apple-system, sans-serif; font-size: 8.5pt; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em; color: #1F5C3F; margin-bottom: 4pt; display: block;
+  }
+  .callout p{ margin: 0; }
+  .callout.gold{ border-left-color: #A87D2E; background: #FBF3E3; }
+  .callout.gold .rotulo{ color: #A87D2E; }
+
+  table{ width: 100%; border-collapse: collapse; margin: 10pt 0 14pt; font-family: -apple-system, sans-serif; font-size: 9.8pt; }
+  th{ background: #1F5C3F; color: #fff; text-align: left; padding: 6pt 8pt; font-weight: 700; }
+  td{ padding: 6pt 8pt; border-bottom: 0.5pt solid #DED5BE; vertical-align: top; }
+  tr:nth-child(even) td{ background: #F7F5EF; }
+  td:first-child{ font-weight: 700; white-space: nowrap; }
+
+  footer.rodape{ margin-top: 30pt; padding-top: 10pt; border-top: 0.5pt solid #DED5BE; font-size: 9pt; font-style: italic; color: #6B6B6B; font-family: -apple-system, sans-serif; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <div class="marca">CIO CERRADO</div>
+  <div class="titulo">Manual do Sistema de Gestão de Eventos</div>
+  <div class="sub">Guia para a diretoria e para a equipe que opera o sistema no dia a dia</div>
+  <div class="data">Setembro de 2026<br>Base publicada em ciocerrado.netlify.app/gestao/</div>
+</div>
+
+<div class="capitulo">
+<h1>1. O que é este sistema</h1>
+<p>Até pouco tempo atrás, organizar um evento do CIO Cerrado — desde a inscrição do primeiro CIO até o crachá do último convidado — dependia de uma sequência de planilhas, scripts avulsos e conferências manuais. Cada etapa vivia num lugar diferente, e juntar tudo era trabalho de gente, sempre sob risco de um dado desatualizado em algum canto.</p>
+<p>O sistema de gestão substitui essa colcha de retalhos por um só lugar, com regra clara em cada etapa. Ele não substitui as ferramentas que já funcionam bem — Sympla para inscrição, Autentique para contrato — ele conecta o que vem delas e organiza tudo o que acontece depois.</p>
+
+<h2>1.1 O caminho de um evento, do início ao fim</h2>
+<p>Um evento grande do CIO Cerrado passa por seis etapas, nesta ordem:</p>
+<ul>
+  <li><strong>Inscrição</strong> — o CIO ou o patrocinador se inscreve pelo Sympla.</li>
+  <li><strong>Contrato</strong> — depois de aprovado, a organização envia o contrato pelo Autentique.</li>
+  <li><strong>Hospedagem</strong> — o CIO preenche seus dados de quarto, acompanhante e transfer.</li>
+  <li><strong>Portal do patrocinador</strong> — a empresa patrocinadora organiza sua cota: quartos, mesa redonda, indicação de convidados, brindes.</li>
+  <li><strong>Jantares</strong> — a organização escolhe, com apoio de inteligência artificial, quem senta à mesa de cada patrocinador.</li>
+  <li><strong>Check-in</strong> — no dia do evento, a equipe registra a chegada de cada pessoa.</li>
+</ul>
+<p>Jantares avulsos (fora do evento grande) seguem um caminho mais curto: não têm hospedagem nem transfer, só a curadoria de convidados e o check-in no dia.</p>
+
+<h2>1.2 Quem usa o quê</h2>
+<p>O sistema tem quatro portas de entrada diferentes, uma para cada tipo de usuário:</p>
+<table>
+  <tr><th>Quem</th><th>O que faz e onde</th></tr>
+  <tr><td>Organização (sócios e analista)</td><td>Acesso total ao painel de gestão — aprova inscrição, acompanha pendência, cadastra patrocinador, cuida do financeiro.</td></tr>
+  <tr><td>Equipe de apoio (staff do dia)</td><td>Acesso operacional, mais restrito — principalmente check-in no dia do evento. Não altera cadastro, cota nem valor.</td></tr>
+  <tr><td>Patrocinador</td><td>Gerencia a própria cota num portal só dele: quartos, mesa redonda, indicação de CIO, brinde, financeiro da cota. Uma empresa pode ter mais de uma pessoa com acesso.</td></tr>
+  <tr><td>CIO convidado</td><td>Confirma seus próprios dados, informa acompanhante e filho, escolhe transfer — tudo numa área pensada para ser preenchida em poucos minutos, do celular.</td></tr>
+</table>
+
+<div class="callout">
+  <span class="rotulo">Regra que vale para o sistema inteiro</span>
+  <p>Nenhum patrocinador vê dado de outro — nem por acaso, nem forçando a URL, nem em relatório. Essa garantia foi auditada linha a linha e está descrita no capítulo 9. É a regra mais importante de todo o sistema.</p>
+</div>
+
+<h2>1.3 Como entrar no sistema</h2>
+<p>Todo mundo entra da mesma forma: por um link enviado por e-mail (chamado de "link mágico") ou, para quem prefere, criando uma senha na primeira vez. Não há usuário e senha compartilhados — cada pessoa tem seu próprio acesso, vinculado ao seu e-mail.</p>
+</div>
+
+<div class="capitulo">
+<h1>2. O painel da organização</h1>
+<p>É a tela central do sistema — onde a analista passa a maior parte do tempo, e onde os sócios podem conferir o andamento do evento a qualquer momento. Tem 17 assuntos diferentes, organizados em abas, e todos giram em torno do evento selecionado no topo da tela.</p>
+
+<div class="callout">
+  <span class="rotulo">Um detalhe que vale saber</span>
+  <p>Trocar o evento selecionado no topo troca o conteúdo de quase toda aba — é assim que o mesmo sistema atende a um evento grande e a vários jantares avulsos ao mesmo tempo, sem misturar os dados de um com o do outro.</p>
+</div>
+
+<h2>2.1 Painel — o resumo do evento</h2>
+<p>A primeira tela que aparece ao entrar. Mostra em números como o evento está: quantos inscritos, quantos contratos assinados, quantos patrocinadores por cota. É um retrato rápido — para conferir um dado com precisão, o caminho certo é a lista ou a exportação da aba específica, não este resumo.</p>
+
+<h2>2.2 Cadastro — a base de contatos</h2>
+<p>Aqui vive o cadastro de todas as pessoas (os CIOs e executivos) que já passaram pelo CIO Cerrado, em qualquer edição. Não é um cadastro por evento — é uma base única, que cresce com o tempo e é reaproveitada sempre.</p>
+<p>O cadastro chega de três formas: pela inscrição do Sympla (automaticamente ou por planilha exportada), por importação de planilha própria, ou por indicação de um patrocinador.</p>
+<p>Um cuidado importante: todo nome, empresa, cargo e cidade que entra no cadastro é automaticamente colocado em maiúscula e o estado é conferido contra a lista das 27 unidades da federação — isso vale tanto para quem entra pela integração quanto para quem é digitado à mão, sem exceção. É o que garante que a base fique arrumada, esteja ela vindo de onde vier.</p>
+<p>Quando duas linhas do cadastro claramente são a mesma pessoa (mesmo nome, mesma empresa), o sistema oferece fundir os dois registros num só, preservando o histórico. E quando uma planilha nova traz uma empresa diferente da que já estava cadastrada para alguém, isso não é aplicado direto — vira uma sugestão, que fica esperando a analista revisar e confirmar antes de valer.</p>
+
+<h2>2.3 Aprovações — quem pode entrar</h2>
+<p>Toda inscrição chega como pendente. Antes da aprovação, a pessoa não gera contrato, não ocupa quarto e não conta em nenhuma cota — é um portão que protege o resto do sistema de gente que ainda não deveria estar dentro do fluxo.</p>
+<p>É também aqui que uma indicação de CIO feita por um patrocinador — que começa como uma sugestão — é avaliada e, se aprovada, vira de fato um convite.</p>
+
+<h2>2.4 Acompanhamento — quem está devendo o quê</h2>
+<p>Esta é a aba que resolve o maior problema do processo antigo: saber, sem precisar vasculhar planilha nenhuma, quem ainda não fez o quê — e por quanto tempo.</p>
+<p>A tela mostra, para cada etapa (inscrição, contrato, hospedagem, fatura paga e outras): quantas pessoas/empresas estão em dia, em atenção ou já atrasadas; há quanto tempo cada pendência está aberta; e um prazo configurável por etapa, que decide quando algo vira "atenção" e quando vira "atrasado".</p>
+<p>Quando alguém precisa ser cobrado, a analista clica em "Preparar cobrança": o sistema já monta o e-mail, mostra para quem vai, avisa se essa pessoa já foi cobrada nos últimos dias — e só sai depois de um clique explícito em "Enviar agora".</p>
+
+<div class="callout gold">
+  <span class="rotulo">Por que isso importa</span>
+  <p>Não existe "cobrar todos de uma vez". A decisão de mandar cada cobrança é sempre humana — o sistema prepara e organiza, quem aperta o botão é a pessoa responsável. Essa regra vale para todo tipo de disparo em massa no sistema inteiro, não só aqui.</p>
+</div>
+
+<h2>2.5 Financeiro</h2>
+<p>Controla o valor da cota de cada patrocinador e a situação de pagamento, além das faturas adicionais dos CIOs (acompanhante, filho, item extra). O sistema registra e organiza; o disparo do lembrete de cobrança em si é feito pela aba Acompanhamento, que é onde a decisão de mandar a mensagem acontece.</p>
+
+<h2>2.6 Estrutura do evento</h2>
+<p>É onde o evento é montado antes de tudo o mais fazer sentido: as datas e prazos gerais do evento, as cotas de patrocínio disponíveis (Esmeralda, Diamante, Platina, Ouro, Prata), o inventário de quartos do resort e as categorias de acomodação. Mexer aqui afeta praticamente todas as outras abas — é a base de tudo.</p>
+
+<h2>2.7 Patrocinadores</h2>
+<p>Cadastro das empresas patrocinadoras e de quem tem acesso ao portal de cada uma — é aqui que se cria o acesso de um segundo (ou terceiro) usuário da mesma empresa, não pelo próprio portal do patrocinador. Também é onde os quartos que a cota dá direito são gerados de uma vez para todos os patrocinadores do evento.</p>
+
+<h2>2.8 Quartos, Organização e Etiquetas</h2>
+<p>Três abas de logística, com propósitos diferentes que vale não confundir: <strong>Quartos</strong> é a alocação física de cada pessoa a um quarto real do resort; <strong>Organização</strong> é a hospedagem da própria equipe do CIO Cerrado, fora da cota de qualquer patrocinador; <strong>Etiquetas</strong> gera crachá a partir da lista já consolidada.</p>
+
+<h2>2.9 Sessões, Atividades, Prospecção, Pesquisa e Preços</h2>
+<p>Cinco abas de apoio à operação e à curadoria do evento grande: <strong>Sessões</strong> mostra mesa redonda e jantar por patrocinador; <strong>Atividades</strong> controla presença por atividade do dia, inclusive por leitura de QR code; <strong>Prospecção</strong> é a curadoria para mesa redonda, com controle para não repetir convidados entre rodadas; <strong>Pesquisa de perfil</strong> organiza respostas de formulário por área de investimento; <strong>Preços</strong> é a tabela de valor de cada item cobrável.</p>
+
+<h2>2.10 Equipe</h2>
+<p>Reúne três assuntos: gestão de acesso (quem é admin/staff e a quais eventos cada um está associado), fila de e-mail (envios pendentes ou com erro), e integração com o app do evento (geração das planilhas no formato do parceiro).</p>
+
+<h2>2.11 Uma divisão de acesso que vale entender</h2>
+<p>A equipe de apoio (staff) enxerga as mesmas 17 abas que a analista e os sócios veem — mas a maior parte das ações dentro delas é reservada só para quem tem acesso de organização, inclusive para simplesmente ver uma lista, não só para alterar algo. Na prática: o staff do dia do evento opera muito bem o check-in, mas não deveria (e não consegue) mexer em cadastro, cota, valor ou estrutura do evento.</p>
+</div>
+
+<div class="capitulo">
+<h1>3. O portal do patrocinador</h1>
+<p>É a tela que a empresa patrocinadora usa para cuidar da própria cota — a "cara" do evento para quem está pagando por ele. Uma empresa pode ter mais de uma pessoa com acesso, todas vendo exatamente os mesmos dados da empresa, e nada de nenhuma outra.</p>
+
+<h2>3.1 Quartos</h2>
+<p>Mostra os quartos que a cota da empresa dá direito e permite preencher quem ocupa cada um. Se a empresa quiser um quarto a mais do que a cota inclui, o portal mostra a disponibilidade em tempo real e o valor exato — e só reserva depois de uma confirmação explícita do custo, nunca como surpresa na fatura.</p>
+
+<h2>3.2 Mesa redonda</h2>
+<p>O número de vagas de convidado vem da cota contratada. O patrocinador pode indicar convidados próprios; o restante é escolhido pela organização, por porte da empresa e afinidade comercial. Se a cota for excedida, o sistema bloqueia — não aceita e cobra sem avisar.</p>
+
+<h2>3.3 Indicações</h2>
+<p>Formulário simples para o patrocinador sugerir executivos que gostaria de ver convidados. Cada indicação tem um status visível e acompanhável: aguardando convite, convidado, inscrito, não seguiu, ou já estava na base.</p>
+<div class="callout">
+  <span class="rotulo">Regra importante para quem atende o patrocinador</span>
+  <p>Indicação não é convite. Ela entra numa fila de avaliação da organização e só vira convite de verdade depois de aprovada — isso precisa ficar claro para não criar expectativa equivocada do lado do cliente.</p>
+</div>
+
+<h2>3.4 Brindes</h2>
+<p>Um brinde por empresa, não por quarto. O patrocinador informa o que é, a quantidade e para onde vai (fica no stand da empresa, ou é entregue no quarto de cada convidado — essa segunda opção tem custo). Depois de confirmado o envio, dá para informar transportadora e código de rastreio, e a organização acompanha até a entrega.</p>
+
+<h2>3.5 Convidados</h2>
+<p>Lista de quem a empresa já tem de fato confirmado — só aparece quem está aprovado e já assinou o contrato. Propositalmente, essa lista não mostra e-mail nem telefone do convidado: o contato só é liberado depois que o patrocinador efetivamente escolhe aquela pessoa para a mesa.</p>
+
+<h2>3.6 Financeiro</h2>
+<p>Mostra os valores adicionais gerados pela empresa (quarto extra, brinde entregue no quarto), com o total discriminado item a item, vencimento e situação de pagamento. Não é a fatura da cota em si — essa é tratada à parte, pela organização.</p>
+
+<h2>3.7 Manual</h2>
+<p>Nome, local, datas do evento e os prazos que afetam o CIO indicado por aquela empresa — informativo, para consulta.</p>
+</div>
+
+<div class="capitulo">
+<h1>4. A área do CIO convidado</h1>
+<p>É a área que o executivo convidado usa para confirmar seus dados e organizar a própria estadia. Substitui a antiga ficha de check-in em PDF, que circulava por e-mail, era preenchida à mão, devolvida e conferida uma a uma.</p>
+<p>O público desse formulário é detalhista e não aceita ambiguidade em nada que envolva dinheiro ou compromisso — por isso, toda a área foi pensada para mostrar clareza antes de pedir confirmação.</p>
+
+<h2>4.1 Quem ainda não está inscrito</h2>
+<p>Existe uma porta de autocadastro para quem chega sem convite prévio — preenche nome e e-mail, e a inscrição entra como pendente, para a organização avaliar, igual a qualquer outra.</p>
+
+<h2>4.2 A trilha de três passos</h2>
+<p>Para quem já está inscrito, a tela mostra exatamente onde a pessoa está: Inscrição (aprovada, em análise, ou não aprovada); Contrato (assinado, enviado com prazo visível, ou ainda não enviado); Dados de hospedagem (só libera depois que as duas etapas anteriores estiverem completas ao mesmo tempo).</p>
+
+<h2>4.3 Acompanhante, filho e transfer</h2>
+<p>O titular já vem incluído. O CIO pode adicionar acompanhante(s) e filho(s) no mesmo formulário, com nome, CPF e — para criança — data de nascimento, que é o dado que decide cobrança e regra de crachá. Para o transfer, cada pessoa do quarto pode escolher sua própria origem (Goiânia ou Brasília), mesmo estando no mesmo quarto.</p>
+<div class="callout">
+  <span class="rotulo">O valor sempre aparece antes de confirmar</span>
+  <p>A cada campo preenchido, o resumo financeiro na mesma tela é recalculado na hora — o convidado nunca é surpreendido pelo valor só depois de já ter confirmado tudo.</p>
+</div>
+
+<h2>4.4 Fatura adicional</h2>
+<p>Consolida tudo que o CIO deve além do que já está incluso — acompanhante, filho, item extra — sempre discriminado, item a item, nunca como um valor único sem explicação.</p>
+</div>
+
+<div class="capitulo">
+<h1>5. Check-in no dia do evento</h1>
+<p>Tela pensada para operação sob pressão: fila na frente, staff em pé, muitas vezes alguém que nunca usou nenhum sistema de gestão antes. Cada decisão de design responde a uma pergunta só — a pessoa consegue usar sozinha, na primeira vez, com pressa?</p>
+<p>O que a tela faz: localiza a pessoa por busca de nome (funciona com nome parcial e sem acento) ou por leitura de QR code pela câmera do celular; registra a chegada com um clique; mostra o que o staff precisa saber na hora — quarto e categoria de crachá.</p>
+<p>Check-in duplicado da mesma pessoa não gera dois registros — o sistema avisa que ela já entrou. E se algo for marcado por engano, existe um botão de "Desfazer" em cada linha, disponível para qualquer pessoa da equipe.</p>
+<p>O check-in de um jantar avulso funciona da mesma forma, só que com a busca por nome — o QR code hoje vale para o check-in do evento grande.</p>
+</div>
+
+<div class="capitulo">
+<h1>6. Jantares — a curadoria de convidados</h1>
+<p>Cada jantar tem um patrocinador. A organização escolhe quem senta à mesa — e essa escolha, mais do que a logística do jantar em si, é o trabalho central deste módulo. Jantar não depende do evento grande: tem vida própria, com data, local e capacidade cadastrados à parte, e não carrega rooming, transfer, acompanhante nem mesa redonda.</p>
+
+<h2>6.1 Como um convidado chega até a lista</h2>
+<p>Três caminhos, que podem se combinar: <strong>busca no cadastro</strong>, quando já se sabe quem chamar; <strong>sugestão por aderência (inteligência artificial)</strong>, que cruza o perfil comercial do patrocinador com a base e pontua quem tem mais afinidade; e <strong>convite avulso</strong>, para quem não está na base.</p>
+<p>Cada convidado passa por um funil de status: sugerido, convidado, confirmado, compareceu — ou recusado.</p>
+
+<h2>6.2 Estatísticas — evitar repetir sempre os mesmos nomes</h2>
+<p>Uma aba dedicada mostra, sem enrolação: quem é convidado sempre e nunca confirma presença; quem confirmou e depois não apareceu; e quem é chamado com mais frequência de todos — sempre deixando de fora a própria equipe do CIO Cerrado. É a ferramenta que evita que a curadoria vire sempre a mesma lista de nomes.</p>
+
+<h2>6.3 Sondagem</h2>
+<p>Permite rodar a mesma análise de aderência antes mesmo de o jantar existir de fato — útil para levar um número concreto para uma conversa comercial, sem comprometer capacidade nem criar convite algum ainda.</p>
+</div>
+
+<div class="capitulo">
+<h1>7. Perguntas frequentes</h1>
+
+<h3>O patrocinador consegue ver dados de outro patrocinador de propósito ou por engano?</h3>
+<p>Não. Essa é a garantia mais auditada de todo o sistema — cada tela de patrocinador só devolve dado da própria empresa, checado no momento de cada consulta, não só escondido na tela.</p>
+
+<h3>Uma cobrança pode sair sem ninguém perceber, de forma automática?</h3>
+<p>Não. Toda cobrança é preparada pelo sistema, mas só sai depois de um clique explícito de confirmação de uma pessoa da equipe. Não existe "disparar para todos" em nenhum lugar.</p>
+
+<h3>O que acontece se alguém preencher só metade de um formulário e sair da página?</h3>
+<p>O formulário guarda o que já foi salvo e mostra isso na próxima visita — mas o que foi digitado e ainda não salvo pode se perder se a sessão cair no meio do preenchimento. É um ponto de atenção conhecido, sem solução ainda.</p>
+
+<h3>Dá para saber quem alterou um dado e quando?</h3>
+<p>Só de forma bem limitada hoje — a maior parte das alterações não fica registrada com histórico de "quem mudou o quê". É um ponto que pode evoluir, se for prioridade.</p>
+
+<h3>A equipe de apoio do dia do evento (staff) pode mexer em qualquer coisa do sistema?</h3>
+<p>Não. Staff opera principalmente o check-in. Praticamente todo o resto — cadastro, cota, valor, estrutura do evento — é reservado só para quem tem acesso de organização.</p>
+
+<h3>O sistema envia e-mail automaticamente, sem checagem?</h3>
+<p>Depende do caminho: os lembretes de cobrança sempre passam por confirmação humana antes de sair. Já o botão de reenviar a fila de e-mails do painel dispara de verdade assim que clicado, sem uma segunda confirmação — vale usar com atenção.</p>
+
+<h3>O QR code do crachá já funciona?</h3>
+<p>Sim, para o check-in do evento grande — a câmera do celular lê o QR e registra a chegada. Para jantar avulso, ainda é por busca de nome.</p>
+</div>
+
+<div class="capitulo">
+<h1>8. Glossário</h1>
+<table>
+  <tr><th>Termo</th><th>Significado</th></tr>
+  <tr><td>Cota</td><td>O nível de patrocínio de uma empresa (Esmeralda, Diamante, Platina, Ouro, Prata) — define quantos quartos, quantas vagas de mesa e quantos participantes ela tem direito.</td></tr>
+  <tr><td>Gestor</td><td>Nome usado no sistema para qualquer pessoa cadastrada na base de contatos — não é só quem tem cargo de gestão, é o termo genérico para "pessoa no cadastro".</td></tr>
+  <tr><td>Participante</td><td>Um gestor que se inscreveu e foi aprovado para um evento específico.</td></tr>
+  <tr><td>Rooming</td><td>O preenchimento dos dados de hospedagem do CIO — quarto, acompanhante, filho, transfer.</td></tr>
+  <tr><td>Sessão</td><td>Uma rodada de mesa redonda ou de jantar vinculada a um patrocinador, dentro do evento grande.</td></tr>
+  <tr><td>Ocupante</td><td>Qualquer pessoa que fica num quarto — o próprio CIO, um acompanhante, um filho, ou alguém da equipe do patrocinador.</td></tr>
+  <tr><td>Indicação</td><td>Sugestão de executivo feita por um patrocinador, que precisa ser aprovada pela organização antes de virar convite.</td></tr>
+  <tr><td>Aderência</td><td>A pontuação que a inteligência artificial dá para o quanto o perfil de uma empresa combina com o que um patrocinador vende.</td></tr>
+</table>
+
+<footer class="rodape">Este manual acompanha o sistema e deve ser atualizado junto com ele. A documentação técnica completa, com todas as regras conferidas contra o código, vive em docs/ no repositório do sistema.</footer>
+</div>
+
+</body>
+</html>
