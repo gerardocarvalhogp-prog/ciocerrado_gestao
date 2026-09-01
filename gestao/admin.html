@@ -1172,7 +1172,8 @@ ABAS.cadastro = async function(){
     </div>
     <div id="g-resumo"></div>
     <div class="cartao"><div class="rolagem"><table id="g-tabela"></table></div></div>
-    <div id="g-paginacao" class="meta" style="margin-top:8px;"></div>`;
+    <div id="g-paginacao" class="meta" style="margin-top:8px;"></div>
+    <div id="g-detalhe"></div>`;
 
   let LINHAS = [];
 
@@ -1525,7 +1526,10 @@ ABAS.cadastro = async function(){
           <td class="meta">${esc(g.segmento||"—")}</td>
           <td class="meta">${esc([g.cidade,g.estado].filter(Boolean).join("/")||"—")}</td>
           <td class="meta">${g.linkedin ? `<a href="${esc(g.linkedin)}" target="_blank" rel="noopener">perfil</a>` : "—"}</td>
-          <td><button class="btn sec mini g-vincular">Vincular empresa</button></td>
+          <td style="white-space:nowrap;">
+            <button class="btn sec mini g-editar">Editar</button>
+            <button class="btn sec mini g-vincular">Vincular empresa</button>
+          </td>
         </tr>`).join("") ||
         `<tr><td colspan="9" style="color:var(--suave)">Nenhum gestor com esse filtro.</td></tr>`}`;
 
@@ -1556,6 +1560,12 @@ ABAS.cadastro = async function(){
           await rpc("admin_associar_gestor_empresa", { p_gestor_id: gid, p_empresa_id: achada.id });
           carregarGestores();
         }catch(e){ aviso("#g-resumo", explicar(e)); }
+      }));
+
+      $$("#g-tabela .g-editar").forEach(b => b.addEventListener("click", (ev) => {
+        const gid = ev.target.closest("tr").dataset.id;
+        const g = GESTORES_CACHE.find(x => x.id === gid);
+        if(g) abrirEditarGestor(g);
       }));
     }catch(e){ aviso("#g-tabela", explicar(e)); }
   };
@@ -1609,6 +1619,72 @@ ABAS.cadastro = async function(){
   carregarEmpresas();
   carregarGestores();
 };
+
+// Painel de edição de um gestor — mesmo espírito do "Pessoas" da aba
+// Organização: abre embaixo da tabela, sem navegar pra outro lugar.
+function abrirEditarGestor(g){
+  const box = $("#g-detalhe");
+  box.innerHTML = `
+    <div class="cartao">
+      <h2>Editar gestor</h2>
+      <div class="barra">
+        <div><label>Nome</label><input type="text" id="ge-nome" value="${esc(g.nome||"")}"></div>
+        <div><label>E-mail</label><input type="email" id="ge-email" value="${esc(g.email||"")}"></div>
+        <div><label>Cargo</label><input type="text" id="ge-cargo" value="${esc(g.cargo||"")}"></div>
+        <div><label>Telefone</label><input type="text" id="ge-telefone" value="${esc(g.telefone||"")}"></div>
+      </div>
+      <div class="barra">
+        <div><label>Empresa (texto livre)</label><input type="text" id="ge-empresa" value="${esc(g.empresa||"")}"></div>
+        <div><label>Segmento</label><select id="ge-segmento"><option value="">—</option></select></div>
+        <div><label>Cidade</label><input type="text" id="ge-cidade" value="${esc(g.cidade||"")}"></div>
+        <div style="max-width:80px;"><label>UF</label><input type="text" id="ge-estado" maxlength="2" value="${esc(g.estado||"")}"></div>
+      </div>
+      <div class="barra">
+        <div style="max-width:200px;"><label>Perfil</label><input type="text" id="ge-perfil" value="${esc(g.perfil||"")}"></div>
+        <div><label>LinkedIn</label><input type="text" id="ge-linkedin" value="${esc(g.linkedin||"")}"></div>
+      </div>
+      <div id="ge-aviso"></div>
+      <button class="btn" id="ge-salvar">Salvar</button>
+      <button class="btn sec" id="ge-cancelar" style="margin-left:6px;">Cancelar</button>
+    </div>`;
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+  // mesma lista de segmentos que o formulario de empresa ja usa —
+  // texto livre aqui viraria NULL sem aviso no proximo save (o
+  // segmento so aceita o vocabulario fechado da tabela `segmentos`)
+  const optsSegmento = $("#emp-segmento")?.innerHTML || `<option value="">—</option>`;
+  $("#ge-segmento").innerHTML = optsSegmento;
+  $("#ge-segmento").value = g.segmento || "";
+
+  $("#ge-cancelar").addEventListener("click", () => { box.innerHTML = ""; });
+
+  $("#ge-salvar").addEventListener("click", async () => {
+    const nome = $("#ge-nome").value.trim();
+    if(!nome){ DS.marcarInvalido($("#ge-nome"), "Informe o nome."); return; }
+    DS.limparInvalido($("#ge-nome"));
+
+    const b = $("#ge-salvar");
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      await rpc("admin_editar_gestor", {
+        p_id: g.id, p_nome: nome,
+        p_email: $("#ge-email").value.trim() || null,
+        p_cargo: $("#ge-cargo").value.trim() || null,
+        p_telefone: $("#ge-telefone").value.trim() || null,
+        p_empresa: $("#ge-empresa").value.trim() || null,
+        p_segmento: $("#ge-segmento").value.trim() || null,
+        p_cidade: $("#ge-cidade").value.trim() || null,
+        p_estado: $("#ge-estado").value.trim() || null,
+        p_perfil: $("#ge-perfil").value.trim() || null,
+        p_linkedin: $("#ge-linkedin").value.trim() || null
+      });
+      box.innerHTML = "";
+      aviso("#aviso-global", `"${nome}" salvo.`, "ok");
+      carregarGestores();
+    }catch(e){ aviso("#ge-aviso", explicar(e)); }
+    finally{ b.disabled = false; b.textContent = "Salvar"; }
+  });
+}
 
 const ROTULO_SUG = {
   troca_empresa:"Trocou de empresa",
@@ -3310,17 +3386,29 @@ async function blocoQuartos(){
             </select></div>
           <div><label>Bloco</label><input type="text" id="qt-bloco" placeholder="Bloco A"></div>
           <div style="min-width:auto;"><button class="btn" id="qt-criar">Criar faixa</button></div>
-          <div style="min-width:auto;">
-            <button class="btn sec" id="qt-alterar" title="Corrige o tipo de quartos já criados nesta faixa">
-              Alterar tipo da faixa
-            </button></div>
         </div>
-        <p class="meta" style="margin:-4px 0 8px;">
-          Errou o tipo na criação? Repita a faixa, escolha o tipo certo e use
-          <strong>Alterar tipo da faixa</strong> — não precisa apagar e recriar,
-          e a alocação já feita fica de pé.
-        </p>
         <div id="qt-aviso"></div>
+
+        <div style="border-top:1px solid var(--linha);margin-top:14px;padding-top:12px;">
+          <p class="meta" style="margin:0 0 8px;">
+            Errou o tipo na criação? Corrija sem apagar e recriar — a alocação já feita fica de pé.
+          </p>
+          <div class="barra">
+            <div style="max-width:100px;"><label>De</label><input type="text" id="qta-de" placeholder="200"></div>
+            <div style="max-width:100px;"><label>Até</label><input type="text" id="qta-ate" placeholder="279"></div>
+            <div style="max-width:120px;"><label>Novo tipo</label>
+              <select id="qta-tipo">
+                <option value="single">Single</option>
+                <option value="duplo" selected>Duplo</option>
+                <option value="triplo">Triplo</option>
+              </select></div>
+            <div style="min-width:auto;">
+              <button class="btn sec" id="qt-alterar" title="Corrige o tipo de quartos já criados nesta faixa">
+                Alterar tipo da faixa
+              </button></div>
+          </div>
+          <div id="qta-aviso"></div>
+        </div>
         <div style="border-top:1px solid var(--linha);margin-top:12px;padding-top:12px;">
           <p class="sub" style="margin-bottom:8px;">
             <strong>Ou suba o mapa do resort.</strong> O hotel manda uma aba por prédio,
@@ -3363,9 +3451,9 @@ async function blocoQuartos(){
     });
 
     $("#qt-alterar").addEventListener("click", async () => {
-      const de = $("#qt-de").value.trim(), ate = $("#qt-ate").value.trim();
-      const tipo = $("#qt-tipo").value;
-      if(!de || !ate){ aviso("#qt-aviso","Informe a faixa que quer corrigir."); return; }
+      const de = $("#qta-de").value.trim(), ate = $("#qta-ate").value.trim();
+      const tipo = $("#qta-tipo").value;
+      if(!de || !ate){ aviso("#qta-aviso","Informe a faixa que quer corrigir."); return; }
       if(!(await DS.confirmar(
           "Só muda o tipo no inventário do hotel. Não altera o que cada patrocinador paga por quarto extra.",
           {titulo:`Passar os quartos de ${de} a ${ate} para ${tipo}?`}))) return;
@@ -3375,11 +3463,11 @@ async function blocoQuartos(){
       try{
         const res = await rpc("admin_alterar_tipo_quartos", {
           p_evento_slug: EVENTO, p_de: de, p_ate: ate, p_tipo: tipo });
-        aviso("#qt-aviso", res.alterados
+        aviso("#qta-aviso", res.alterados
           ? `${res.alterados} quarto(s) passaram para ${tipo}.`
           : `Nenhum quarto nessa faixa precisava mudar.`, "ok");
         blocoQuartos();
-      }catch(e){ aviso("#qt-aviso", explicar(e)); }
+      }catch(e){ aviso("#qta-aviso", explicar(e)); }
       finally{ b.disabled = false; b.textContent = "Alterar tipo da faixa"; }
     });
     $("#mp-arquivo").addEventListener("change", e => {
