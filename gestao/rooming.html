@@ -621,7 +621,11 @@ async function areaRooming(){
       <div class="fatura" id="fatura"></div>
       <div id="aviso-rooming"></div>
       <button class="btn" id="salvar-rooming">Confirmar dados</button>
-    </div>`;
+    </div>
+
+    <div class="cartao" id="cartao-quarto-extra"></div>`;
+
+  carregarQuartoExtra();
 
   $("#add-pessoa").addEventListener("click", () => {
     ACOMPANHANTES.push({ nome:"", cpf:"", data_nascimento:"", tipo:"adulto",
@@ -633,6 +637,82 @@ async function areaRooming(){
   $("#transfer-origem").addEventListener("change", atualizarFatura);
 
   desenharPessoas();
+}
+
+// O quarto principal comporta ate 4 (a mensagem de "acima disso e
+// quarto adicional" ja existia, so nunca oferecia a opcao). Reusa
+// patro_disponibilidade — apesar do nome, e so leitura agregada por
+// tipo (quantos livres, preco), sem dado de patrocinador nenhum.
+async function carregarQuartoExtra(){
+  const box = $("#cartao-quarto-extra");
+  box.innerHTML = `<p class="carregando">Carregando…</p>`;
+
+  let disponibilidade, meusQuartos;
+  try{
+    [disponibilidade, meusQuartos] = await Promise.all([
+      rpc("patro_disponibilidade", { p_evento_slug: EVENTO }),
+      rpc("part_listar_meus_quartos", { p_evento_slug: EVENTO })
+    ]);
+  }catch(e){ aviso(box, explicar(e)); return; }
+
+  const extras = meusQuartos.filter(q => q.origem === "extra");
+  const ROTULO_TIPO = { single:"Single", duplo:"Duplo", triplo:"Triplo" };
+
+  box.innerHTML = `
+    <h2>Quarto adicional</h2>
+    <p class="sub" style="margin-bottom:12px;">
+      Seu quarto comporta até 4 pessoas. Precisa de mais espaço — família grande,
+      quer um quarto separado — compre um adicional aqui. Entra na sua fatura.
+    </p>
+
+    ${extras.length ? `
+      <div style="margin-bottom:12px;">
+        ${extras.map(q => `
+          <div class="linha" style="align-items:center;">
+            <div><strong>${esc(q.rotulo)}</strong> · ${ROTULO_TIPO[q.tipo]||esc(q.tipo)}
+              ${q.quarto_numero ? ` · nº ${esc(q.quarto_numero)}` : ` · <span class="fila-nota">ainda sem número</span>`}</div>
+            <div style="min-width:auto;"><button class="btn perigo mini qe-cancelar" data-id="${esc(q.reserva_id)}">Cancelar</button></div>
+          </div>`).join("")}
+      </div>` : ""}
+
+    <div class="linha">
+      ${disponibilidade.map(d => `
+        <div>
+          <button class="btn sec mini qe-comprar" data-tipo="${esc(d.tipo)}" ${Number(d.livres) ? "" : "disabled"}>
+            Comprar ${ROTULO_TIPO[d.tipo]||esc(d.tipo)}
+          </button>
+          <p class="fila-nota" style="margin:4px 0 0;">
+            ${Number(d.livres) ? `${d.livres} livre(s) · ${moeda(d.valor)}` : "Esgotado"}
+          </p>
+        </div>`).join("")}
+    </div>
+    <div id="qe-aviso"></div>`;
+
+  $$(".qe-comprar", box).forEach(b => b.addEventListener("click", async () => {
+    b.disabled = true;
+    try{
+      const r = await rpc("part_comprar_quarto", { p_evento_slug: EVENTO, p_tipo: b.dataset.tipo });
+      if(!r.ok){
+        aviso("#qe-aviso", "Esse tipo acabou de esgotar — tente outro.", "erro");
+        carregarQuartoExtra();
+        return;
+      }
+      aviso("#qe-aviso", "Quarto adicional comprado — já entra na sua fatura.", "ok");
+      carregarQuartoExtra();
+      atualizarFatura();
+    }catch(e){ aviso("#qe-aviso", explicar(e)); b.disabled = false; }
+  }));
+
+  $$(".qe-cancelar", box).forEach(b => b.addEventListener("click", async () => {
+    if(!(await DS.confirmar("O quarto volta a ficar disponível pra outra pessoa.",
+        {titulo:"Cancelar este quarto adicional?", tom:"perigo", textoConfirmar:"Cancelar"}))) return;
+    b.disabled = true;
+    try{
+      await rpc("part_cancelar_quarto_extra", { p_reserva_id: b.dataset.id });
+      carregarQuartoExtra();
+      atualizarFatura();
+    }catch(e){ aviso("#qe-aviso", explicar(e)); b.disabled = false; }
+  }));
 }
 
 function desenharPessoas(){
