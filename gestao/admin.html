@@ -1534,6 +1534,7 @@ ABAS.cadastro = async function(){
           <td class="meta">${esc([g.cidade,g.estado].filter(Boolean).join("/")||"—")}</td>
           <td class="meta">${g.linkedin ? `<a href="${esc(g.linkedin)}" target="_blank" rel="noopener">perfil</a>` : "—"}</td>
           <td style="white-space:nowrap;">
+            <button class="btn sec mini g-ia" title="Buscar dados profissionais na web">IA</button>
             <button class="btn sec mini g-editar">Editar</button>
             <button class="btn sec mini g-vincular">Vincular empresa</button>
           </td>
@@ -1573,6 +1574,25 @@ ABAS.cadastro = async function(){
         const gid = ev.target.closest("tr").dataset.id;
         const g = GESTORES_CACHE.find(x => x.id === gid);
         if(g) abrirEditarGestor(g);
+      }));
+
+      $$("#g-tabela .g-ia").forEach(b => b.addEventListener("click", async (ev) => {
+        const btn = ev.target;
+        const gid = btn.closest("tr").dataset.id;
+        const g = GESTORES_CACHE.find(x => x.id === gid);
+        if(!g) return;
+        btn.disabled = true; btn.textContent = "…";
+        try{
+          const achou = await enriquecerUmGestor(g.id, g.nome, g.empresa);
+          aviso("#aviso-global", achou
+            ? `${g.nome}: ${achou} campo(s) atualizado(s).`
+            : `Nada encontrado sobre ${g.nome}. Preencha à mão.`,
+            achou ? "ok" : "erro");
+          carregarGestores();
+        }catch(e){
+          aviso("#aviso-global", explicar(e));
+          btn.disabled = false; btn.textContent = "IA";
+        }
       }));
     }catch(e){ aviso("#g-tabela", explicar(e)); }
   };
@@ -2667,6 +2687,25 @@ async function abrirSessao(id, s){
             <td><button class="btn mini por">Adicionar</button></td>
           </tr>`).join("")}</table>` :
           `<div class="vazio">Sem sugestões disponíveis — todos já estão em outra sessão deste tipo.</div>`}
+      </div>
+
+      <div class="cartao">
+        <h2>Adicionar outro convidado</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Sem cálculo de aderência — para quem não apareceu na lista acima.
+        </p>
+        <div class="barra">
+          <div><label>Nome</label><input type="text" id="sv-nome"></div>
+          <div><label>Empresa</label><input type="text" id="sv-empresa"></div>
+          <div><label>Cargo</label><input type="text" id="sv-cargo"></div>
+        </div>
+        <div class="barra">
+          <div><label>E-mail</label><input type="email" id="sv-email"></div>
+          <div><label>Telefone</label><input type="text" id="sv-telefone"></div>
+          <div><label>Identificação</label><input type="text" id="sv-rotulo" placeholder="ex.: vegetariano"></div>
+        </div>
+        <div id="sv-aviso"></div>
+        <button class="btn sec" id="sv-salvar" style="margin-top:8px;">Adicionar convidado</button>
       </div>`;
 
     const bm = $("#s-mailing", box);
@@ -2703,6 +2742,33 @@ async function abrirSessao(id, s){
         b.disabled = false; b.textContent = "Adicionar";
       }
     }));
+
+    $("#sv-salvar", box).addEventListener("click", async () => {
+      const nome = $("#sv-nome", box).value.trim();
+      if(!nome){
+        DS.marcarInvalido($("#sv-nome", box), "Informe o nome.");
+        $("#sv-nome", box).focus();
+        return;
+      }
+      DS.limparInvalido($("#sv-nome", box));
+      const b = $("#sv-salvar", box);
+      b.disabled = true; b.textContent = "Adicionando…";
+      try{
+        await rpc("admin_convidado_avulso", {
+          p_sessao_id: id,
+          p_nome: nome,
+          p_empresa: $("#sv-empresa", box).value.trim() || null,
+          p_email: $("#sv-email", box).value.trim() || null,
+          p_telefone: $("#sv-telefone", box).value.trim() || null,
+          p_cargo: $("#sv-cargo", box).value.trim() || null,
+          p_rotulo: $("#sv-rotulo", box).value.trim() || null
+        });
+        abrirSessao(id, s); ABAS.sessoes();
+      }catch(e){
+        aviso("#sv-aviso", explicar(e));
+        b.disabled = false; b.textContent = "Adicionar convidado";
+      }
+    });
   }catch(e){ aviso(box, explicar(e)); }
 }
 
@@ -4335,6 +4401,40 @@ async function enriquecerUmPatrocinador(id, empresa, site){
     p_cnpj: d.cnpj || null
   });
   return ["site","resumo","o_que_vende","segmento","cidade","estado","cnpj"]
+    .filter(k => String(d[k] || "").trim()).length;
+}
+
+// Mesma ideia da busca de patrocinador, mas so pra dado profissional
+// PUBLICO de uma pessoa (cargo, empresa, segmento, cidade/UF,
+// linkedin) — CPF, telefone e e-mail nunca entram aqui.
+async function pesquisarGestor(nome, empresa){
+  const d = await ia(
+    `Pesquise o profissional "${nome}"${empresa ? `, que trabalha ou trabalhou na empresa "${empresa}"` : ""} ` +
+    `e responda APENAS um objeto JSON, sem markdown, com estas chaves:\n` +
+    `{"cargo":"cargo atual, curto","empresa":"empresa atual",` +
+    `"segmento":"segmento de atuação da empresa em 1-3 palavras",` +
+    `"cidade":"cidade onde trabalha","estado":"UF",` +
+    `"linkedin":"URL do perfil no LinkedIn, se encontrar"}\n` +
+    `Use string vazia no que não encontrar — não invente. Nunca inclua CPF, ` +
+    `telefone ou e-mail pessoal na resposta, mesmo que encontre.`,
+    { buscarWeb: true, json: true, maxTokens: 500 });
+
+  if(!d || typeof d !== "object"){
+    throw new Error("A busca não retornou dados utilizáveis para essa pessoa.");
+  }
+  return d;
+}
+
+async function enriquecerUmGestor(id, nome, empresa){
+  const d = await pesquisarGestor(nome, empresa);
+  await rpc("admin_enriquecer_gestor", {
+    p_id: id,
+    p_cargo: d.cargo || null, p_empresa: d.empresa || null,
+    p_segmento: d.segmento || null,
+    p_cidade: d.cidade || null, p_estado: d.estado || null,
+    p_linkedin: d.linkedin || null
+  });
+  return ["cargo","empresa","segmento","cidade","estado","linkedin"]
     .filter(k => String(d[k] || "").trim()).length;
 }
 
