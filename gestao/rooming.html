@@ -581,7 +581,12 @@ async function areaRooming(){
     data_nascimento: o.data_nascimento || "",
     tipo: o.tipo || "adulto",
     usa_transfer: !!o.usa_transfer,
-    transfer_origem: o.transfer_origem || null
+    transfer_origem: o.transfer_origem || null,
+    dificuldade_mobilidade: !!o.dificuldade_mobilidade,
+    tem_alergia: !!o.tem_alergia,
+    alergia_detalhe: o.alergia_detalhe || "",
+    precisa_berco: !!o.precisa_berco,
+    observacoes: o.observacoes || ""
   }));
 
   $("#area").innerHTML = `
@@ -601,6 +606,24 @@ async function areaRooming(){
           <input type="checkbox" id="titular-transfer" ${titular?.usa_transfer ? "checked" : ""}>
           Vou usar o transfer
         </label>
+        <div class="linha" style="margin-top:8px;">
+          <label class="check">
+            <input type="checkbox" id="titular-mobilidade" ${titular?.dificuldade_mobilidade ? "checked" : ""}>
+            Tenho dificuldade de mobilidade
+          </label>
+          <label class="check">
+            <input type="checkbox" id="titular-alergia" ${titular?.tem_alergia ? "checked" : ""}>
+            Tenho alergia
+          </label>
+        </div>
+        <div class="linha" style="margin-top:8px;">
+          <div><label>Detalhe da alergia</label>
+            <input type="text" id="titular-alergia-detalhe" value="${esc(titular?.alergia_detalhe || "")}"
+                   ${titular?.tem_alergia ? "" : "disabled"} placeholder="Ex.: camarão, amendoim…"></div>
+          <div><label>Observações</label>
+            <input type="text" id="titular-obs" value="${esc(titular?.observacoes || "")}"
+                   placeholder="Algo que a equipe deva saber"></div>
+        </div>
       </div>
 
       <div id="lista-pessoas"></div>
@@ -629,12 +652,18 @@ async function areaRooming(){
 
   $("#add-pessoa").addEventListener("click", () => {
     ACOMPANHANTES.push({ nome:"", cpf:"", data_nascimento:"", tipo:"adulto",
-                       usa_transfer:false, transfer_origem:null });
+                       usa_transfer:false, transfer_origem:null,
+                       dificuldade_mobilidade:false, tem_alergia:false,
+                       alergia_detalhe:"", precisa_berco:false, observacoes:"" });
     desenharPessoas();
   });
   $("#salvar-rooming").addEventListener("click", salvarRooming);
   $("#titular-transfer").addEventListener("change", atualizarFatura);
   $("#transfer-origem").addEventListener("change", atualizarFatura);
+  $("#titular-alergia").addEventListener("change", e => {
+    $("#titular-alergia-detalhe").disabled = !e.target.checked;
+    if(!e.target.checked) $("#titular-alergia-detalhe").value = "";
+  });
 
   desenharPessoas();
 }
@@ -756,6 +785,26 @@ function desenharPessoas(){
             <option value="BSB" ${p.transfer_origem === "BSB" ? "selected":""}>Brasília</option>
           </select>
         </div>
+      </div>
+      <div class="linha">
+        <label class="check">
+          <input type="checkbox" class="f-mobilidade" ${p.dificuldade_mobilidade ? "checked":""}>
+          Dificuldade de mobilidade
+        </label>
+        <label class="check">
+          <input type="checkbox" class="f-alergia" ${p.tem_alergia ? "checked":""}> Tem alergia
+        </label>
+        ${p.tipo === "crianca" ? `<label class="check">
+          <input type="checkbox" class="f-berco" ${p.precisa_berco ? "checked":""}> Precisa de berço
+        </label>` : ""}
+      </div>
+      <div class="linha">
+        <div><label>Detalhe da alergia</label>
+          <input type="text" class="f-alergia-detalhe" value="${esc(p.alergia_detalhe)}"
+                 ${p.tem_alergia ? "" : "disabled"} placeholder="Ex.: camarão, amendoim…"></div>
+        <div><label>Observações</label>
+          <input type="text" class="f-obs" value="${esc(p.observacoes)}"
+                 placeholder="Algo que a equipe deva saber"></div>
       </div>`;
 
     // grava no estado a cada digitada para a fatura acompanhar.
@@ -764,7 +813,23 @@ function desenharPessoas(){
     el.querySelector(".f-nome").addEventListener("input", e => { p.nome = e.target.value; atualizarFatura(); });
     el.querySelector(".f-cpf").addEventListener("input",  e => { p.cpf  = e.target.value; });
     el.querySelector(".f-nasc").addEventListener("change",e => { p.data_nascimento = e.target.value; atualizarFatura(); });
-    el.querySelector(".f-tipo").addEventListener("change",e => { p.tipo = e.target.value; atualizarFatura(); });
+    el.querySelector(".f-tipo").addEventListener("change",e => {
+      p.tipo = e.target.value;
+      if(p.tipo !== "crianca") p.precisa_berco = false;
+      atualizarFatura(); desenharPessoas();
+    });
+    el.querySelector(".f-mobilidade").addEventListener("change", e => { p.dificuldade_mobilidade = e.target.checked; });
+    el.querySelector(".f-alergia").addEventListener("change", e => {
+      p.tem_alergia = e.target.checked;
+      const det = el.querySelector(".f-alergia-detalhe");
+      det.disabled = !p.tem_alergia;
+      if(!p.tem_alergia){ det.value = ""; p.alergia_detalhe = ""; }
+    });
+    el.querySelector(".f-alergia-detalhe").addEventListener("input", e => { p.alergia_detalhe = e.target.value; });
+    el.querySelector(".f-obs").addEventListener("input", e => { p.observacoes = e.target.value; });
+    if(el.querySelector(".f-berco")){
+      el.querySelector(".f-berco").addEventListener("change", e => { p.precisa_berco = e.target.checked; });
+    }
     el.querySelector(".f-transfer").addEventListener("change", e => {
       p.usa_transfer = e.target.checked;
       // a origem so faz sentido para quem usa: deixar habilitada convida
@@ -871,7 +936,11 @@ async function salvarRooming(){
       p_evento_slug: EVENTO,
       p_acompanhantes: lista,
       p_usa_transfer: titularTransfer,
-      p_transfer_origem: origem || null
+      p_transfer_origem: origem || null,
+      p_dificuldade_mobilidade: $("#titular-mobilidade").checked,
+      p_tem_alergia: $("#titular-alergia").checked,
+      p_alergia_detalhe: $("#titular-alergia-detalhe").value.trim() || null,
+      p_observacoes: $("#titular-obs").value.trim() || null
     });
     aviso("#aviso-global","Dados de hospedagem confirmados.","ok");
     await carregar();
