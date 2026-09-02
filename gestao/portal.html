@@ -955,6 +955,25 @@ const NOME_TIPO = {
 };
 
 async function desenharSessao(card, s){
+  // cota que nao escolhe (sorteio direto): sem fila, sem "sua vez" — so
+  // mostra quem a organizacao sorteou, pra marcar presenca depois
+  if(s.escolhe_convidados === false){
+    card.innerHTML = `
+      <div class="cartao-cab">
+        <div>
+          <h3>${NOME_TIPO[s.tipo] || esc(s.tipo)}${s.data ? " · " + dataBR(s.data) : ""}</h3>
+          <p class="meta">${s.escolhidos} de ${s.vagas} vaga(s) preenchida(s) por sorteio${s.local ? " · " + esc(s.local) : ""}</p>
+        </div>
+      </div>
+      <p class="fila-nota">Sua cota não escolhe os próprios convidados — a organização preenche por sorteio.
+        ${s.escolhidos > 0 ? "Marque abaixo quem realmente apareceu." : ""}</p>
+      <div class="lista-presenca carregando">${s.escolhidos > 0 ? "Carregando…" : ""}</div>`;
+    if(s.escolhidos > 0){
+      await desenharPresencaSessao(card.querySelector(".lista-presenca"), s.sessao_id);
+    }
+    return;
+  }
+
   let vez;
   try{
     vez = await rpc("patro_minha_vez", { p_sessao_id: s.sessao_id });

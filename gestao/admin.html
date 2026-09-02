@@ -2501,16 +2501,30 @@ ABAS.sessoes = async function(){
       <tr><th>Patrocinador</th><th>Cota</th><th>Tipo</th><th>Data</th><th>Vagas</th><th></th></tr>
       ${sessoes.map(s => `<tr data-id="${esc(s.sessao_id)}">
         <td><strong>${esc(s.patrocinador)}</strong></td>
-        <td class="meta">${esc(s.cota||"—")}</td>
+        <td class="meta">${esc(s.cota||"—")}${s.escolhe_convidados===false ? ` <span class="selo alerta">Sorteio</span>` : ""}</td>
         <td style="text-transform:capitalize">${esc(String(s.tipo).replace("_"," "))}</td>
         <td class="meta">${dataBR(s.data)}</td>
         <td><span class="selo ${Number(s.escolhidos)>=s.vagas?"ok":"pend"}">${s.escolhidos}/${s.vagas}</span></td>
-        <td><button class="btn sec mini abrir">Abrir</button></td>
+        <td style="white-space:nowrap;">
+          <button class="btn sec mini abrir">Abrir</button>
+          ${s.escolhe_convidados===false && Number(s.escolhidos)<s.vagas
+            ? `<button class="btn mini sortear">Sortear</button>` : ""}
+        </td>
       </tr>`).join("")}`;
 
     $$("#s-tabela .abrir").forEach(b => b.addEventListener("click", () => {
       const tr = b.closest("tr");
       abrirSessao(tr.dataset.id, sessoes.find(s => s.sessao_id === tr.dataset.id));
+    }));
+
+    $$("#s-tabela .sortear").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true; b.textContent = "Sorteando…";
+      try{
+        const r = await rpc("admin_sortear_sessao", { p_sessao_id: tr.dataset.id });
+        aviso("#sg-aviso", `${r.sorteados} convidado(s) sorteado(s).`, "ok");
+        ABAS.sessoes();
+      }catch(e){ aviso("#sg-aviso", explicar(e)); b.disabled = false; b.textContent = "Sortear"; }
     }));
 
     ligarGerarSessoes();
@@ -3289,15 +3303,19 @@ async function blocoCotas(){
             <select id="co-jantar"><option value="0">Não</option><option value="1">Sim</option></select></div>
           <div style="max-width:140px;"><label>Limite de indicações</label>
             <input type="text" id="co-limite-ind" placeholder="sem limite"></div>
+          <div style="max-width:150px;"><label>Escolhe convidados</label>
+            <select id="co-escolhe"><option value="1">Sim</option><option value="0">Não (sorteio)</option></select></div>
           <div style="min-width:auto;"><button class="btn" id="co-salvar">Salvar cota</button></div>
         </div>
         <p class="meta" style="margin:0 0 8px;">
           A cota pode misturar tipos — 2 duplos e 2 singles, por exemplo. Deixe zero no que não usar.
+          "Escolhe convidados" em Não tira a cota da fila de escolha — as vagas dela são preenchidas
+          por sorteio em Mesas e jantares, não pelo próprio patrocinador.
         </p>
         <div id="co-aviso"></div>
         ${l.length ? `<table style="margin-top:10px;">
           <tr>${COTA_UNICA ? "" : "<th>Ordem</th><th>Janela</th>"}<th>Cota</th><th>Quartos</th><th>Mesa</th>
-              <th>Reunião</th><th>Jantar</th><th>Limite indicação</th><th>Patrocinadores</th><th></th></tr>
+              <th>Reunião</th><th>Jantar</th><th>Limite indicação</th><th>Escolhe</th><th>Patrocinadores</th><th></th></tr>
           ${l.map(c => `<tr data-id="${esc(c.id)}" data-nome="${esc(c.nome)}"
                             data-ordem="${c.ordem_prioridade}"
                             data-prazo="${esc(c.prazo_indicacao || "")}"
@@ -3305,6 +3323,7 @@ async function blocoCotas(){
                             data-q='${esc(JSON.stringify(c.quartos||{}))}'
                             data-mesa="${c.vagas_mesa_redonda}"
                             data-limite-ind="${c.limite_indicacoes ?? ""}"
+                            data-escolhe="${c.escolhe_convidados === false ? 0 : 1}"
                             data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}">
             ${COTA_UNICA ? "" : `<td class="meta">${c.ordem_prioridade}</td>
               <td class="meta">${c.janela_horas ? c.janela_horas + "h" : "sem limite"}
@@ -3318,6 +3337,7 @@ async function blocoCotas(){
             <td>${c.tem_reuniao_exclusiva ? "Sim" : "—"}</td>
             <td>${c.tem_jantar ? "Sim" : "—"}</td>
             <td class="meta">${c.limite_indicacoes ?? "sem limite"}</td>
+            <td>${c.escolhe_convidados === false ? `<span class="selo alerta">Sorteio</span>` : "Sim"}</td>
             <td>${(c.lista_patrocinadores||[]).length
                    ? (c.lista_patrocinadores||[]).map(p => esc(p.empresa)).join("<br>")
                    : `<span class="meta">nenhum</span>`}</td>
@@ -3348,6 +3368,7 @@ async function blocoCotas(){
       $("#co-reuniao").value = t.reuniao;
       $("#co-jantar").value = t.jantar;
       $("#co-limite-ind").value = t.limiteInd || "";
+      $("#co-escolhe").value = t.escolhe;
       $("#co-nome").focus();
     }));
 
@@ -3447,13 +3468,15 @@ async function salvarCota(){
       // uma cota que ja teve um
       p_prazo_indicacao: $("#co-prazo")?.value || null,
       p_janela_horas: parseInt($("#co-janela")?.value, 10) || null,
-      p_limite_indicacoes: parseInt($("#co-limite-ind").value, 10) || null
+      p_limite_indicacoes: parseInt($("#co-limite-ind").value, 10) || null,
+      p_escolhe_convidados: $("#co-escolhe").value === "1"
     });
     ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind"]
       .forEach(s => $(s).value = "");
     if($("#co-ordem"))  $("#co-ordem").value  = "";
     if($("#co-prazo"))  $("#co-prazo").value  = "";
     if($("#co-janela")) $("#co-janela").value = "";
+    $("#co-escolhe").value = "1";
     blocoCotas();
   }catch(e){ aviso("#co-aviso", explicar(e)); }
   finally{ b.disabled = false; b.textContent = "Salvar cota"; }
