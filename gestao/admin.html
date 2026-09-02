@@ -205,6 +205,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
         <button class="aba" role="tab" data-aba="organizacao" aria-selected="false">Organização</button>
         <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
         <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
+        <button class="aba" role="tab" data-aba="arquivos" aria-selected="false">Arquivos</button>
         <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
         <button class="aba" role="tab" data-aba="atividades" aria-selected="false">Atividades</button>
         <button class="aba" role="tab" data-aba="estrutura" aria-selected="false">Estrutura</button>
@@ -2483,6 +2484,88 @@ function ligarGerarSessoes(){
   });
 }
 
+const ROTULO_TIPO_UPLOAD = {
+  logo: "Logo", banner: "Banner", arte_revista: "Arte de revista",
+  apresentacao: "Apresentação", video: "Vídeo"
+};
+const ROTULO_STATUS_UPLOAD_ADMIN = {
+  enviado: "Em análise", aprovado: "Aprovado", rejeitado: "Rejeitado"
+};
+
+ABAS.arquivos = async function(){
+  const c = $("#conteudo");
+  c.innerHTML = `
+    <h1>Arquivos dos patrocinadores</h1>
+    <p class="sub">Logo, banner, arte de revista, apresentação e vídeo — conforme o que a cota de cada
+      um exige. Só admin aprova ou rejeita; qualquer staff pode conferir a lista.</p>
+    <div class="barra">
+      <div style="max-width:200px;"><label>Situação</label>
+        <select id="ar-status">
+          <option value="">Todas</option>
+          <option value="enviado">Em análise</option>
+          <option value="aprovado">Aprovado</option>
+          <option value="rejeitado">Rejeitado</option>
+        </select></div>
+    </div>
+    <div id="ar-aviso"></div>
+    <div class="cartao"><div class="rolagem"><table id="ar-tabela"></table></div></div>`;
+
+  const carregar = async () => {
+    $("#ar-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
+    try{
+      const lista = await rpc("admin_listar_uploads", {
+        p_evento_slug: EVENTO, p_status: $("#ar-status").value || null
+      });
+
+      $("#ar-tabela").innerHTML = lista.length ? `
+        <tr><th>Empresa</th><th>Tipo</th><th>Arquivo</th><th>Enviado</th><th>Situação</th><th></th></tr>
+        ${lista.map(u => `<tr data-id="${esc(u.id)}" data-path="${esc(u.storage_path)}">
+          <td><strong>${esc(u.empresa)}</strong></td>
+          <td>${esc(ROTULO_TIPO_UPLOAD[u.tipo] || u.tipo)}</td>
+          <td>${esc(u.nome_arquivo||"—")}
+              ${u.tamanho_bytes ? `<br><span class="meta">${(u.tamanho_bytes/1024/1024).toFixed(1)} MB</span>` : ""}</td>
+          <td class="meta">${dataBR((u.enviado_em||"").slice(0,10))}</td>
+          <td><span class="selo ${u.status==='aprovado'?'ok':u.status==='rejeitado'?'pend':''}">${ROTULO_STATUS_UPLOAD_ADMIN[u.status]||u.status}</span>
+              ${u.observacao_admin ? `<br><span class="meta">${esc(u.observacao_admin)}</span>` : ""}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn sec mini ar-baixar">Baixar</button>
+            ${SOU_ADMIN ? `<button class="btn mini ar-aprovar">Aprovar</button>
+              <button class="btn perigo mini ar-rejeitar">Rejeitar</button>` : ""}
+          </td>
+        </tr>`).join("")}`
+        : `<tr><td style="color:var(--suave)">Nenhum arquivo enviado ainda.</td></tr>`;
+
+      $$(".ar-baixar", c).forEach(b => b.addEventListener("click", async () => {
+        const path = b.closest("tr").dataset.path;
+        try{
+          const { data, error } = await sb.storage.from("patrocinador-uploads").createSignedUrl(path, 300);
+          if(error) throw error;
+          window.open(data.signedUrl, "_blank");
+        }catch(e){ aviso("#ar-aviso", explicar(e)); }
+      }));
+
+      $$(".ar-aprovar", c).forEach(b => b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        b.disabled = true;
+        try{ await rpc("admin_revisar_upload", { p_upload_id: tr.dataset.id, p_status: "aprovado" }); carregar(); }
+        catch(e){ aviso("#ar-aviso", explicar(e)); b.disabled = false; }
+      }));
+
+      $$(".ar-rejeitar", c).forEach(b => b.addEventListener("click", async () => {
+        const tr = b.closest("tr");
+        const motivo = prompt("Por que está rejeitando? Vai aparecer pro patrocinador.");
+        if(motivo === null) return;
+        b.disabled = true;
+        try{ await rpc("admin_revisar_upload", { p_upload_id: tr.dataset.id, p_status: "rejeitado", p_observacao: motivo || null }); carregar(); }
+        catch(e){ aviso("#ar-aviso", explicar(e)); b.disabled = false; }
+      }));
+    }catch(e){ aviso("#ar-tabela", explicar(e)); }
+  };
+
+  $("#ar-status").addEventListener("change", carregar);
+  carregar();
+};
+
 ABAS.sessoes = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
@@ -3199,6 +3282,7 @@ async function blocoEvento(){
           <div><label>Prazo do contrato</label><input type="date" id="ev-pc" value="${esc(e.prazo_contrato||"")}"></div>
           <div><label>Prazo do rooming</label><input type="date" id="ev-pr" value="${esc(e.prazo_rooming||"")}"></div>
           <div><label>Cancelamento sem multa</label><input type="date" id="ev-pcan" value="${esc(e.prazo_cancelamento||"")}"></div>
+          <div><label>Prazo padrão de upload</label><input type="date" id="ev-pup" value="${esc(e.prazo_upload_padrao||"")}"></div>
           <div style="min-width:210px;"><label>Escolha das mesas abre em</label>
             <input type="datetime-local" id="ev-abre" value="${esc(paraInputHora(e.escolha_abre_em))}"></div>
         </div>
@@ -3224,7 +3308,7 @@ async function blocoEvento(){
       // datas e prazos do anterior sem ninguem perceber — e, pior, com o
       // link de inscricao do evento antigo
       ["#ev-slug","#ev-nome","#ev-local","#ev-ini","#ev-fim",
-       "#ev-pc","#ev-pr","#ev-pcan","#ev-sympla"].forEach(s => $(s).value = "");
+       "#ev-pc","#ev-pr","#ev-pcan","#ev-pup","#ev-sympla"].forEach(s => $(s).value = "");
       $("#ev-status").value = "rascunho";
       $("#ev-slug").focus();
       aviso("#ev-aviso",
@@ -3245,6 +3329,7 @@ async function blocoEvento(){
           p_prazo_contrato: $("#ev-pc").value || null,
           p_prazo_rooming: $("#ev-pr").value || null,
           p_prazo_cancelamento: $("#ev-pcan").value || null,
+          p_prazo_upload_padrao: $("#ev-pup").value || null,
           p_cota_unica: $("#ev-unica").value === "1",
           // sem isso nenhuma janela de cota comeca a contar — e o
           // padrao seguro: o relogio so anda quando alguem diz que
@@ -3319,10 +3404,22 @@ async function blocoCotas(){
           "Escolhe convidados" em Não tira a cota da fila de escolha — as vagas dela são preenchidas
           por sorteio em Mesas e jantares, não pelo próprio patrocinador.
         </p>
+        <div class="barra" style="align-items:flex-end;">
+          <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-logo"> Logo</label></div>
+          <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-banner"> Banner</label></div>
+          <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-revista"> Arte de revista</label></div>
+          <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-apresentacao"> Apresentação</label></div>
+          <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-video"> Vídeo</label></div>
+          <div style="max-width:150px;"><label>Prazo de upload</label><input type="date" id="co-up-prazo"></div>
+        </div>
+        <p class="meta" style="margin:0 0 8px;">
+          Arquivos que essa cota precisa enviar (aba Arquivos, no portal dela). Prazo vazio usa o
+          prazo padrão do evento (Estrutura); os dois vazios = sem prazo.
+        </p>
         <div id="co-aviso"></div>
         ${l.length ? `<table style="margin-top:10px;">
           <tr>${COTA_UNICA ? "" : "<th>Ordem</th><th>Janela</th>"}<th>Cota</th><th>Quartos</th><th>Mesa</th>
-              <th>Reunião</th><th>Jantar</th><th>Limite indicação</th><th>Escolhe</th><th>Patrocinadores</th><th></th></tr>
+              <th>Reunião</th><th>Jantar</th><th>Limite indicação</th><th>Escolhe</th><th>Arquivos</th><th>Patrocinadores</th><th></th></tr>
           ${l.map(c => `<tr data-id="${esc(c.id)}" data-nome="${esc(c.nome)}"
                             data-ordem="${c.ordem_prioridade}"
                             data-prazo="${esc(c.prazo_indicacao || "")}"
@@ -3331,6 +3428,9 @@ async function blocoCotas(){
                             data-mesa="${c.vagas_mesa_redonda}"
                             data-limite-ind="${c.limite_indicacoes ?? ""}"
                             data-escolhe="${c.escolhe_convidados === false ? 0 : 1}"
+                            data-up-logo="${c.upload_logo?1:0}" data-up-banner="${c.upload_banner?1:0}"
+                            data-up-revista="${c.upload_arte_revista?1:0}" data-up-apresentacao="${c.upload_apresentacao?1:0}"
+                            data-up-video="${c.upload_video?1:0}" data-up-prazo="${esc(c.prazo_upload || "")}"
                             data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}">
             ${COTA_UNICA ? "" : `<td class="meta">${c.ordem_prioridade}</td>
               <td class="meta">${c.janela_horas ? c.janela_horas + "h" : "sem limite"}
@@ -3345,6 +3445,11 @@ async function blocoCotas(){
             <td>${c.tem_jantar ? "Sim" : "—"}</td>
             <td class="meta">${c.limite_indicacoes ?? "sem limite"}</td>
             <td>${c.escolhe_convidados === false ? `<span class="selo alerta">Sorteio</span>` : "Sim"}</td>
+            <td class="meta">${[
+                c.upload_logo && "Logo", c.upload_banner && "Banner",
+                c.upload_arte_revista && "Arte", c.upload_apresentacao && "Apresentação",
+                c.upload_video && "Vídeo"
+              ].filter(Boolean).join(", ") || "—"}</td>
             <td>${(c.lista_patrocinadores||[]).length
                    ? (c.lista_patrocinadores||[]).map(p => esc(p.empresa)).join("<br>")
                    : `<span class="meta">nenhum</span>`}</td>
@@ -3376,6 +3481,12 @@ async function blocoCotas(){
       $("#co-jantar").value = t.jantar;
       $("#co-limite-ind").value = t.limiteInd || "";
       $("#co-escolhe").value = t.escolhe;
+      $("#co-up-logo").checked = t.upLogo === "1";
+      $("#co-up-banner").checked = t.upBanner === "1";
+      $("#co-up-revista").checked = t.upRevista === "1";
+      $("#co-up-apresentacao").checked = t.upApresentacao === "1";
+      $("#co-up-video").checked = t.upVideo === "1";
+      $("#co-up-prazo").value = t.upPrazo || "";
       $("#co-nome").focus();
     }));
 
@@ -3476,10 +3587,18 @@ async function salvarCota(){
       p_prazo_indicacao: $("#co-prazo")?.value || null,
       p_janela_horas: parseInt($("#co-janela")?.value, 10) || null,
       p_limite_indicacoes: parseInt($("#co-limite-ind").value, 10) || null,
-      p_escolhe_convidados: $("#co-escolhe").value === "1"
+      p_escolhe_convidados: $("#co-escolhe").value === "1",
+      p_upload_logo: $("#co-up-logo").checked,
+      p_upload_banner: $("#co-up-banner").checked,
+      p_upload_arte_revista: $("#co-up-revista").checked,
+      p_upload_apresentacao: $("#co-up-apresentacao").checked,
+      p_upload_video: $("#co-up-video").checked,
+      p_prazo_upload: $("#co-up-prazo").value || null
     });
-    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind"]
+    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo"]
       .forEach(s => $(s).value = "");
+    ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
+      .forEach(s => $(s).checked = false);
     if($("#co-ordem"))  $("#co-ordem").value  = "";
     if($("#co-prazo"))  $("#co-prazo").value  = "";
     if($("#co-janela")) $("#co-janela").value = "";

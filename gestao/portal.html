@@ -235,6 +235,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
       <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
       <button class="aba" role="tab" data-aba="convidados" aria-selected="false">Convidados</button>
       <button class="aba" role="tab" data-aba="lounge" aria-selected="false">Lounge</button>
+      <button class="aba" role="tab" data-aba="arquivos" aria-selected="false">Arquivos</button>
       <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
       <button class="aba" role="tab" data-aba="manual" aria-selected="false">Manual</button>
     </div>
@@ -247,6 +248,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
     <section id="painel-brindes" class="oculto"></section>
     <section id="painel-convidados" class="oculto"></section>
     <section id="painel-lounge" class="oculto"></section>
+    <section id="painel-arquivos" class="oculto"></section>
     <section id="painel-financeiro" class="oculto"></section>
     <section id="painel-manual" class="oculto"></section>
   </div>
@@ -619,7 +621,7 @@ function desenharCabecalho(){
 function ligarAbas(){
   $$(".aba").forEach(b => b.addEventListener("click", () => {
     $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
-    ["quartos","mesa","indicacoes","brindes","convidados","lounge","financeiro","manual"]
+    ["quartos","mesa","indicacoes","brindes","convidados","lounge","arquivos","financeiro","manual"]
       .forEach(a =>
       $("#painel-"+a).classList.toggle("oculto", a !== b.dataset.aba));
 
@@ -628,6 +630,7 @@ function ligarAbas(){
     if(b.dataset.aba === "brindes")    carregarBrindes();
     if(b.dataset.aba === "convidados") carregarConvidados();
     if(b.dataset.aba === "lounge")     carregarLounge();
+    if(b.dataset.aba === "arquivos")   carregarArquivos();
     if(b.dataset.aba === "financeiro") carregarFinanceiro();
     if(b.dataset.aba === "manual")     carregarManual();
   }));
@@ -1595,6 +1598,118 @@ async function listarLounge(){
       catch(e){ aviso("#lg-aviso", explicar(e)); b.disabled = false; }
     }));
   }catch(e){ aviso(box, explicar(e)); }
+}
+
+// =====================================================================
+// ABA: ARQUIVOS
+//
+// Upload direto pro storage (bucket privado patrocinador-uploads), um
+// arquivo por tipo — reenviar substitui. Ao trocar, remove o arquivo
+// antigo do storage antes de gravar o novo (senão fica órfão lá — a
+// tabela não guarda histórico, só o atual).
+// =====================================================================
+const ROTULO_UPLOAD = {
+  logo: "Logo", banner: "Banner", arte_revista: "Arte de revista",
+  apresentacao: "Apresentação", video: "Vídeo"
+};
+const ROTULO_STATUS_UPLOAD = {
+  enviado: { texto: "Em análise", classe: "pend" },
+  aprovado: { texto: "Aprovado", classe: "ok" },
+  rejeitado: { texto: "Rejeitado — reenvie", classe: "pend" }
+};
+
+async function carregarArquivos(){
+  const alvo = $("#painel-arquivos");
+  alvo.innerHTML = `<p class="carregando">Carregando…</p>`;
+
+  let lista;
+  try{
+    lista = await rpc("patro_meus_uploads", { p_patrocinador_id: PATRO.patrocinador_id });
+  }catch(e){ aviso(alvo, explicar(e)); return; }
+
+  if(lista.length === 0){
+    alvo.innerHTML = `<div class="vazio">Sua cota não pede nenhum arquivo.</div>`;
+    return;
+  }
+
+  const prazo = lista[0]?.prazo;
+  alvo.innerHTML = `
+    <h2>Arquivos</h2>
+    <p class="sub" style="margin-bottom:12px;">
+      Envie os arquivos pedidos pela sua cota.
+      ${prazo ? ` Prazo: <strong>${dataBR(prazo)}</strong>.` : ""}
+    </p>
+    <div id="arq-lista"></div>`;
+
+  const box = $("#arq-lista");
+  box.innerHTML = lista.map(a => {
+    const st = a.upload_id ? ROTULO_STATUS_UPLOAD[a.status] : null;
+    return `
+    <div class="cartao" data-tipo="${esc(a.tipo)}" data-path="${esc(a.storage_path||"")}" style="margin-bottom:12px;">
+      <div class="cartao-cab">
+        <h3 style="margin:0;">${esc(ROTULO_UPLOAD[a.tipo] || a.tipo)}</h3>
+        ${st ? `<span class="selo ${st.classe}">${st.texto}</span>` : ""}
+      </div>
+      ${a.upload_id ? `
+        <p class="meta" style="margin:6px 0;">${esc(a.nome_arquivo||"")}
+          ${a.tamanho_bytes ? ` · ${(a.tamanho_bytes/1024/1024).toFixed(1)} MB` : ""}
+          · enviado ${dataBR((a.enviado_em||"").slice(0,10))}</p>
+        ${a.status === "rejeitado" && a.observacao_admin
+          ? `<p class="fila-nota">Motivo: ${esc(a.observacao_admin)}</p>` : ""}
+      ` : `<p class="meta" style="margin:6px 0;">Nenhum arquivo enviado ainda.</p>`}
+      <input type="file" class="arq-arquivo">
+      <div class="arq-aviso"></div>
+      ${a.upload_id ? `<button class="btn perigo mini arq-remover" style="margin-top:8px;">Remover</button>` : ""}
+    </div>`;
+  }).join("");
+
+  box.querySelectorAll(".arq-arquivo").forEach(input => input.addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const cartao = input.closest(".cartao");
+    const tipo = cartao.dataset.tipo;
+    const pathAntigo = cartao.dataset.path;
+    const avisoEl = cartao.querySelector(".arq-aviso");
+    input.disabled = true;
+    aviso(avisoEl, "Enviando…", "ok");
+
+    try{
+      const caminho = `${PATRO.patrocinador_id}/${tipo}/${Date.now()}-${file.name}`;
+      const up = await sb.storage.from("patrocinador-uploads").upload(caminho, file, { upsert: false });
+      if(up.error) throw up.error;
+
+      await rpc("patro_registrar_upload", {
+        p_patrocinador_id: PATRO.patrocinador_id,
+        p_tipo: tipo, p_storage_path: caminho,
+        p_nome_arquivo: file.name, p_tamanho_bytes: file.size
+      });
+
+      if(pathAntigo){
+        await sb.storage.from("patrocinador-uploads").remove([pathAntigo]);
+      }
+
+      aviso("#aviso-global", `${ROTULO_UPLOAD[tipo]} enviado.`, "ok");
+      carregarArquivos();
+    }catch(err){
+      aviso(avisoEl, explicar(err));
+      input.disabled = false;
+    }
+  }));
+
+  box.querySelectorAll(".arq-remover").forEach(btn => btn.addEventListener("click", async () => {
+    const cartao = btn.closest(".cartao");
+    const path = cartao.dataset.path;
+    if(!(await DS.confirmar("O arquivo enviado será apagado.",
+        {titulo:`Remover ${ROTULO_UPLOAD[cartao.dataset.tipo]}?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+    btn.disabled = true;
+    try{
+      const lista2 = await rpc("patro_meus_uploads", { p_patrocinador_id: PATRO.patrocinador_id });
+      const item = lista2.find(x => x.tipo === cartao.dataset.tipo);
+      if(item?.upload_id) await rpc("patro_remover_upload", { p_upload_id: item.upload_id });
+      if(path) await sb.storage.from("patrocinador-uploads").remove([path]);
+      carregarArquivos();
+    }catch(e){ aviso("#aviso-global", explicar(e)); btn.disabled = false; }
+  }));
 }
 
 // =====================================================================
