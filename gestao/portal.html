@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="assets/design-system.js"></script>
 <style>
 *{box-sizing:border-box;}
@@ -233,6 +234,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
       <button class="aba" role="tab" data-aba="indicacoes" aria-selected="false">Indicar CIO</button>
       <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
       <button class="aba" role="tab" data-aba="convidados" aria-selected="false">Convidados</button>
+      <button class="aba" role="tab" data-aba="lounge" aria-selected="false">Lounge</button>
       <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
       <button class="aba" role="tab" data-aba="manual" aria-selected="false">Manual</button>
     </div>
@@ -244,6 +246,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
     <section id="painel-indicacoes" class="oculto"></section>
     <section id="painel-brindes" class="oculto"></section>
     <section id="painel-convidados" class="oculto"></section>
+    <section id="painel-lounge" class="oculto"></section>
     <section id="painel-financeiro" class="oculto"></section>
     <section id="painel-manual" class="oculto"></section>
   </div>
@@ -616,7 +619,7 @@ function desenharCabecalho(){
 function ligarAbas(){
   $$(".aba").forEach(b => b.addEventListener("click", () => {
     $$(".aba").forEach(x => x.setAttribute("aria-selected", x === b));
-    ["quartos","mesa","indicacoes","brindes","convidados","financeiro","manual"]
+    ["quartos","mesa","indicacoes","brindes","convidados","lounge","financeiro","manual"]
       .forEach(a =>
       $("#painel-"+a).classList.toggle("oculto", a !== b.dataset.aba));
 
@@ -624,6 +627,7 @@ function ligarAbas(){
     if(b.dataset.aba === "indicacoes") carregarIndicacoes();
     if(b.dataset.aba === "brindes")    carregarBrindes();
     if(b.dataset.aba === "convidados") carregarConvidados();
+    if(b.dataset.aba === "lounge")     carregarLounge();
     if(b.dataset.aba === "financeiro") carregarFinanceiro();
     if(b.dataset.aba === "manual")     carregarManual();
   }));
@@ -979,11 +983,13 @@ async function desenharSessao(card, s){
   const corpo = card.querySelector(".corpo-sessao");
 
   if(s.encerrada){
-    corpo.innerHTML = `<p class="fila-nota">${
-      s.passou
-        ? "Você passou a vez. As vagas restantes foram liberadas para as próximas empresas da fila."
-        : "Suas escolhas estão confirmadas."
-    }</p>`;
+    if(s.passou){
+      corpo.innerHTML = `<p class="fila-nota">Você passou a vez. As vagas restantes foram liberadas para as próximas empresas da fila.</p>`;
+      return;
+    }
+    corpo.innerHTML = `<p class="fila-nota">Suas escolhas estão confirmadas. Marque abaixo quem realmente apareceu.</p>
+      <div class="lista-presenca carregando">Carregando…</div>`;
+    await desenharPresencaSessao(corpo.querySelector(".lista-presenca"), s.sessao_id);
     return;
   }
 
@@ -1074,6 +1080,43 @@ async function desenharSessao(card, s){
       calcularPendencias();
     }catch(e){ aviso("#aviso-global", explicar(e)); }
   });
+}
+
+async function desenharPresencaSessao(box, sessaoId){
+  let lista;
+  try{
+    lista = await rpc("patro_meus_escolhidos", { p_sessao_id: sessaoId });
+  }catch(e){ aviso(box, explicar(e)); return; }
+
+  box.classList.remove("carregando");
+  box.innerHTML = lista.length === 0
+    ? `<div class="vazio">Nenhum convidado confirmado.</div>`
+    : `<table><tbody>${lista.map(c => `
+        <tr data-id="${esc(c.convidado_id)}">
+          <td><strong>${esc(c.nome)}</strong><br><span class="meta">${esc(c.empresa||"")}</span></td>
+          <td style="text-align:right;">
+            ${c.presente
+              ? `<span class="selo ok">Presente</span> <button class="btn sec mini desmarcar-presenca">Desfazer</button>`
+              : `<button class="btn mini marcar-presenca">Marcar presença</button>`}
+          </td>
+        </tr>`).join("")}</tbody></table>`;
+
+  box.querySelectorAll(".marcar-presenca").forEach(b => b.addEventListener("click", async () => {
+    const tr = b.closest("tr");
+    b.disabled = true;
+    try{
+      await rpc("patro_sessao_marcar_presenca", { p_sessao_id: sessaoId, p_convidado_id: tr.dataset.id, p_presente: true });
+      desenharPresencaSessao(box, sessaoId);
+    }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+  }));
+  box.querySelectorAll(".desmarcar-presenca").forEach(b => b.addEventListener("click", async () => {
+    const tr = b.closest("tr");
+    b.disabled = true;
+    try{
+      await rpc("patro_sessao_marcar_presenca", { p_sessao_id: sessaoId, p_convidado_id: tr.dataset.id, p_presente: false });
+      desenharPresencaSessao(box, sessaoId);
+    }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+  }));
 }
 
 // A fila: mostra onde a empresa está na ordem de escolha.
@@ -1454,6 +1497,85 @@ async function carregarConvidados(){
   ["#cv-estado","#cv-cidade","#cv-segmento"].forEach(sel =>
     $(sel).addEventListener("change", buscar));
   buscar();
+}
+
+// =====================================================================
+// ABA: LOUNGE
+//
+// Visita ao lounge/estande: leia o QR do crachá do CIO (o mesmo QR que
+// ele já carrega, de v_etiquetas) e registra. O filtro ele/CIO existe
+// porque o CIO também pode se autodeclarar pela área dele — a lista
+// mistura os dois, e o filtro é o "relatório" pedido.
+// =====================================================================
+let LOUNGE_FILTRO = null;
+const dataHoraBR = d => d ? new Date(d).toLocaleString("pt-BR",
+  { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }) : "—";
+
+async function carregarLounge(){
+  const alvo = $("#painel-lounge");
+  LOUNGE_FILTRO = null;
+  alvo.innerHTML = `
+    <h2>Visitas ao lounge</h2>
+    <p class="sub">Leia o QR do crachá do CIO quando ele passar no seu lounge/estande.</p>
+    <div class="cartao">
+      <button class="btn" id="lg-ler-qr">Ler QR do crachá</button>
+      <div id="lg-aviso"></div>
+    </div>
+    <div class="linha" style="margin-top:16px;">
+      <div style="max-width:220px;"><label>Quem marcou</label>
+        <select id="lg-filtro">
+          <option value="">Todos</option>
+          <option value="patrocinador">Você marcou</option>
+          <option value="cio">O CIO marcou</option>
+        </select></div>
+    </div>
+    <div id="lg-lista" style="margin-top:10px;"><p class="carregando">Carregando…</p></div>`;
+
+  $("#lg-ler-qr").addEventListener("click", () => {
+    DS.lerQR(async (pessoaKey) => {
+      try{
+        const r = await rpc("patro_lounge_registrar", {
+          p_patrocinador_id: PATRO.patrocinador_id, p_pessoa_key: pessoaKey });
+        aviso("#lg-aviso", r.ja_estava
+          ? `${r.nome} já tinha visita registrada.`
+          : `${r.nome} · visita registrada.`, "ok");
+        listarLounge();
+      }catch(e){ aviso("#lg-aviso", explicar(e)); }
+    });
+  });
+
+  $("#lg-filtro").addEventListener("change", e => {
+    LOUNGE_FILTRO = e.target.value || null;
+    listarLounge();
+  });
+
+  listarLounge();
+}
+
+async function listarLounge(){
+  const box = $("#lg-lista");
+  try{
+    const l = await rpc("patro_lounge_listar", {
+      p_patrocinador_id: PATRO.patrocinador_id, p_origem: LOUNGE_FILTRO });
+    box.innerHTML = l.length === 0
+      ? `<div class="vazio">Nenhuma visita registrada ${LOUNGE_FILTRO ? "com esse filtro" : "ainda"}.</div>`
+      : `<div class="cartao"><table>
+          <tr><th>Nome</th><th>Empresa</th><th>Quem marcou</th><th>Quando</th><th></th></tr>
+          ${l.map(v => `<tr data-id="${esc(v.id)}">
+            <td><strong>${esc(v.nome)}</strong></td>
+            <td>${esc(v.empresa||"—")}</td>
+            <td class="meta">${v.origem === "cio" ? "O próprio CIO" : "Você"}</td>
+            <td class="meta">${dataHoraBR(v.registrado_em)}</td>
+            <td><button class="btn sec mini lg-desfazer">Desfazer</button></td>
+          </tr>`).join("")}
+        </table></div>`;
+    box.querySelectorAll(".lg-desfazer").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true;
+      try{ await rpc("patro_lounge_desfazer", { p_visita_id: tr.dataset.id }); listarLounge(); }
+      catch(e){ aviso("#lg-aviso", explicar(e)); b.disabled = false; }
+    }));
+  }catch(e){ aviso(box, explicar(e)); }
 }
 
 // =====================================================================
