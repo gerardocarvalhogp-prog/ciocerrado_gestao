@@ -3497,6 +3497,7 @@ async function blocoQuartos(){
             com o número, o andar, o corredor e a categoria de cada apartamento —
             importar evita transcrever 424 linhas à mão.
           </p>
+          <button class="btn sec mini" id="mp-modelo" type="button">Baixar modelo de exemplo</button>
           <input type="file" id="mp-arquivo" accept=".xlsx,.xls">
           <div id="mp-aviso"></div>
         </div>
@@ -3580,6 +3581,7 @@ async function blocoQuartos(){
       if(f) importarMapaResort(f);
       e.target.value = "";
     });
+    $("#mp-modelo").addEventListener("click", baixarModeloMapaResort);
   }catch(e){ aviso("#bl-quartos", explicar(e)); }
 }
 
@@ -3632,6 +3634,27 @@ async function carregarQuartosIndividual(){
 // cabeçalho entre versões. O que não muda é a ordem — prédio, andar,
 // corredor, apto, categoria.
 // =====================================================================
+// Gera um exemplo no formato EXATO que lerMapaResort espera — a leitura
+// é por posição de coluna, não por título, então o jeito mais confiável
+// de mostrar "assim que o arquivo tem que vir" é gerar com o mesmo
+// código que depois vai ler de volta.
+function baixarModeloMapaResort(){
+  const linhas = [
+    ["", "SUP", "Superior", "", "2 camas queen e 1 cama de viúva"],
+    ["", "STD", "Standard", "", "1 cama king"],
+    [],
+    ["MAPA DE ALOCAÇÕES"],
+    ["", "PRÉDIO", "ANDAR", "CORREDOR", "Nº DO APTO", "CATEGORIA"],
+    ["", "Alexânia 1", "2", "A", "201", "SUP"],
+    ["", "Alexânia 1", "2", "A", "202", "STD"],
+    ["", "Alexânia 1", "3", "B", "301", "SUP"]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(linhas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Alexânia 1");
+  XLSX.writeFile(wb, "modelo-mapa-resort-cio-cerrado.xlsx");
+}
+
 function lerMapaResort(wb){
   const cats = new Map();
   const quartos = [];
