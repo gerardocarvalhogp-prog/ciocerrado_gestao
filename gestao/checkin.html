@@ -227,6 +227,11 @@ const LOCAL  = new URLSearchParams(location.search).get("local")  || null;
 // evento_id (design deliberado — jantares sao standalone), entao
 // nao da pra reaproveitar checkin_* nem v_esperados aqui.
 const JANTAR = new URLSearchParams(location.search).get("jantar") || null;
+// modo atividade: ?atividade=<uuid> — presenca de uma atividade especifica
+// (ex.: abertura, reuniao exclusiva de uma cota), em vez do check-in geral
+// do evento. Atividade TEM evento_id, entao reaproveita v_esperados por
+// baixo (atividade_checkin_listar/registrar), so filtrando por atividade_id.
+const ATIVIDADE = new URLSearchParams(location.search).get("atividade") || null;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   db: { schema: "gestao" }
@@ -478,6 +483,7 @@ function trocarFiltro(pend){
 // nem paginacao no servidor porque a lista de um jantar e pequena
 // (poucas dezenas) — filtrar aqui e mais simples que criar outra RPC
 let JANTAR_CACHE = [];
+let ATIVIDADE_CACHE = [];
 
 async function placar(){
   if(JANTAR){
@@ -486,6 +492,14 @@ async function placar(){
       <div><div class="n">${JANTAR_CACHE.length}</div><div class="r">Convidados</div></div>
       <div class="feitos"><div class="n">${feitos}</div><div class="r">Chegaram</div></div>
       <div class="pend"><div class="n">${JANTAR_CACHE.length-feitos}</div><div class="r">Pendentes</div></div>`;
+    return;
+  }
+  if(ATIVIDADE){
+    const feitos = ATIVIDADE_CACHE.filter(p => p.checkin_id).length;
+    $("#placar").innerHTML = `
+      <div><div class="n">${ATIVIDADE_CACHE.length}</div><div class="r">Esperados</div></div>
+      <div class="feitos"><div class="n">${feitos}</div><div class="r">Presentes</div></div>
+      <div class="pend"><div class="n">${ATIVIDADE_CACHE.length-feitos}</div><div class="r">Pendentes</div></div>`;
     return;
   }
   try{
@@ -523,6 +537,41 @@ async function carregar(){
             <span class="meta">${esc(p.empresa||"—")}</span>
           </div>
           ${p.status === "compareceu"
+            ? `<div style="text-align:right;">
+                 <div class="meta" style="margin-bottom:4px;">✓ ${hora(p.registrado_em)}</div>
+                 <button class="btn sec desfazer">Desfazer</button>
+               </div>`
+            : `<button class="btn marcar">Check-in</button>`}
+        </div>`).join("");
+
+    $$(".marcar").forEach(b => b.addEventListener("click", () => marcar(b)));
+    $$(".desfazer").forEach(b => b.addEventListener("click", () => desfazer(b)));
+    return;
+  }
+
+  if(ATIVIDADE){
+    try{
+      ATIVIDADE_CACHE = await rpc("atividade_checkin_listar", {
+        p_atividade_id: ATIVIDADE,
+        p_termo: termo || null,
+        p_so_pendentes: soPendentes,
+        p_limite: 300
+      });
+    }catch(e){ aviso(explicar(e)); return; }
+
+    $("#lista").innerHTML = ATIVIDADE_CACHE.length === 0
+      ? `<div class="vazio">
+          ${termo ? `Ninguém encontrado para "${esc(termo)}".`
+                  : soPendentes ? "Todos já estão presentes." : "Ninguém esperado ainda."}
+        </div>`
+      : ATIVIDADE_CACHE.map(p => `
+        <div class="pessoa ${p.checkin_id ? "feito" : ""}" data-k="${esc(p.pessoa_key)}" data-c="${esc(p.checkin_id||"")}">
+          <div class="info">
+            <strong>${esc(p.nome)}</strong>
+            <span class="meta">${esc(p.empresa||"—")}</span>
+            <span class="selo">${esc(p.categoria)}</span>
+          </div>
+          ${p.checkin_id
             ? `<div style="text-align:right;">
                  <div class="meta" style="margin-bottom:4px;">✓ ${hora(p.registrado_em)}</div>
                  <button class="btn sec desfazer">Desfazer</button>
@@ -588,8 +637,10 @@ $("#ler-qr").addEventListener("click", () => {
     try{
       const r = JANTAR
         ? await rpc("jantar_checkin_por_qr", { p_pessoa_key: pessoaKey })
-        : await rpc("checkin_registrar", {
-            p_evento_slug: EVENTO, p_pessoa_key: pessoaKey, p_local: LOCAL });
+        : ATIVIDADE
+          ? await rpc("atividade_checkin_registrar", { p_atividade_id: ATIVIDADE, p_pessoa_key: pessoaKey })
+          : await rpc("checkin_registrar", {
+              p_evento_slug: EVENTO, p_pessoa_key: pessoaKey, p_local: LOCAL });
       aviso(r.ja_estava
         ? `${r.nome} já tinha feito check-in às ${hora(r.registrado_em)}.`
         : `${r.nome} · check-in registrado.`, "ok");
@@ -606,6 +657,20 @@ async function marcar(btn){
     try{
       await rpc("jantar_checkin_registrar", { p_convidado_id: card.dataset.c });
       aviso(`${card.querySelector("strong").textContent} · check-in registrado.`, "ok");
+      await carregar(); await placar();
+    }catch(e){
+      aviso(explicar(e));
+      btn.disabled = false; btn.textContent = "Check-in";
+    }
+    return;
+  }
+
+  if(ATIVIDADE){
+    try{
+      const r = await rpc("atividade_checkin_registrar", { p_atividade_id: ATIVIDADE, p_pessoa_key: card.dataset.k });
+      aviso(r.ja_estava
+        ? `${r.nome} já estava presente.`
+        : `${r.nome} · presença registrada.`, "ok");
       await carregar(); await placar();
     }catch(e){
       aviso(explicar(e));

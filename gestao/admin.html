@@ -2674,6 +2674,8 @@ ABAS.atividades = async function(){
             <td><span class="selo ${Number(a.presentes) ? "ok" : "pend"}">${a.presentes} / ${a.esperados}</span></td>
             <td style="white-space:nowrap;">
               <button class="btn sec mini at-presenca">Presença</button>
+              <a class="btn sec mini" href="checkin.html?atividade=${esc(a.id)}" target="_blank" rel="noopener"
+                 style="text-decoration:none;display:inline-block;">Abrir check-in</a>
               <button class="btn perigo mini at-remover">Remover</button>
             </td>
           </tr>`).join("")}
