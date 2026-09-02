@@ -194,7 +194,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
         <div style="margin-bottom:8px;">
           <label>Cargo</label><input type="text" id="n-cargo"></div>
         <div style="margin-bottom:12px;">
-          <label>Categoria do crachá</label>
+          <label id="n-cat-label">Categoria do crachá</label>
           <select id="n-cat">
             <option value="PROTAGONISTA">Protagonista (CIO)</option>
             <option value="FAMILIAR">Familiar</option>
@@ -528,7 +528,8 @@ async function carregar(){
       ? `<div class="vazio">
           ${termo ? `Ninguém encontrado para "${esc(termo)}".`
                   : soPendentes ? "Todos já chegaram." : "Nenhum convidado confirmado ainda."}
-          <p class="meta" style="margin-top:10px;">Quem não está na lista se adiciona pela tela de jantares, não por aqui.</p>
+          ${termo ? `<div style="margin-top:14px;">
+            <button class="btn" id="abrir-novo">Cadastrar "${esc(termo)}"</button></div>` : ""}
         </div>`
       : l.map(p => `
         <div class="pessoa ${p.status==='compareceu' ? "feito" : ""}" data-c="${esc(p.id)}">
@@ -543,6 +544,16 @@ async function carregar(){
                </div>`
             : `<button class="btn marcar">Check-in</button>`}
         </div>`).join("");
+
+    if(l.length){
+      $("#lista").insertAdjacentHTML("beforeend",
+        `<div style="margin-top:14px;text-align:center;">
+           <button class="btn sec" id="abrir-novo2">Não está na lista? Cadastrar</button>
+         </div>`);
+      $("#abrir-novo2").addEventListener("click", () => abrirCadastro(termo));
+    }
+    const bn = $("#abrir-novo");
+    if(bn) bn.addEventListener("click", () => abrirCadastro(termo));
 
     $$(".marcar").forEach(b => b.addEventListener("click", () => marcar(b)));
     $$(".desfazer").forEach(b => b.addEventListener("click", () => desfazer(b)));
@@ -700,6 +711,21 @@ function abrirCadastro(termo){
   $("#n-nome").value = termo || "";
   ["#n-empresa","#n-email","#n-telefone","#n-cargo"].forEach(s => $(s).value = "");
   $("#n-aviso").innerHTML = "";
+
+  if(JANTAR){
+    $("#n-cat-label").textContent = "Tipo de convidado";
+    $("#n-cat").innerHTML = `
+      <option value="CIO">CIO — entra na base de gestores</option>
+      <option value="CONVIDADO">Convidado do patrocinador — só neste jantar</option>`;
+  }else{
+    $("#n-cat-label").textContent = "Categoria do crachá";
+    $("#n-cat").innerHTML = `
+      <option value="PROTAGONISTA">Protagonista (CIO)</option>
+      <option value="FAMILIAR">Familiar</option>
+      <option value="PATROCINADOR">Patrocinador</option>
+      <option value="CIO CERRADO">Equipe CIO Cerrado</option>`;
+  }
+
   $("#n-nome").focus();
   $("#form-novo").scrollIntoView({ behavior:"smooth", block:"nearest" });
 }
@@ -721,16 +747,26 @@ $("#n-salvar").addEventListener("click", async () => {
   const b = $("#n-salvar");
   b.disabled = true; b.textContent = "Cadastrando…";
   try{
-    const r = await rpc("checkin_cadastrar", {
-      p_evento_slug: EVENTO,
-      p_nome: nome,
-      p_empresa:  $("#n-empresa").value.trim()  || null,
-      p_email:    $("#n-email").value.trim()    || null,
-      p_telefone: $("#n-telefone").value.trim() || null,
-      p_cargo:    $("#n-cargo").value.trim()    || null,
-      p_categoria: $("#n-cat").value,
-      p_local: LOCAL
-    });
+    const r = JANTAR
+      ? await rpc("jantar_checkin_cadastrar", {
+          p_jantar_id: JANTAR,
+          p_nome: nome,
+          p_empresa:  $("#n-empresa").value.trim()  || null,
+          p_email:    $("#n-email").value.trim()    || null,
+          p_telefone: $("#n-telefone").value.trim() || null,
+          p_cargo:    $("#n-cargo").value.trim()    || null,
+          p_e_cio: $("#n-cat").value === "CIO"
+        })
+      : await rpc("checkin_cadastrar", {
+          p_evento_slug: EVENTO,
+          p_nome: nome,
+          p_empresa:  $("#n-empresa").value.trim()  || null,
+          p_email:    $("#n-email").value.trim()    || null,
+          p_telefone: $("#n-telefone").value.trim() || null,
+          p_cargo:    $("#n-cargo").value.trim()    || null,
+          p_categoria: $("#n-cat").value,
+          p_local: LOCAL
+        });
 
     // reaproveitou cadastro existente: vale avisar, senão a recepção
     // acha que criou duplicata
