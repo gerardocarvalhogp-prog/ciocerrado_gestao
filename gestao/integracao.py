@@ -17,10 +17,20 @@
 #
 # Por padrao roda em modo seguro (nao envia nada de verdade).
 # Use --producao para valer.
+#
+# --contratos precisa, alem de SYMPLA_TOKEN/AUTENTIQUE_TOKEN:
+#   CONTRATO_TEMPLATE_PATH  caminho do .docx do contrato (com os
+#                           placeholders "Prezado(a) participante",
+#                           "Nome: ____", "CPF: ____" — mesmo formato
+#                           do pipeline antigo, EXPERIENCE 2026)
+#   pip install python-docx
+#   LibreOffice instalado (soffice no PATH) OU Word + `pip install docx2pdf`,
+#   pra converter o docx preenchido em PDF antes de subir pro Autentique
 # =====================================================================
 
 import os
 import sys
+import json
 import argparse
 import logging
 from datetime import datetime, timezone, timedelta
@@ -39,8 +49,16 @@ RESEND_KEY        = os.environ.get("RESEND_API_KEY", "")
 EVENTO_SLUG       = os.environ.get("CERRADO_EVENTO", "cerrado2027")
 REMETENTE         = os.environ.get("CERRADO_REMETENTE", "contato@ciocerrado.com.br")
 
-# Modelo do contrato no Autentique (id do documento base)
-AUTENTIQUE_TEMPLATE = os.environ.get("AUTENTIQUE_TEMPLATE_ID", "")
+# Caminho do .docx do contrato (o mesmo padrao do pipeline antigo,
+# cerrado_contratos.py: preenche nome/CPF no docx, converte pra PDF e
+# sobe pro Autentique — NAO usa createDocumentFromTemplate, porque
+# nunca existiu template cadastrado no Autentique, so o docx local).
+# Sem isso configurado, envio de contrato fica pulado (ver enviar_contratos).
+CONTRATO_TEMPLATE_PATH = os.environ.get("CONTRATO_TEMPLATE_PATH", "")
+
+# Prazo de assinatura no Autentique (bloqueia assinatura apos esta data).
+# Formato: "AAAA-MM-DDTHH:MM:SS.000-03:00". Vazio = sem prazo.
+AUTENTIQUE_DEADLINE = os.environ.get("AUTENTIQUE_DEADLINE", "")
 
 # Lembrete de contrato: dias sem assinar antes da primeira cobranca,
 # e intervalo minimo entre uma cobranca e a proxima.
@@ -221,15 +239,148 @@ def autentique(query, variaveis=None):
     return corpo.get("data", {})
 
 
+# ---------------------------------------------------------------------
+# Geracao do PDF a partir do .docx — mesmo mecanismo do pipeline antigo
+# (cerrado_contratos.py): preenche nome/CPF por substituicao de
+# paragrafo, converte via LibreOffice (soffice) ou, se nao tiver,
+# docx2pdf (precisa do Word instalado — so funciona no Windows).
+# ---------------------------------------------------------------------
+MUTATION_CRIAR_DOCUMENTO = """
+mutation CreateDocumentMutation(
+  $document: DocumentInput!,
+  $signers: [SignerInput!]!,
+  $file: Upload!,
+  $sandbox: Boolean
+) {
+  createDocument(document: $document, signers: $signers, file: $file, sandbox: $sandbox) {
+    id
+    name
+    signatures { public_id email link { short_link } }
+  }
+}
+"""
+
+
+def _preencher_docx(template, destino, nome, cpf=""):
+    from docx import Document
+    doc = Document(template)
+    ja_nome = ja_cpf = False
+    for p in doc.paragraphs:
+        texto = p.text.strip()
+        if texto.startswith("Prezado(a) participante"):
+            _substituir_paragrafo(p, f"Prezado(a) {nome},")
+        elif texto.startswith("Nome:") and "_" in texto and not ja_nome:
+            _substituir_paragrafo(p, f"Nome: {nome}")
+            ja_nome = True
+        elif texto.startswith("CPF:") and "_" in texto and not ja_cpf:
+            if cpf:
+                _substituir_paragrafo(p, f"CPF: {cpf}")
+            ja_cpf = True
+    doc.save(destino)
+
+
+def _substituir_paragrafo(paragrafo, novo_texto):
+    if paragrafo.runs:
+        paragrafo.runs[0].text = novo_texto
+        for run in paragrafo.runs[1:]:
+            run.text = ""
+    else:
+        paragrafo.text = novo_texto
+
+
+def gerar_contrato_pdf(nome, cpf=""):
+    """Preenche o .docx com nome/CPF e converte pra PDF, em pasta
+    temporaria. Levanta excecao clara se o template ou o conversor
+    (LibreOffice/docx2pdf) nao estiverem disponiveis — quem chama
+    decide se isso pula so este contrato ou para tudo."""
+    import shutil, subprocess, tempfile, unicodedata
+
+    if not CONTRATO_TEMPLATE_PATH or not os.path.exists(CONTRATO_TEMPLATE_PATH):
+        raise RuntimeError(
+            f"CONTRATO_TEMPLATE_PATH nao aponta pra um .docx que existe: "
+            f"{CONTRATO_TEMPLATE_PATH!r}")
+
+    nome_ascii = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    nome_ascii = nome_ascii.replace(" ", "_") or "contrato"
+
+    pasta_tmp = tempfile.mkdtemp(prefix="cerrado_")
+    try:
+        docx_tmp = os.path.join(pasta_tmp, f"{nome_ascii}.docx")
+        pdf_tmp = os.path.join(pasta_tmp, f"{nome_ascii}.pdf")
+        _preencher_docx(CONTRATO_TEMPLATE_PATH, docx_tmp, nome, cpf)
+
+        soffice = shutil.which("soffice") or shutil.which("libreoffice")
+        if soffice:
+            subprocess.run(
+                [soffice, "--headless", "--convert-to", "pdf",
+                 "--outdir", pasta_tmp, docx_tmp],
+                check=True, capture_output=True, timeout=120)
+        else:
+            from docx2pdf import convert
+            convert(docx_tmp, pdf_tmp)
+
+        if not os.path.exists(pdf_tmp):
+            raise RuntimeError("PDF nao foi gerado na conversao")
+
+        # move pra fora da pasta temporaria antes dela ser apagada
+        destino = os.path.join(tempfile.gettempdir(), f"{nome_ascii}.pdf")
+        shutil.move(pdf_tmp, destino)
+        return destino
+    finally:
+        shutil.rmtree(pasta_tmp, ignore_errors=True)
+
+
+def criar_documento_autentique(nome_doc, caminho_pdf, email, sandbox=True):
+    """Sobe o PDF preenchido pro Autentique (createDocument, nao
+    createDocumentFromTemplate — nao existe template cadastrado la).
+    Um signatario so (o gestor) — o modelo de dados do gestao nao
+    rastreia testemunha/co-signer, diferente do pipeline antigo que
+    tinha Gerardo e Kelson fixos. Sem posicionamento automatico do
+    carimbo de assinatura: depende do texto exato do template (o
+    pipeline antigo procurava "Participante / CIO" etc. no PDF), e
+    nao ha template de 2027 ainda pra saber se essas marcas existem —
+    o signatario posiciona a propria assinatura na tela do Autentique."""
+    documento = {"name": nome_doc}
+    if AUTENTIQUE_DEADLINE:
+        documento["deadline_at"] = AUTENTIQUE_DEADLINE
+
+    operations = json.dumps({
+        "query": MUTATION_CRIAR_DOCUMENTO,
+        "variables": {
+            "document": documento,
+            "signers": [{"email": email, "action": "SIGN"}],
+            "file": None,
+            "sandbox": sandbox,
+        },
+    })
+    file_map = json.dumps({"file": ["variables.file"]})
+
+    with open(caminho_pdf, "rb") as f:
+        r = requests.post(
+            AUTENTIQUE_API,
+            headers={"Authorization": f"Bearer {AUTENTIQUE_TOKEN}"},
+            data={"operations": operations, "map": file_map},
+            files={"file": (os.path.basename(caminho_pdf), f, "application/pdf")},
+            timeout=60)
+    r.raise_for_status()
+    resp = r.json()
+    if resp.get("errors"):
+        raise RuntimeError(f"Erro Autentique: {resp['errors']}")
+    return resp["data"]["createDocument"]
+
+
 def enviar_contratos(supa, evento, producao):
     if not AUTENTIQUE_TOKEN:
         log.warning("AUTENTIQUE_TOKEN ausente: pulando envio.")
+        return
+    if not CONTRATO_TEMPLATE_PATH:
+        log.warning("CONTRATO_TEMPLATE_PATH ausente: pulando envio.")
         return
 
     # aprovados que ainda nao receberam contrato
     pend = supa.get(
         "contratos",
-        select="id,participante_id,status,participantes!inner(evento_id,status,gestores!inner(nome,email))",
+        select="id,participante_id,status,participantes!inner(evento_id,status,gestores!inner(nome,email,cpf))",
         status="eq.nao_enviado")
 
     alvo = [c for c in pend
@@ -244,19 +395,12 @@ def enviar_contratos(supa, evento, producao):
             log.info("  [seguro] contrato para %s <%s>", g["nome"], g["email"])
             continue
 
+        pdf = None
         try:
-            dados = autentique("""
-              mutation($documento: DocumentInput!, $signatarios: [SignerInput!]!) {
-                createDocumentFromTemplate(
-                  template_id: "%s", document: $documento, signers: $signatarios
-                ) { id name }
-              }""" % AUTENTIQUE_TEMPLATE,
-              {
-                "documento": {"name": f"Contrato · {g['nome']}"},
-                "signatarios": [{"email": g["email"], "action": "SIGN"}],
-              })
+            pdf = gerar_contrato_pdf(g["nome"], g.get("cpf") or "")
+            doc = criar_documento_autentique(
+                f"Contrato · {g['nome']}", pdf, g["email"], sandbox=not producao)
 
-            doc = dados["createDocumentFromTemplate"]
             supa.patch("contratos", {"id": f"eq.{c['id']}"}, {
                 "autentique_id": doc["id"],
                 "autentique_url": f"https://app.autentique.com.br/documentos/{doc['id']}",
@@ -270,6 +414,12 @@ def enviar_contratos(supa, evento, producao):
         except Exception as e:
             # um contrato que falha nao pode parar a fila inteira
             log.error("  falhou para %s: %s", g["email"], e)
+        finally:
+            if pdf and os.path.exists(pdf):
+                try:
+                    os.remove(pdf)
+                except OSError:
+                    pass
 
 
 def ler_status(supa, evento, producao):
