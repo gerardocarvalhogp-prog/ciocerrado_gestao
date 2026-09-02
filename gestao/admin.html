@@ -803,7 +803,7 @@ ABAS.acompanhamento = async function(){
 
       $("#ac-tabela").innerHTML = lista.length ? `
         <tr><th>Quem</th><th>Público</th><th>Etapa</th><th>Aberta em</th>
-            <th>Dias em aberto</th><th>Nível</th><th></th></tr>
+            <th>Dias em aberto</th><th>Nível</th><th>Cobrança</th><th></th></tr>
         ${lista.map(l => `<tr data-sujeito="${esc(l.sujeito_id)}" data-etapa="${esc(l.etapa_chave)}"
                              data-etapa-rotulo="${esc(l.etapa_rotulo)}"
                              data-quem="${esc(l.sujeito_nome || l.sujeito_empresa || "")}">
@@ -815,9 +815,12 @@ ABAS.acompanhamento = async function(){
           <td class="meta">${l.dias_em_aberto ?? "—"}</td>
           <td><span class="selo ${l.nivel === "atrasado" ? "erro" : l.nivel === "atencao" ? "alerta" : "ok"}">
                 ${ROTULO_NIVEL[l.nivel]}</span></td>
+          <td class="meta">${l.ultima_cobranca_em
+                ? `<span class="selo pend">já cobrado</span><br>${dataBR(l.ultima_cobranca_em)}`
+                : "—"}</td>
           <td><button class="btn sec mini ac-cobrar">Preparar cobrança</button></td>
         </tr>`).join("")}`
-        : `<tr><td colspan="7" style="color:var(--suave)">Nada pendente com esse filtro.</td></tr>`;
+        : `<tr><td colspan="8" style="color:var(--suave)">Nada pendente com esse filtro.</td></tr>`;
 
       $$(".ac-cobrar").forEach(b => b.addEventListener("click", () => {
         const tr = b.closest("tr");
