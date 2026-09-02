@@ -1780,7 +1780,7 @@ ABAS.quartos = async function(){
       if(!reservas.has(p.reserva_id))
         reservas.set(p.reserva_id, {
           reserva_id:p.reserva_id, empresa:p.empresa, quarto_tipo:p.quarto_tipo,
-          quarto_id:p.quarto_id, quarto_numero:p.quarto_numero, gente:[] });
+          quarto_id:p.quarto_id, quarto_numero:p.quarto_numero, publico:p.publico, gente:[] });
       reservas.get(p.reserva_id).gente.push(p.nome);
     });
     const lista = [...reservas.values()];
@@ -1799,8 +1799,13 @@ ABAS.quartos = async function(){
       </div>
       <div class="cartao"><div class="rolagem"><table id="q-tabela"></table></div></div>`;
 
-    const opcoes = q => livres.map(l =>
-      `<option value="${esc(l.id)}">${esc(l.numero||"s/n")} · ${esc(l.tipo)} (${l.capacidade})</option>`).join("");
+    // quarto bloqueado pra outro publico nem aparece como opcao — a
+    // recusa no banco (admin_alocar_quarto) e so o cinto de seguranca,
+    // aqui evita a viagem e a tela nao oferece o que ja sabe que vai falhar
+    const opcoes = r => livres
+      .filter(l => !l.publico_alvo || l.publico_alvo === r.publico)
+      .map(l => `<option value="${esc(l.id)}">${esc(l.numero||"s/n")} · ${esc(l.tipo)} (${l.capacidade})</option>`)
+      .join("");
 
     const desenhar = () => {
       const busca = $("#q-busca").value.toLowerCase();
@@ -1846,7 +1851,9 @@ async function alocar(el, liberar=false){
       // o banco recusou por um motivo que a tela precisa explicar
       aviso("#aviso-global", r.motivo === "quarto_ocupado"
         ? "Esse quarto acabou de ser ocupado por outra reserva."
-        : `Não cabe: a reserva tem ${r.ocupantes} pessoa(s) e o quarto comporta ${r.capacidade}.`);
+        : r.motivo === "publico_incompativel"
+          ? `Esse quarto está bloqueado para ${r.publico_quarto} — essa reserva é de ${r.publico_reserva}.`
+          : `Não cabe: a reserva tem ${r.ocupantes} pessoa(s) e o quarto comporta ${r.capacidade}.`);
     }
     ABAS.quartos();
   }catch(e){
@@ -3528,6 +3535,28 @@ async function blocoQuartos(){
           <div id="qta-aviso"></div>
         </div>
         <div style="border-top:1px solid var(--linha);margin-top:12px;padding-top:12px;">
+          <p class="meta" style="margin:0 0 8px;">
+            Reserve uma faixa pra um público antes mesmo de vendas/inscrições — CIO, Organização
+            ou Cotas param de disputar esses números com os outros. "Liberar" volta ao pool geral.
+          </p>
+          <div class="barra">
+            <div style="max-width:100px;"><label>De</label><input type="text" id="qtb-de" placeholder="200"></div>
+            <div style="max-width:100px;"><label>Até</label><input type="text" id="qtb-ate" placeholder="279"></div>
+            <div style="max-width:150px;"><label>Público</label>
+              <select id="qtb-publico">
+                <option value="">Liberar (pool geral)</option>
+                <option value="cio">CIO</option>
+                <option value="organizacao">Organização</option>
+                <option value="cotas">Cotas</option>
+              </select></div>
+            <div style="min-width:auto;">
+              <button class="btn sec" id="qt-publico" title="Bloqueia ou libera a faixa pro publico escolhido">
+                Aplicar
+              </button></div>
+          </div>
+          <div id="qtb-aviso"></div>
+        </div>
+        <div style="border-top:1px solid var(--linha);margin-top:12px;padding-top:12px;">
           <p class="sub" style="margin-bottom:8px;">
             <strong>Ou suba o mapa do resort.</strong> O hotel manda uma aba por prédio,
             com o número, o andar, o corredor e a categoria de cada apartamento —
@@ -3612,6 +3641,25 @@ async function blocoQuartos(){
       }catch(e){ aviso("#qta-aviso", explicar(e)); }
       finally{ b.disabled = false; b.textContent = "Alterar tipo da faixa"; }
     });
+
+    $("#qt-publico").addEventListener("click", async () => {
+      const de = $("#qtb-de").value.trim(), ate = $("#qtb-ate").value.trim();
+      const publico = $("#qtb-publico").value || null;
+      if(!de || !ate){ aviso("#qtb-aviso","Informe a faixa."); return; }
+
+      const b = $("#qt-publico");
+      b.disabled = true; b.textContent = "Aplicando…";
+      try{
+        const res = await rpc("admin_definir_publico_faixa", {
+          p_evento_slug: EVENTO, p_de: de, p_ate: ate, p_publico_alvo: publico });
+        aviso("#qtb-aviso", res.alterados
+          ? `${res.alterados} quarto(s) ${publico ? "bloqueado(s) para " + publico : "liberado(s) pro pool geral"}.`
+          : `Nenhum quarto nessa faixa precisava mudar.`, "ok");
+        blocoQuartos();
+      }catch(e){ aviso("#qtb-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Aplicar"; }
+    });
+
     $("#mp-arquivo").addEventListener("change", e => {
       const f = e.target.files[0];
       if(f) importarMapaResort(f);
@@ -3630,7 +3678,7 @@ async function carregarQuartosIndividual(){
       p_evento_slug: EVENTO, p_busca: $("#qi-busca").value.trim() || null
     });
     tbl.innerHTML = `
-      <tr><th>Número</th><th>Tipo</th><th>Bloco</th><th>Status</th><th>Ocupado por</th><th></th></tr>
+      <tr><th>Número</th><th>Tipo</th><th>Público</th><th>Bloco</th><th>Status</th><th>Ocupado por</th><th></th></tr>
       ${lista.map(q => `<tr data-id="${esc(q.id)}">
         <td>${esc(q.numero||"—")}</td>
         <td><select class="qi-tipo">
@@ -3638,19 +3686,27 @@ async function carregarQuartosIndividual(){
           <option value="duplo"  ${q.tipo==="duplo" ?"selected":""}>Duplo</option>
           <option value="triplo" ${q.tipo==="triplo"?"selected":""}>Triplo</option>
         </select></td>
+        <td><select class="qi-publico">
+          <option value="" ${!q.publico_alvo?"selected":""}>Pool geral</option>
+          <option value="cio" ${q.publico_alvo==="cio"?"selected":""}>CIO</option>
+          <option value="organizacao" ${q.publico_alvo==="organizacao"?"selected":""}>Organização</option>
+          <option value="cotas" ${q.publico_alvo==="cotas"?"selected":""}>Cotas</option>
+        </select></td>
         <td class="meta">${esc(q.bloco||"—")}</td>
         <td class="meta">${esc(q.status)}</td>
         <td class="meta">${esc(q.ocupado_por||"—")}</td>
         <td><button class="btn sec mini qi-salvar">Salvar</button></td>
-      </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nada com essa busca.</td></tr>`}`;
+      </tr>`).join("") || `<tr><td colspan="7" style="color:var(--suave)">Nada com essa busca.</td></tr>`}`;
 
     $$(".qi-salvar", tbl).forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
       const tipo = tr.querySelector(".qi-tipo").value;
+      const publico = tr.querySelector(".qi-publico").value || null;
       b.disabled = true; b.textContent = "Salvando…";
       try{
-        const res = await rpc("admin_editar_tipo_quarto", { p_id: tr.dataset.id, p_tipo: tipo });
-        aviso("#qi-aviso", `Quarto ${res.numero || "—"} agora é ${tipo}.`, "ok");
+        const res = await rpc("admin_editar_tipo_quarto",
+          { p_id: tr.dataset.id, p_tipo: tipo, p_publico_alvo: publico });
+        aviso("#qi-aviso", `Quarto ${res.numero || "—"} agora é ${tipo}${publico ? " · bloqueado para " + publico : ""}.`, "ok");
         b.disabled = false; b.textContent = "Salvar";
         blocoQuartos();
       }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar"; }
