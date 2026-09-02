@@ -17,6 +17,8 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- xlsx (SheetJS) na versao community nao grava imagem em celula — so exceljs faz isso -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="assets/design-system.js"></script>
 <style>
 *{box-sizing:border-box;}
@@ -2069,12 +2071,19 @@ ABAS.etiquetas = async function(){
           <option value="inscricao">Só inscritos sem quarto</option>
           <option value="patrocinador">Só equipe de patrocinador</option>
         </select></div>
+      <div style="min-width:auto;align-self:end;">
+        <label class="check"><input type="checkbox" id="e-so-com-numero"> Só quem já tem número de quarto</label>
+      </div>
       <div style="min-width:auto;"><button class="btn sec" id="e-exportar">Exportar Excel</button></div>
+      <div style="min-width:auto;"><button class="btn sec" id="e-exportar-qr">Exportar Excel com QR</button></div>
       <div style="min-width:auto;"><button class="btn" id="e-imprimir">Imprimir crachás com QR</button></div>
     </div>
     <div class="cartao"><div class="rolagem"><table id="e-tabela"></table></div></div>`;
 
   let ETIQ = [];
+  // "so quem ja tem numero" e filtro de cliente, nao vale ida ao banco —
+  // ETIQ ja tem o campo apto, so precisa esconder quem esta vazio
+  const visivel = () => $("#e-so-com-numero").checked ? ETIQ.filter(e => e.apto) : ETIQ;
 
   const carregar = async () => {
     $("#e-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
@@ -2084,47 +2093,120 @@ ABAS.etiquetas = async function(){
         p_categoria: $("#e-cat").value || null,
         p_origem: $("#e-origem").value || null
       });
-
-      const semQuarto = ETIQ.filter(e => !e.apto).length;
-
-      $("#e-tabela").innerHTML = `
-        <tr><th>Apto</th><th>Nome</th><th>Empresa</th><th>Categoria</th></tr>
-        ${ETIQ.map(e => `<tr>
-          <td class="meta">${e.apto ? esc(e.apto) : "—"}</td>
-          <td>${esc(e.nome)}</td>
-          <td>${esc(e.empresa||"—")}</td>
-          <td><span class="selo ${e.categoria==="S/CRACHA"?"pend":"ok"}">${esc(e.categoria)}</span></td>
-        </tr>`).join("") || `<tr><td colspan="4" style="color:var(--suave)">Nada com esse filtro.</td></tr>`}`;
-
-      $("#et-resumo").innerHTML = ETIQ.length
-        ? `<div class="cartao"><p class="meta" style="margin:0;">
-             <strong style="font-size:15px;color:var(--verde);">${ETIQ.length}</strong> etiqueta(s)
-             ${semQuarto ? ` · ${semQuarto} sem número de quarto` : ""}
-           </p></div>`
-        : "";
+      desenharTabela();
     }catch(e){ aviso("#e-tabela", explicar(e)); }
+  };
+
+  const desenharTabela = () => {
+    const lista = visivel();
+    const semQuarto = lista.filter(e => !e.apto).length;
+
+    $("#e-tabela").innerHTML = `
+      <tr><th>Apto</th><th>Nome</th><th>Empresa</th><th>Categoria</th></tr>
+      ${lista.map(e => `<tr>
+        <td class="meta">${e.apto ? esc(e.apto) : "—"}</td>
+        <td>${esc(e.nome)}</td>
+        <td>${esc(e.empresa||"—")}</td>
+        <td><span class="selo ${e.categoria==="S/CRACHA"?"pend":"ok"}">${esc(e.categoria)}</span></td>
+      </tr>`).join("") || `<tr><td colspan="4" style="color:var(--suave)">Nada com esse filtro.</td></tr>`}`;
+
+    $("#et-resumo").innerHTML = lista.length
+      ? `<div class="cartao"><p class="meta" style="margin:0;">
+           <strong style="font-size:15px;color:var(--verde);">${lista.length}</strong> etiqueta(s)
+           ${semQuarto ? ` · ${semQuarto} sem número de quarto` : ""}
+         </p></div>`
+      : "";
   };
 
   $("#e-cat").addEventListener("change", carregar);
   $("#e-origem").addEventListener("change", carregar);
+  $("#e-so-com-numero").addEventListener("change", desenharTabela);
 
   $("#e-exportar").addEventListener("click", () => exportar(
     // apto vazio em vez de nulo: a planilha de impressão espera a
     // coluna presente, mesmo quando não há hospedagem
-    ETIQ.map(e => ({ ...e, apto: e.apto || "" })),
+    visivel().map(e => ({ ...e, apto: e.apto || "" })),
     [["apto","APTO"],["nome","NOME"],["empresa","EMPRESA"],["categoria","CATEGORIA"]],
     "etiquetas-cio-cerrado.xlsx", "Etiquetas"));
 
+  $("#e-exportar-qr").addEventListener("click", async () => {
+    const lista = visivel();
+    if(!lista.length){ DS.avisar("Nada para exportar com esse filtro.", {tom:"erro"}); return; }
+    const btn = $("#e-exportar-qr");
+    btn.disabled = true; btn.textContent = "Gerando…";
+    try{ await exportarEtiquetasComQR(lista); }
+    catch(e){ aviso("#aviso-global", explicar(e)); }
+    finally{ btn.disabled = false; btn.textContent = "Exportar Excel com QR"; }
+  });
+
   $("#e-imprimir").addEventListener("click", async () => {
-    if(!ETIQ.length){ DS.avisar("Nada para imprimir com esse filtro.", {tom:"erro"}); return; }
+    const lista = visivel();
+    if(!lista.length){ DS.avisar("Nada para imprimir com esse filtro.", {tom:"erro"}); return; }
     const btn = $("#e-imprimir");
     btn.disabled = true; btn.textContent = "Gerando…";
-    try{ await imprimirCrachas(ETIQ); }
+    try{ await imprimirCrachas(lista); }
     finally{ btn.disabled = false; btn.textContent = "Imprimir crachás com QR"; }
   });
 
   carregar();
 };
+
+// Excel de etiquetas com o QR de verdade dentro da celula. O xlsx
+// (SheetJS) que o resto do sistema usa nao grava imagem em planilha na
+// edicao gratuita — so por isso o exceljs entra aqui, so pra este botao.
+async function exportarEtiquetasComQR(lista){
+  if(typeof ExcelJS === "undefined"){
+    DS.avisar("Gerador de Excel com imagem não carregou. Recarregue a página.", {tom:"erro"});
+    return;
+  }
+  if(typeof window.QRCode !== "function"){
+    DS.avisar("Gerador de QR não carregou. Recarregue a página.", {tom:"erro"});
+    return;
+  }
+
+  const temp = document.createElement("div");
+  temp.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
+  document.body.appendChild(temp);
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Etiquetas");
+  ws.columns = [
+    { header:"APTO", key:"apto", width:10 },
+    { header:"NOME", key:"nome", width:32 },
+    { header:"EMPRESA", key:"empresa", width:28 },
+    { header:"CATEGORIA", key:"categoria", width:16 },
+    { header:"QR", key:"qr", width:14 }
+  ];
+
+  for(let i = 0; i < lista.length; i++){
+    const e = lista[i];
+    ws.addRow({ apto:e.apto||"", nome:e.nome, empresa:e.empresa||"", categoria:e.categoria }).height = 66;
+
+    const div = document.createElement("div");
+    temp.appendChild(div);
+    // eslint-disable-next-line no-new
+    new QRCode(div, { text: e.pessoa_key, width:110, height:110, correctLevel: QRCode.CorrectLevel.M });
+    await new Promise(r => setTimeout(r, 0));
+    const canvasEl = div.querySelector("canvas");
+    const base64 = canvasEl ? canvasEl.toDataURL("image/png").split(",")[1] : null;
+    if(base64){
+      const imgId = wb.addImage({ base64, extension:"png" });
+      // linha 1 e o cabecalho — a linha de dados i (0-indexada) cai na
+      // linha i+2 da planilha, que e indice i+1 no sistema 0-indexado
+      // de coordenadas do addImage
+      ws.addImage(imgId, { tl:{ col:4, row:i+1 }, ext:{ width:60, height:60 } });
+    }
+  }
+  temp.remove();
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "etiquetas-com-qr-cio-cerrado.xlsx";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
 // Gera o QR de cada cracha na propria pagina (biblioteca ja carregada
 // aqui) e manda so a imagem pronta (data URL) pra janela de impressao —
@@ -3697,10 +3779,14 @@ ABAS.patrocinadores = async function(){
       <div class="cartao">
         <div class="cartao-cab" style="margin-bottom:10px;">
           <h2 style="margin:0;">Cadastrados</h2>
-          <button class="btn sec mini" id="pt-gerar">Gerar quartos das cotas</button>
+          <div>
+            <button class="btn sec mini" id="pt-ia-lote" disabled>Aplicar IA nos selecionados</button>
+            <button class="btn sec mini" id="pt-gerar">Gerar quartos das cotas</button>
+          </div>
         </div>
         ${lista.length ? `<table>
-          <tr><th>Empresa</th><th>Cota</th><th>O que vende</th><th>Quartos</th><th>Usuários</th><th></th></tr>
+          <tr><th><input type="checkbox" id="pt-marcar-todos"></th>
+              <th>Empresa</th><th>Cota</th><th>O que vende</th><th>Quartos</th><th>Usuários</th><th></th></tr>
           ${lista.map(p => `<tr data-id="${esc(p.id)}" data-empresa="${esc(p.empresa)}"
                                 data-cota="${esc(p.cota||"")}" data-cnpj="${esc(p.cnpj||"")}"
                                 data-seg="${esc(p.segmento||"")}" data-vende="${esc(p.o_que_vende||"")}"
@@ -3708,6 +3794,7 @@ ABAS.patrocinadores = async function(){
                                 data-natureza="${esc(p.natureza||"")}" data-cidade="${esc(p.cidade||"")}"
                                 data-estado="${esc(p.estado||"")}" data-lounge="${esc(p.lounge||"")}"
                                 data-extras="${p.quartos_extras||0}" data-mesa="${p.vagas_mesa_override??""}">
+            <td><input type="checkbox" class="pt-marcar"></td>
             <td><strong>${esc(p.empresa)}</strong>
                 ${p.site ? `<br><span class="meta">${esc(p.site)}</span>` : ""}
                 ${p.fechado_em ? `<br><span class="selo ok">fechou</span>` : ""}
@@ -3745,12 +3832,13 @@ ABAS.patrocinadores = async function(){
         por("#pt-site", d.site);         por("#pt-segmento", d.segmento);
         por("#pt-vende", d.o_que_vende); por("#pt-resumo", d.resumo);
         por("#pt-cidade", d.cidade);     por("#pt-estado", d.estado);
+        por("#pt-cnpj", d.cnpj);
         if(d.natureza && !$("#pt-natureza").value) $("#pt-natureza").value = d.natureza;
         $("#pt-mais").open = true;
 
         // "sucesso" com todos os campos vazios engana: parece que
         // preencheu quando a busca não achou nada
-        const achou = ["site","resumo","o_que_vende","segmento","cidade","estado"]
+        const achou = ["site","resumo","o_que_vende","segmento","cidade","estado","cnpj"]
           .filter(k => String(d[k] || "").trim()).length;
         aviso("#pt-aviso", achou
           ? `${achou} campo(s) preenchido(s). Confira antes de salvar.`
@@ -3788,16 +3876,7 @@ ABAS.patrocinadores = async function(){
       const tr = b.closest("tr");
       b.disabled = true; b.textContent = "…";
       try{
-        const d = await pesquisarEmpresa(tr.dataset.empresa, tr.dataset.site);
-        await rpc("admin_enriquecer_patrocinador", {
-          p_id: tr.dataset.id,
-          p_site: d.site || null, p_resumo: d.resumo || null,
-          p_o_que_vende: d.o_que_vende || null, p_segmento: d.segmento || null,
-          p_natureza: d.natureza || null,
-          p_cidade: d.cidade || null, p_estado: d.estado || null
-        });
-        const achou = ["site","resumo","o_que_vende","segmento","cidade","estado"]
-          .filter(k => String(d[k] || "").trim()).length;
+        const achou = await enriquecerUmPatrocinador(tr.dataset.id, tr.dataset.empresa, tr.dataset.site);
         aviso("#aviso-global", achou
           ? `${tr.dataset.empresa}: ${achou} campo(s) atualizado(s).`
           : `Nada encontrado sobre ${tr.dataset.empresa}. Preencha à mão.`,
@@ -3808,6 +3887,44 @@ ABAS.patrocinadores = async function(){
         b.disabled = false; b.textContent = "IA";
       }
     }));
+
+    // Selecao multipla so serve pro botao de lote — cada checkbox
+    // habilita/desabilita conforme tem algo marcado, "marcar todos"
+    // so espelha nas linhas visiveis.
+    const atualizarBotaoLote = () => {
+      $("#pt-ia-lote").disabled = $$(".pt-marcar").filter(cb => cb.checked).length === 0;
+    };
+    $("#pt-marcar-todos").addEventListener("change", (e) => {
+      $$(".pt-marcar").forEach(cb => cb.checked = e.target.checked);
+      atualizarBotaoLote();
+    });
+    $$(".pt-marcar").forEach(cb => cb.addEventListener("change", atualizarBotaoLote));
+
+    $("#pt-ia-lote").addEventListener("click", async () => {
+      const trs = $$(".pt-marcar").filter(cb => cb.checked).map(cb => cb.closest("tr"));
+      if(!trs.length) return;
+      if(!(await DS.confirmar(
+          `Cada empresa dispara uma busca na web, uma de cada vez — pode levar um tempo.`,
+          {titulo:`Aplicar IA em ${trs.length} empresa(s) selecionada(s)?`}))) return;
+
+      const btn = $("#pt-ia-lote");
+      btn.disabled = true;
+      let ok = 0, semAchado = 0, erro = 0;
+      for(let i = 0; i < trs.length; i++){
+        const tr = trs[i];
+        btn.textContent = `Processando ${i+1}/${trs.length}…`;
+        try{
+          const achou = await enriquecerUmPatrocinador(tr.dataset.id, tr.dataset.empresa, tr.dataset.site);
+          if(achou) ok++; else semAchado++;
+        }catch(e){ erro++; }
+      }
+      aviso("#aviso-global",
+        `IA em lote: ${ok} atualizada(s)` +
+        (semAchado ? `, ${semAchado} sem dado encontrado` : "") +
+        (erro ? `, ${erro} com erro` : "") + ".",
+        erro ? "erro" : "ok");
+      ABAS.patrocinadores();
+    });
 
     $$(".pt-apagar").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
@@ -3869,6 +3986,7 @@ async function pesquisarEmpresa(nome, site){
     `{"site":"domínio oficial","resumo":"o que a empresa faz, máx 25 palavras",` +
     `"o_que_vende":"principais produtos e serviços, máx 20 palavras",` +
     `"segmento":"segmento de atuação em 1-3 palavras",` +
+    `"cnpj":"CNPJ no formato XX.XXX.XXX/XXXX-XX, so a matriz",` +
     `"natureza":"privada|hibrida|publica","cidade":"sede","estado":"UF"}\n` +
     `natureza: "hibrida" para Sistema S, fundações e associações ligadas a estatais, ` +
     `fundos de pensão e capital misto; "publica" para governo, autarquias e estatais puras. ` +
@@ -3879,6 +3997,23 @@ async function pesquisarEmpresa(nome, site){
     throw new Error("A busca não retornou dados utilizáveis para essa empresa.");
   }
   return d;
+}
+
+// Uma busca + gravação, reaproveitada pelo botão "IA" da linha e pelo
+// botão de lote — os dois fazem exatamente a mesma coisa, só o
+// segundo repete isto várias vezes, uma empresa de cada vez.
+async function enriquecerUmPatrocinador(id, empresa, site){
+  const d = await pesquisarEmpresa(empresa, site);
+  await rpc("admin_enriquecer_patrocinador", {
+    p_id: id,
+    p_site: d.site || null, p_resumo: d.resumo || null,
+    p_o_que_vende: d.o_que_vende || null, p_segmento: d.segmento || null,
+    p_natureza: d.natureza || null,
+    p_cidade: d.cidade || null, p_estado: d.estado || null,
+    p_cnpj: d.cnpj || null
+  });
+  return ["site","resumo","o_que_vende","segmento","cidade","estado","cnpj"]
+    .filter(k => String(d[k] || "").trim()).length;
 }
 
 async function abrirUsuarios(id, empresa){
