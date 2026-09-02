@@ -542,10 +542,17 @@ async function iniciar(){
 // só descobre o que falta entrando aba por aba. Só entra aqui o que dá
 // pra saber com segurança pelas mesmas funções/RPCs que as abas já
 // chamam: quartos (do painel, sempre disponível), mesa redonda
-// (escolhidos vs vagas, já vem pronto de patro_minhas_sessoes) e
-// financeiro (fatura emitida e não paga). Brindes ficou de fora de
-// propósito: "não vamos levar" e "ainda não respondeu" têm a mesma cara
-// nos dados hoje, e não dá pra distinguir sem adivinhar.
+// (escolhidos vs vagas, já vem pronto de patro_minhas_sessoes),
+// indicação de CIO (só quando a cota tem vaga de mesa pra indicar
+// alguém), arquivos (patro_meus_uploads) e financeiro (fatura emitida
+// e não paga). Brindes ficou de fora de propósito: "não vamos levar" e
+// "ainda não respondeu" têm a mesma cara nos dados hoje, e não dá pra
+// distinguir sem adivinhar.
+//
+// Sessão de cota que não escolhe (sorteio da organização,
+// escolhe_convidados=false) não entra aqui — não tem nada que o
+// patrocinador possa fazer sobre ela, e mandar pra aba "mesa" mostraria
+// um formulário vazio sem sentido.
 // =====================================================================
 async function calcularPendencias(){
   const pend = [];
@@ -557,9 +564,14 @@ async function calcularPendencias(){
     });
   }
 
+  if(PATRO.vagas_mesa_redonda > 0 && PATRO.indicacoes_feitas === 0){
+    pend.push({ aba: "indicacoes", texto: "Nenhum CIO indicado ainda" });
+  }
+
   try{
     const sessoes = await rpc("patro_minhas_sessoes", { p_patrocinador_id: PATRO.patrocinador_id });
-    const abertas = (sessoes || []).filter(s => !s.encerrada && Number(s.escolhidos) < Number(s.vagas));
+    const abertas = (sessoes || []).filter(s =>
+      s.escolhe_convidados !== false && !s.encerrada && Number(s.escolhidos) < Number(s.vagas));
     if(abertas.length > 0){
       pend.push({
         aba: "mesa",
@@ -569,6 +581,19 @@ async function calcularPendencias(){
       });
     }
   }catch(e){ /* patrocinador sem mesa redonda na cota: sem sessao, sem pendencia */ }
+
+  try{
+    const uploads = await rpc("patro_meus_uploads", { p_patrocinador_id: PATRO.patrocinador_id });
+    const faltando = (uploads || []).filter(u => !u.upload_id);
+    if(faltando.length > 0){
+      pend.push({
+        aba: "arquivos",
+        texto: faltando.length === 1
+          ? `Falta enviar: ${ROTULO_UPLOAD[faltando[0].tipo] || faltando[0].tipo}`
+          : `${faltando.length} arquivo(s) por enviar`
+      });
+    }
+  }catch(e){ /* cota sem arquivo exigido: sem pendencia */ }
 
   try{
     const f = await rpc("patro_minha_fatura", { p_patrocinador_id: PATRO.patrocinador_id });
