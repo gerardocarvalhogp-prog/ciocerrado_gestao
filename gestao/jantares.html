@@ -16,6 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/design-system.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -684,6 +685,7 @@ async function desenharJantar(){
           <a class="btn sec mini" href="checkin.html?jantar=${esc(J.id)}" target="_blank" rel="noopener"
              style="text-decoration:none;display:inline-block;">Abrir check-in</a>
           <button class="btn sec mini" id="cv-etiquetas" title="Crachás dos convidados">Etiquetas</button>
+          <button class="btn sec mini" id="cv-crachas-qr" title="Crachás com QR, para ler no check-in">Imprimir crachás (QR)</button>
           <button class="btn sec mini" id="cv-exportar" title="Convidados ou só quem compareceu">Exportar mailing</button>
         </div>
       </div>
@@ -701,6 +703,7 @@ async function desenharJantar(){
   $("#av-salvar").addEventListener("click", salvarAvulso);
   $("#cv-exportar").addEventListener("click", exportarMailing);
   $("#cv-etiquetas").addEventListener("click", exportarEtiquetasJantar);
+  $("#cv-crachas-qr").addEventListener("click", imprimirCrachasJantar);
 
   let bsDebounce;
   $("#bs-busca").addEventListener("input", () => {
@@ -1309,6 +1312,78 @@ async function exportarEtiquetasJantar(){
       `Etiquetas_${(J.patrocinador_nome||"jantar").replace(/\W+/g,"_")}.xlsx`,
       "Etiquetas");
   }catch(e){ aviso("#aviso-global", explicar(e)); }
+}
+
+// Cracha de papel com QR pra ler na tela de check-in do jantar. O QR
+// carrega "jantar_convidado:<id>" — mesma chave que jantar_checkin_por_qr
+// espera, e como o id ja e unico em jantar_convidados nao precisa levar
+// o jantar_id junto.
+async function imprimirCrachasJantar(){
+  if(typeof window.QRCode !== "function"){
+    aviso("#aviso-global", "Gerador de QR não carregou. Recarregue a página.");
+    return;
+  }
+  let lista;
+  try{
+    const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
+    lista = l.filter(c => c.status !== "recusado")
+             .sort((a,b) => (a.nome||"").localeCompare(b.nome||"", "pt-BR"));
+  }catch(e){ aviso("#aviso-global", explicar(e)); return; }
+
+  if(lista.length === 0){
+    aviso("#aviso-global", "Nenhum convidado ativo neste jantar — os crachás sairiam vazios.");
+    return;
+  }
+
+  const temp = document.createElement("div");
+  temp.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
+  document.body.appendChild(temp);
+
+  const cartoes = [];
+  for(const c of lista){
+    const div = document.createElement("div");
+    temp.appendChild(div);
+    // eslint-disable-next-line no-new
+    new QRCode(div, { text: "jantar_convidado:" + c.id, width:130, height:130, correctLevel: QRCode.CorrectLevel.M });
+    await new Promise(r => setTimeout(r, 0));
+    const canvasEl = div.querySelector("canvas");
+    const src = canvasEl ? canvasEl.toDataURL("image/png") : null;
+    cartoes.push({ nome:c.nome, empresa:c.empresa||"", qr:src });
+  }
+  temp.remove();
+
+  const win = window.open("", "_blank");
+  if(!win){ aviso("#aviso-global", "O navegador bloqueou a janela de impressão — permita pop-ups para este site."); return; }
+
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8">
+    <title>Crachás do jantar — CIO Cerrado</title>
+    <style>
+      body{font-family:'Public Sans',Arial,sans-serif;margin:0;padding:16px;}
+      .grade{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+      .cracha{
+        border:1px solid #ccc;border-radius:8px;padding:14px;
+        display:flex;align-items:center;gap:12px;break-inside:avoid;
+        page-break-inside:avoid;
+      }
+      .cracha img{width:80px;height:80px;flex:none;}
+      .cracha .info{overflow:hidden;}
+      .cracha .nome{font-weight:700;font-size:15px;margin:0 0 2px;}
+      .cracha .empresa{font-size:12.5px;color:#555;margin:0;}
+      @media print{ .grade{gap:6px;} .cracha{border-color:#999;} }
+    </style></head><body>
+    <div class="grade">
+      ${cartoes.map(c => `<div class="cracha">
+        ${c.qr ? `<img src="${c.qr}" alt="">` : ""}
+        <div class="info">
+          <p class="nome">${esc(c.nome)}</p>
+          <p class="empresa">${esc(c.empresa)}</p>
+        </div>
+      </div>`).join("")}
+    </div>
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 300);
 }
 
 // Exporta a lista do jantar. Nasceu como "lista de presentes" (só quem
