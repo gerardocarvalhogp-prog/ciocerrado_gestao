@@ -2058,7 +2058,7 @@ ABAS.etiquetas = async function(){
         <select id="e-cat">
           <option value="">Todas</option>
           <option value="PROTAGONISTA">Protagonista</option>
-          <option value="ACOMPANHANTE">Acompanhante</option>
+          <option value="FAMILIAR">Familiar</option>
           <option value="PATROCINADOR">Patrocinador</option>
           <option value="S/CRACHA">Sem crachá</option>
         </select></div>
@@ -2822,7 +2822,7 @@ ABAS.financeiro = async function(){
     c.innerHTML = `
       <h1>Financeiro</h1>
       <p class="sub">
-        Valores adicionais de acompanhante, criança, transfer e quarto extra.
+        Valores adicionais de familiar, criança, transfer e quarto extra.
         A cota do patrocinador não entra aqui — ela é do contrato.
       </p>
 
@@ -2955,7 +2955,7 @@ async function verItens(tr){
             <td><strong>${moeda(i.valor_total)}</strong></td>
           </tr>`).join("")}
         </table>` : `<div class="vazio">
-          Sem itens. A fatura fica em zero quando não há acompanhante,
+          Sem itens. A fatura fica em zero quando não há familiar,
           criança, transfer nem quarto extra.
         </div>`}
       </div>`;

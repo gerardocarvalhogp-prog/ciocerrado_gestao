@@ -248,7 +248,7 @@ function explicar(e){
   if(m.includes("data de nascimento das criancas"))
     return "Informe a data de nascimento das crianças — ela define a cobrança e o crachá.";
   if(m.includes("depois do início do evento")) return "Confira a data de nascimento: é depois do início do evento.";
-  if(m.includes("acompanhante precisa de nome")) return "Todo acompanhante precisa de nome.";
+  if(m.includes("familiar precisa de nome")) return "Todo familiar precisa de nome.";
   if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
   return m;
 }
@@ -588,8 +588,8 @@ async function areaRooming(){
     <div class="cartao">
       <h2>Quem vai com você</h2>
       <p class="sub" style="margin-bottom:16px;">
-        Você já está incluído. Adicione acompanhantes e filhos — cada um gera custo adicional,
-        que aparece no resumo abaixo enquanto você preenche.
+        Você já está incluído. Adicione os familiares que vão com você — cada um gera custo
+        adicional, que aparece no resumo abaixo enquanto você preenche.
       </p>
 
       <div class="pessoa" style="background:#EDF2EF;">
@@ -605,7 +605,7 @@ async function areaRooming(){
 
       <div id="lista-pessoas"></div>
 
-      <button class="btn sec mini" id="add-pessoa">+ Adicionar acompanhante</button>
+      <button class="btn sec mini" id="add-pessoa">+ Adicionar familiar</button>
 
       <div class="linha" style="margin-top:16px;">
         <div style="max-width:280px;">
@@ -644,7 +644,7 @@ function desenharPessoas(){
     el.className = "pessoa";
     el.innerHTML = `
       <div class="pessoa-cab">
-        <strong>Acompanhante ${i+1}</strong>
+        <strong>Familiar ${i+1}</strong>
         <button class="btn perigo mini remover">Remover</button>
       </div>
       <div class="linha">
@@ -680,7 +680,7 @@ function desenharPessoas(){
 
     // grava no estado a cada digitada para a fatura acompanhar.
     // O nome tambem recalcula: a previa so conta quem ja tem nome, entao
-    // sem isso a pessoa digita o acompanhante e o valor nao mexe.
+    // sem isso a pessoa digita o familiar e o valor nao mexe.
     el.querySelector(".f-nome").addEventListener("input", e => { p.nome = e.target.value; atualizarFatura(); });
     el.querySelector(".f-cpf").addEventListener("input",  e => { p.cpf  = e.target.value; });
     el.querySelector(".f-nasc").addEventListener("change",e => { p.data_nascimento = e.target.value; atualizarFatura(); });
@@ -762,10 +762,10 @@ async function salvarRooming(){
   }
 
   // Aviso, não bloqueio: sem a data o valor sai pela faixa padrão, e a
-  // pessoa pode legitimamente não saber a data do acompanhante agora.
+  // pessoa pode legitimamente não saber a data do familiar agora.
   const semData = lista.filter(p => !p.data_nascimento).length;
   if(semData && !(await DS.confirmar(
-      `${semData} acompanhante(s) sem data de nascimento. ` +
+      `${semData} familiar(es) sem data de nascimento. ` +
       `O valor será calculado pela faixa padrão e pode mudar depois. Continuar?`,
       {titulo:"Continuar sem data de nascimento?"}))) return;
 
@@ -781,7 +781,7 @@ async function salvarRooming(){
   const semOrigem = lista.find(p => p.usa_transfer && !p.transfer_origem);
   if(semOrigem){
     aviso("#aviso-rooming",
-      `Escolha de onde ${semOrigem.nome.trim() || "o acompanhante"} sai no transfer.`);
+      `Escolha de onde ${semOrigem.nome.trim() || "o familiar"} sai no transfer.`);
     return;
   }
 
