@@ -145,7 +145,7 @@ set role authenticated;
 set request.jwt.claims = '{"email":"patro-dinheiro@teste.invalido","role":"authenticated"}';
 
 \echo '-- antes de escolher, ja sabe quanto custaria (3 x 25 = 75):'
-select patro_meu_brinde(:'pt'::uuid) -> 'custo_se_quarto' as custo_previsto;
+select patro_prever_custo_brinde(:'pt'::uuid) -> 'custo_se_quarto' as custo_previsto;
 
 \echo '-- no stand: nada na fatura'
 select patro_salvar_brinde(:'pt'::uuid, true, 'Caneca', 60, 'stand') -> 'destino' as destino;
@@ -227,7 +227,7 @@ set request.jwt.claims = '{"role":"anon"}';
 -- transacao e as seguintes nao chegam a ser testadas — o teste passaria
 -- por engano, sem ter testado nada.
 savepoint s_a1;
-select patro_meu_brinde(:'pt'::uuid);
+select patro_prever_custo_brinde(:'pt'::uuid);
 rollback to s_a1;
 savepoint s_a2;
 select admin_alterar_tipo_quartos('cerrado2027','901','902','duplo');

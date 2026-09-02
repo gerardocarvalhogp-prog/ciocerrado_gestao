@@ -1155,114 +1155,128 @@ async function carregarBrindes(){
   const alvo = $("#painel-brindes");
   alvo.innerHTML = `<p class="carregando">Carregando…</p>`;
 
-  let b;
+  let lista, previa;
   try{
-    b = await rpc("patro_meu_brinde", { p_patrocinador_id: PATRO.patrocinador_id });
+    [lista, previa] = await Promise.all([
+      rpc("patro_listar_brindes",     { p_patrocinador_id: PATRO.patrocinador_id }),
+      rpc("patro_prever_custo_brinde",{ p_patrocinador_id: PATRO.patrocinador_id })
+    ]);
   }catch(e){ aviso(alvo, explicar(e)); return; }
 
-  const temBrinde = !!b.vai_enviar;
-  const custo = Number(b.custo_se_quarto || 0);
+  const custoQuarto = Number(previa.custo_se_quarto || 0);
+  const algumPendente = lista.some(b => b.vai_enviar && b.status !== "entregue");
+
+  const cartaoBrinde = (b) => `
+    <div class="cartao" data-id="${b ? esc(b.id) : ""}" style="margin-bottom:10px;">
+      ${b ? `<p class="sub" style="margin:0 0 8px;">
+               Situação: <span class="selo ${SELO_BRINDE[b.status] || "pend"}">${ROTULO_BRINDE[b.status] || esc(b.status || "")}</span>
+               ${b.recebido_em ? ` · recebido em ${dataBR(b.recebido_em)}` : ""}
+             </p>` : ""}
+      <div class="linha">
+        <div><label>O que é</label>
+          <input type="text" class="b-desc" placeholder="Ex.: caneca térmica"
+                 value="${esc(b?.descricao || "")}"></div>
+        <div style="max-width:130px;"><label>Quantidade</label>
+          <input type="text" class="b-qtd" placeholder="60"
+                 value="${esc(b?.quantidade ?? "")}"></div>
+        <div style="max-width:150px;"><label>Volumes despachados</label>
+          <input type="text" class="b-volumes" placeholder="Ex.: 2 caixas"
+                 value="${esc(b?.volumes_despachados ?? "")}"></div>
+      </div>
+      <div class="linha">
+        <div style="max-width:280px;">
+          <label>Para onde vai</label>
+          <select class="b-destino">
+            <option value="stand" ${b?.destino === "quarto" ? "" : "selected"}>Fica no nosso stand</option>
+            <option value="quarto" ${b?.destino === "quarto" ? "selected" : ""}>Entregue no quarto dos convidados</option>
+          </select>
+        </div>
+      </div>
+      <p class="fila-nota b-custo"></p>
+      <div class="b-aviso"></div>
+      <button class="btn b-salvar">${b ? "Salvar" : "Adicionar brinde"}</button>
+      ${b && b.status === "prometido" ? `<button class="btn perigo sec b-remover" style="margin-left:6px;">Remover</button>` : ""}
+    </div>`;
 
   alvo.innerHTML = `
-    <h2>Brinde da empresa</h2>
+    <h2>Brindes da empresa</h2>
     <p class="sub">
-      Um brinde por empresa, não um por quarto. Diga o que é e para onde vai.
+      Cada tipo de brinde é uma linha — caneca e camiseta, por exemplo, entram separados.
     </p>
 
-    <div class="cartao">
-      <div class="linha">
-        <div>
-          <label class="check">
-            <input type="checkbox" id="b-tem" ${temBrinde ? "checked" : ""}>
-            Vamos levar brinde
-          </label>
-        </div>
-      </div>
+    <div id="b-lista">${lista.map(cartaoBrinde).join("") || `<p class="fila-nota">Nenhum brinde cadastrado ainda.</p>`}</div>
 
-      <div id="b-campos" class="${temBrinde ? "" : "oculto"}">
-        <div class="linha">
-          <div><label>O que é</label>
-            <input type="text" id="b-desc" placeholder="Ex.: caneca térmica"
-                   value="${esc(b.descricao || "")}"></div>
-          <div style="max-width:140px;"><label>Quantidade</label>
-            <input type="text" id="b-qtd" placeholder="60"
-                   value="${esc(b.quantidade ?? "")}"></div>
-        </div>
-        <div class="linha">
-          <div style="max-width:280px;">
-            <label>Para onde vai</label>
-            <select id="b-destino">
-              <option value="stand" ${b.destino === "quarto" ? "" : "selected"}>
-                Fica no nosso stand
-              </option>
-              <option value="quarto" ${b.destino === "quarto" ? "selected" : ""}>
-                Entregue no quarto dos convidados
-              </option>
-            </select>
-          </div>
-        </div>
-        <p class="fila-nota" id="b-custo"></p>
-      </div>
+    <button class="btn sec" id="b-novo">+ Adicionar outro brinde</button>
+    <div id="b-form-novo"></div>
 
-      <div id="b-aviso"></div>
-      <button class="btn" id="b-salvar">Salvar brinde</button>
-    </div>
-
-    ${temBrinde ? `
+    ${algumPendente ? `
       <h2 style="margin-top:26px;">Envio</h2>
       <div class="cartao">
         <p class="sub" style="margin-bottom:12px;">
-          Situação: <span class="selo ${SELO_BRINDE[b.status] || "pend"}">${ROTULO_BRINDE[b.status] || esc(b.status || "")}</span>
-          ${b.recebido_em ? ` · recebido em ${dataBR(b.recebido_em)}` : ""}
+          Um código de rastreio só — a empresa não posta uma caixa por brinde,
+          posta uma caixa com tudo. Vale para todos os brindes ainda não entregues.
         </p>
         <div class="linha">
           <div style="max-width:200px;"><label>Transportadora</label>
-            <input type="text" id="b-transp" placeholder="Correios, Jadlog…"
-                   value="${esc(b.transportadora || "")}"></div>
+            <input type="text" id="b-transp" placeholder="Correios, Jadlog…"></div>
           <div><label>Código de rastreio</label>
-            <input type="text" id="b-rastreio" placeholder="BR123456789BR"
-                   value="${esc(b.rastreio || "")}"></div>
+            <input type="text" id="b-rastreio" placeholder="BR123456789BR"></div>
         </div>
         <div id="b-aviso-envio"></div>
-        <button class="btn sec" id="b-enviar">
-          ${b.rastreio ? "Atualizar rastreio" : "Informar envio"}
-        </button>
-        <p class="fila-nota" style="margin-top:8px;">
-          Errou o código? Pode corrigir aqui — vale o último informado.
-        </p>
+        <button class="btn sec" id="b-enviar">Informar envio</button>
       </div>` : ""}`;
 
-  const mostrarCusto = () => {
-    const noQuarto = $("#b-destino").value === "quarto";
-    $("#b-custo").innerHTML = noQuarto
+  const mostrarCusto = (card) => {
+    const noQuarto = card.querySelector(".b-destino").value === "quarto";
+    card.querySelector(".b-custo").innerHTML = noQuarto
       ? `Entrega no quarto é serviço do resort, cobrado por porta:
-         <strong>${b.quartos} quarto(s) × ${moeda(b.preco_entrega)} = ${moeda(custo)}</strong>,
+         <strong>${previa.quartos} quarto(s) × ${moeda(previa.preco_entrega)} = ${moeda(custoQuarto)}</strong>,
          que entra na sua fatura.`
       : `No stand não há custo — o brinde fica na sua mesa e quem quiser, pega.`;
   };
 
-  $("#b-tem").addEventListener("change", e =>
-    $("#b-campos").classList.toggle("oculto", !e.target.checked));
-  $("#b-destino").addEventListener("change", mostrarCusto);
-  mostrarCusto();
+  const ligarCartao = (card, id) => {
+    mostrarCusto(card);
+    card.querySelector(".b-destino").addEventListener("change", () => mostrarCusto(card));
 
-  $("#b-salvar").addEventListener("click", async () => {
-    const btn = $("#b-salvar");
-    btn.disabled = true; btn.textContent = "Salvando…";
-    try{
-      await rpc("patro_salvar_brinde", {
-        p_patrocinador_id: PATRO.patrocinador_id,
-        p_vai_enviar: $("#b-tem").checked,
-        p_descricao: $("#b-desc").value.trim() || null,
-        p_quantidade: parseInt($("#b-qtd").value, 10) || null,
-        p_destino: $("#b-destino").value
-      });
-      aviso("#b-aviso", "Brinde salvo.", "ok");
-      carregarBrindes();
-    }catch(e){
-      aviso("#b-aviso", explicar(e));
-      btn.disabled = false; btn.textContent = "Salvar brinde";
-    }
+    card.querySelector(".b-salvar").addEventListener("click", async () => {
+      const desc = card.querySelector(".b-desc").value.trim();
+      if(!desc){ aviso(card.querySelector(".b-aviso"), "Diga o que é o brinde."); return; }
+      const btn = card.querySelector(".b-salvar");
+      btn.disabled = true; btn.textContent = "Salvando…";
+      try{
+        await rpc("patro_salvar_brinde", {
+          p_patrocinador_id: PATRO.patrocinador_id,
+          p_id: id || null,
+          p_vai_enviar: true,
+          p_descricao: desc,
+          p_quantidade: parseInt(card.querySelector(".b-qtd").value, 10) || null,
+          p_volumes_despachados: parseInt(card.querySelector(".b-volumes").value, 10) || null,
+          p_destino: card.querySelector(".b-destino").value
+        });
+        carregarBrindes();
+      }catch(e){
+        aviso(card.querySelector(".b-aviso"), explicar(e));
+        btn.disabled = false; btn.textContent = id ? "Salvar" : "Adicionar brinde";
+      }
+    });
+
+    const btnRemover = card.querySelector(".b-remover");
+    if(btnRemover) btnRemover.addEventListener("click", async () => {
+      btnRemover.disabled = true;
+      try{
+        await rpc("patro_remover_brinde", { p_id: id });
+        carregarBrindes();
+      }catch(e){ aviso(card.querySelector(".b-aviso"), explicar(e)); btnRemover.disabled = false; }
+    });
+  };
+
+  $$("#b-lista .cartao").forEach(card => ligarCartao(card, card.dataset.id));
+
+  $("#b-novo").addEventListener("click", () => {
+    $("#b-form-novo").innerHTML = cartaoBrinde(null);
+    ligarCartao($("#b-form-novo .cartao"), null);
+    $("#b-novo").classList.add("oculto");
   });
 
   const btnEnviar = $("#b-enviar");
@@ -1271,7 +1285,7 @@ async function carregarBrindes(){
     if(!cod){ aviso("#b-aviso-envio","Informe o código de rastreio."); return; }
     btnEnviar.disabled = true; btnEnviar.textContent = "Salvando…";
     try{
-      const r = await rpc("patro_informar_rastreio", {
+      await rpc("patro_informar_rastreio", {
         p_patrocinador_id: PATRO.patrocinador_id,
         p_transportadora: $("#b-transp").value.trim() || null,
         p_rastreio: cod

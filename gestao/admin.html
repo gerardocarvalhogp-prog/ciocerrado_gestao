@@ -2293,9 +2293,9 @@ ABAS.brindes = async function(){
   c.innerHTML = `
     <h1>Brindes</h1>
     <p class="sub">
-      Um brinde por empresa, com destino: fica no stand ou é entregue no quarto.
-      Entrega no quarto é serviço do resort e entra na fatura do patrocinador.
-      Aqui a organização confere a chegada e a entrega.
+      Cada empresa pode ter mais de um brinde (tipo diferente, cada um com seu status).
+      Destino: fica no stand ou é entregue no quarto — entrega no quarto é serviço do
+      resort e entra na fatura do patrocinador. Aqui a organização confere a chegada e a entrega.
     </p>
     <div id="br-resumo"></div>
     <div class="barra">
@@ -2341,7 +2341,7 @@ ABAS.brindes = async function(){
              Nenhum patrocinador marcou brinde ainda.</p></div>`;
 
       $("#br-tabela").innerHTML = BR.length ? `
-        <tr><th>Empresa</th><th>Destino</th><th>Brinde</th><th>Rastreio</th>
+        <tr><th>Empresa</th><th>Destino</th><th>Brinde</th><th>Volumes</th><th>Rastreio</th>
             <th>Situação</th><th></th></tr>
         ${BR.map(b => `<tr data-id="${esc(b.brinde_id)}" data-status="${esc(b.status)}">
           <td><strong>${esc(b.empresa)}</strong><br>
@@ -2349,8 +2349,9 @@ ABAS.brindes = async function(){
           <td>${b.destino === "quarto"
                  ? `<span class="selo vez">no quarto</span><br><span class="meta">${b.quartos} quarto(s)</span>`
                  : `<span class="meta">stand</span>`}</td>
-          <td>${esc(b.descricao||"—")}
+          <td>${esc(b.descricao||"—")}${b.quantidade ? ` <span class="meta">×${b.quantidade}</span>` : ""}
               ${b.observacao ? `<br><span class="meta">${esc(b.observacao)}</span>` : ""}</td>
+          <td class="meta">${b.volumes_despachados ?? "—"}</td>
           <td class="meta">${b.rastreio
                ? `${esc(b.rastreio)}<br>${esc(b.transportadora||"")}`
                : "—"}</td>
@@ -2410,6 +2411,7 @@ ABAS.brindes = async function(){
   $("#br-status").addEventListener("change", carregar);
   $("#br-exportar").addEventListener("click", () => exportar(BR,
     [["empresa","EMPRESA"],["cota","COTA"],["destino","DESTINO"],["quartos","QUARTOS"],["descricao","BRINDE"],
+     ["quantidade","QUANTIDADE"],["volumes_despachados","VOLUMES DESPACHADOS"],
      ["transportadora","TRANSPORTADORA"],["rastreio","RASTREIO"],["status","SITUACAO"],
      ["recebido_em","RECEBIDO EM"],["recebido_por","RECEBIDO POR"],
      ["entregue_em","ENTREGUE EM"],["observacao","OBSERVACAO"]],
