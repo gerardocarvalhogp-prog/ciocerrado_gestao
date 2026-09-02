@@ -35,6 +35,16 @@ import argparse
 import logging
 from datetime import datetime, timezone, timedelta
 
+# .env na mesma pasta, se existir — carrega ANTES de ler as variaveis
+# abaixo. So preenche o que ja nao estiver no ambiente (override=False),
+# entao uma variavel exportada de verdade (Agendador de Tarefas, CI)
+# sempre vence o .env local.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except ImportError:
+    pass  # sem python-dotenv, so funciona com variaveis ja exportadas
+
 import requests
 
 # ---------------------------------------------------------------------
