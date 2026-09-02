@@ -10,6 +10,7 @@
 # Uso:
 #   python integracao.py --tudo
 #   python integracao.py --sympla          sincroniza inscricoes
+#   python integracao.py --jantares        convidados de jantar (link do Sympla de cada jantar)
 #   python integracao.py --contratos       envia contratos pendentes
 #   python integracao.py --status          le status no Autentique
 #   python integracao.py --lembretes       cobra quem nao assinou
@@ -29,10 +30,12 @@
 # =====================================================================
 
 import os
+import re
 import sys
 import json
 import argparse
 import logging
+import unicodedata
 from datetime import datetime, timezone, timedelta
 
 # .env na mesma pasta, se existir — carrega ANTES de ler as variaveis
@@ -135,10 +138,39 @@ class Supa:
             raise SystemExit(f'Evento "{slug}" nao existe no banco.')
         return e[0]
 
+    def rpc(self, funcao, args):
+        r = requests.post(f"{self.base}/rpc/{funcao}", headers=self.h,
+                          json=args, timeout=30)
+        r.raise_for_status()
+        return r.json() if r.text else None
+
 
 # =====================================================================
 # 1. SYMPLA  →  gestores + participantes
 # =====================================================================
+
+# A API do Sympla nao documenta os codigos de order_status (o proprio
+# schema oficial da Sympla tipa o campo como string livre, sem enum).
+# "A" foi confirmado batendo 100/100 pedidos aprovados de verdade, num
+# evento real ja realizado (Experience 2026, id 3467585, em 02/09/2026)
+# — os nomes por extenso ficam de fallback, caso outra conta/versao da
+# API devolva isso diferente.
+def _pedido_aprovado(order_status):
+    return (order_status or "").strip().upper() in ("A", "APPROVED", "APROVADO", "COMPLETE")
+
+
+# O link que fica em jantares.sympla_url segue o padrao
+# https://www.sympla.com.br/slug-do-evento__<id>, com o id numerico do
+# evento no Sympla depois do "__" — foi assim que os eventos "CIO
+# Cerrado Experience 20XX" da propria conta vieram na API (checado em
+# 02/09/2026: 1617982, 2017269, 2507590... todos com esse formato).
+def _sympla_event_id_do_link(url):
+    if not url:
+        return None
+    m = re.search(r"__(\d+)(?:[/?#].*)?$", url.strip())
+    return m.group(1) if m else None
+
+
 def sincronizar_sympla(supa, evento, producao):
     if not SYMPLA_TOKEN:
         log.warning("SYMPLA_TOKEN ausente: pulando sincronizacao.")
@@ -173,8 +205,7 @@ def sincronizar_sympla(supa, evento, producao):
 
     for p in participantes:
         # cancelado no Sympla nao entra nem atualiza
-        status_sympla = (p.get("order_status") or "").upper()
-        if status_sympla not in ("APPROVED", "APROVADO", "COMPLETE"):
+        if not _pedido_aprovado(p.get("order_status")):
             ignorados += 1
             continue
 
@@ -229,6 +260,118 @@ def sincronizar_sympla(supa, evento, producao):
 
     log.info("Sympla: %d novo(s), %d ja existiam, %d ignorado(s).",
              novos, atualizados, ignorados)
+
+
+# ---------------------------------------------------------------------
+# 1b. SYMPLA  →  convidados de jantar
+#
+# Jantar nao tem evento_id (e standalone por desenho — jantares.html
+# ja documenta isso). Cada jantar pode ter o proprio evento no Sympla,
+# guardado como link em jantares.sympla_url. Por isso essa etapa
+# ignora o --evento da linha de comando e olha TODOS os jantares
+# ativos (planejado/confirmado) que tem link configurado.
+#
+# Reusa jantar_importar_convidados_sympla via RPC — a mesma funcao SQL
+# que a tela de admin ja chama quando alguem sobe a planilha na mao,
+# so que aqui a "planilha" vem pronta da API. Sem duplicar a regra de
+# negocio (achar/criar gestor, aprovado vs cancelado, etc.) em Python.
+# ---------------------------------------------------------------------
+DIACRITICOS = re.compile(r"[̀-ͯ]")
+
+
+def _normaliza_rotulo(s):
+    s = unicodedata.normalize("NFD", s or "")
+    s = DIACRITICOS.sub("", s)
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _campo_sympla(custom_form, *alternativas):
+    """Mesma tolerancia da tela (achaSympla em jantares.html): casa por
+    prefixo, sem acento/maiuscula — o rotulo do formulario custom as
+    vezes vem com acento quebrado na API."""
+    campos = [(_normaliza_rotulo(c.get("name", "")), c.get("value", "")) for c in custom_form]
+    for alvo in alternativas:
+        alvo_norm = _normaliza_rotulo(alvo)
+        for chave, valor in campos:
+            if chave.startswith(alvo_norm) and str(valor).strip():
+                return str(valor).strip()
+    return ""
+
+
+def sincronizar_jantares_sympla(supa, evento, producao):
+    if not SYMPLA_TOKEN:
+        log.warning("SYMPLA_TOKEN ausente: pulando sincronizacao de jantares.")
+        return
+
+    jantares = supa.get("jantares", select="id,patrocinador_nome,sympla_url",
+                        status="in.(planejado,confirmado)")
+    alvo = [(j, _sympla_event_id_do_link(j.get("sympla_url"))) for j in jantares]
+    alvo = [(j, sid) for j, sid in alvo if sid]
+
+    if not alvo:
+        log.info("Nenhum jantar ativo com link do Sympla configurado.")
+        return
+
+    log.info("%d jantar(es) com link do Sympla.", len(alvo))
+
+    for jantar, sympla_id in alvo:
+        log.info("  %s (Sympla #%s)...", jantar["patrocinador_nome"], sympla_id)
+
+        participantes, pagina = [], 1
+        while True:
+            r = requests.get(
+                f"https://api.sympla.com.br/public/v3/events/{sympla_id}/participants",
+                headers={"s_token": SYMPLA_TOKEN},
+                params={"page": pagina, "page_size": 200}, timeout=30)
+            if r.status_code == 404:
+                log.warning("    evento %s nao encontrado no Sympla — confira o link", sympla_id)
+                break
+            r.raise_for_status()
+            corpo = r.json()
+            lote = corpo.get("data", [])
+            participantes.extend(lote)
+            pg = corpo.get("pagination", {})
+            if not pg.get("has_next") or not lote:
+                break
+            pagina += 1
+
+        if not participantes:
+            log.info("    0 inscricao(oes).")
+            continue
+
+        linhas = []
+        for p in participantes:
+            custom = p.get("custom_form") or []
+            nome = _campo_sympla(custom, "Nome Cracha", "Nome") or \
+                   (p.get("first_name", "") + " " + p.get("last_name", "")).strip()
+            linhas.append({
+                "nome": nome,
+                "email": (p.get("email") or "").strip().lower(),
+                "email_corporativo": _campo_sympla(custom, "E-MAIL CORPORATIVO", "Email Corporativo"),
+                "empresa": _campo_sympla(custom, "Empresa"),
+                "cargo": _campo_sympla(custom, "Cargo"),
+                "telefone": _campo_sympla(custom, "Telefone Celular", "Telefone"),
+                "cpf": _campo_sympla(custom, "CPF"),
+                "cnpj": _campo_sympla(custom, "CNPJ"),
+                "sympla_id": str(p.get("id")),
+                "estado_pagamento": "aprovado" if _pedido_aprovado(p.get("order_status")) else "cancelado",
+            })
+
+        if not producao:
+            aprov = sum(1 for l in linhas if l["estado_pagamento"] == "aprovado")
+            log.info("    [seguro] %d linha(s), %d aprovada(s)", len(linhas), aprov)
+            continue
+
+        try:
+            r = supa.rpc("jantar_importar_convidados_sympla",
+                        {"p_jantar_id": jantar["id"], "p_linhas": linhas})
+            log.info("    %d novo(s), %d atualizado(s), %d recusado(s), "
+                     "%d gestor(es) novo(s), %d erro(s) · %d/%d vaga(s)",
+                     r.get("criados", 0), r.get("atualizados", 0), r.get("recusados", 0),
+                     r.get("gestores_novos", 0), r.get("erros", 0),
+                     r.get("ocupados_agora", 0), r.get("capacidade", 0))
+        except Exception as e:
+            log.error("    falhou: %s", e)
 
 
 # =====================================================================
@@ -650,6 +793,8 @@ def main():
     ap = argparse.ArgumentParser(description="Integracoes do CIO Cerrado")
     ap.add_argument("--tudo",      action="store_true")
     ap.add_argument("--sympla",    action="store_true")
+    ap.add_argument("--jantares",  action="store_true",
+                    help="convidados de jantar, pelo link do Sympla de cada jantar")
     ap.add_argument("--contratos", action="store_true")
     ap.add_argument("--status",    action="store_true")
     ap.add_argument("--lembretes", action="store_true")
@@ -659,7 +804,7 @@ def main():
     ap.add_argument("--evento", default=EVENTO_SLUG)
     args = ap.parse_args()
 
-    if not any([args.tudo, args.sympla, args.contratos,
+    if not any([args.tudo, args.sympla, args.jantares, args.contratos,
                 args.status, args.lembretes, args.emails]):
         ap.print_help()
         return 1
@@ -675,6 +820,7 @@ def main():
     # despacha a fila — assim tudo que foi gerado agora ja sai junto.
     passos = [
         (args.tudo or args.sympla,    "Sympla",    sincronizar_sympla),
+        (args.tudo or args.jantares,  "Jantares",  sincronizar_jantares_sympla),
         (args.tudo or args.contratos, "Contratos", enviar_contratos),
         (args.tudo or args.status,    "Status",    ler_status),
         (args.tudo or args.lembretes, "Lembretes", lembretes),
