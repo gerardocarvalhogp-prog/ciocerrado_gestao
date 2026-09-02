@@ -3508,7 +3508,30 @@ async function blocoQuartos(){
             <td><span class="selo ${Number(x.livres)?"ok":"pend"}">${x.livres}</span></td>
             <td class="meta">${x.ocupados}</td></tr>`).join("")}</table>`
           : `<div class="vazio" style="margin-top:10px;">Nenhum quarto cadastrado.</div>`}
+
+        <details style="margin-top:14px;" id="qi-detalhes">
+          <summary class="meta" style="cursor:pointer;">Ver e corrigir quarto por quarto</summary>
+          <p class="sub" style="margin:8px 0;">
+            Corrige o tipo de UM apartamento sem mexer no resto da faixa — útil quando o
+            mapa do hotel diverge da faixa que você cadastrou num número isolado.
+          </p>
+          <div class="barra">
+            <div><label>Buscar número ou bloco</label><input type="text" id="qi-busca" placeholder="205 ou Bloco A"></div>
+          </div>
+          <div id="qi-aviso"></div>
+          <div class="rolagem"><table id="qi-tabela"></table></div>
+        </details>
       </div>`;
+
+    if($("#qi-detalhes").open) await carregarQuartosIndividual();
+    $("#qi-detalhes").addEventListener("toggle", () => {
+      if($("#qi-detalhes").open) carregarQuartosIndividual();
+    });
+    let qiTimer;
+    $("#qi-busca").addEventListener("input", () => {
+      clearTimeout(qiTimer);
+      qiTimer = setTimeout(carregarQuartosIndividual, 300);
+    });
 
     $("#qt-criar").addEventListener("click", async () => {
       const de = parseInt($("#qt-de").value,10), ate = parseInt($("#qt-ate").value,10);
@@ -3558,6 +3581,43 @@ async function blocoQuartos(){
       e.target.value = "";
     });
   }catch(e){ aviso("#bl-quartos", explicar(e)); }
+}
+
+async function carregarQuartosIndividual(){
+  const tbl = $("#qi-tabela");
+  if(!tbl) return;
+  tbl.innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
+  try{
+    const lista = await rpc("admin_listar_quartos_individual", {
+      p_evento_slug: EVENTO, p_busca: $("#qi-busca").value.trim() || null
+    });
+    tbl.innerHTML = `
+      <tr><th>Número</th><th>Tipo</th><th>Bloco</th><th>Status</th><th>Ocupado por</th><th></th></tr>
+      ${lista.map(q => `<tr data-id="${esc(q.id)}">
+        <td>${esc(q.numero||"—")}</td>
+        <td><select class="qi-tipo">
+          <option value="single" ${q.tipo==="single"?"selected":""}>Single</option>
+          <option value="duplo"  ${q.tipo==="duplo" ?"selected":""}>Duplo</option>
+          <option value="triplo" ${q.tipo==="triplo"?"selected":""}>Triplo</option>
+        </select></td>
+        <td class="meta">${esc(q.bloco||"—")}</td>
+        <td class="meta">${esc(q.status)}</td>
+        <td class="meta">${esc(q.ocupado_por||"—")}</td>
+        <td><button class="btn sec mini qi-salvar">Salvar</button></td>
+      </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nada com essa busca.</td></tr>`}`;
+
+    $$(".qi-salvar", tbl).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const tipo = tr.querySelector(".qi-tipo").value;
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        const res = await rpc("admin_editar_tipo_quarto", { p_id: tr.dataset.id, p_tipo: tipo });
+        aviso("#qi-aviso", `Quarto ${res.numero || "—"} agora é ${tipo}.`, "ok");
+        b.disabled = false; b.textContent = "Salvar";
+        blocoQuartos();
+      }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar"; }
+    }));
+  }catch(e){ aviso("#qi-tabela", explicar(e)); }
 }
 
 // =====================================================================
