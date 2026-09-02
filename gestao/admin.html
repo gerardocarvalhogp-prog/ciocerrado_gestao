@@ -3398,7 +3398,8 @@ async function blocoCotas(){
             <input type="text" id="co-limite-ind" placeholder="sem limite"></div>
           <div style="max-width:150px;"><label>Escolhe convidados</label>
             <select id="co-escolhe"><option value="1">Sim</option><option value="0">Não (sorteio)</option></select></div>
-          <div style="min-width:auto;"><button class="btn" id="co-salvar">Salvar cota</button></div>
+          <div style="min-width:auto;"><button class="btn" id="co-salvar">Salvar cota</button>
+            <button class="btn sec" id="co-cancelar" style="margin-left:6px;display:none;">Cancelar edição</button></div>
         </div>
         <p class="meta" style="margin:0 0 8px;">
           A cota pode misturar tipos — 2 duplos e 2 singles, por exemplo. Deixe zero no que não usar.
@@ -3488,8 +3489,23 @@ async function blocoCotas(){
       $("#co-up-apresentacao").checked = t.upApresentacao === "1";
       $("#co-up-video").checked = t.upVideo === "1";
       $("#co-up-prazo").value = t.upPrazo || "";
+      $("#co-cancelar").style.display = "";
       $("#co-nome").focus();
     }));
+
+    $("#co-cancelar").addEventListener("click", () => {
+      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo"]
+        .forEach(s => $(s).value = "");
+      ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
+        .forEach(s => $(s).checked = false);
+      if($("#co-ordem"))  $("#co-ordem").value  = "";
+      if($("#co-prazo"))  $("#co-prazo").value  = "";
+      if($("#co-janela")) $("#co-janela").value = "";
+      $("#co-escolhe").value = "1";
+      $("#co-cancelar").style.display = "none";
+      DS.limparInvalido($("#co-nome"));
+      if($("#co-ordem")) DS.limparInvalido($("#co-ordem"));
+    });
 
     $$(".co-apagar").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
@@ -3604,6 +3620,7 @@ async function salvarCota(){
     if($("#co-prazo"))  $("#co-prazo").value  = "";
     if($("#co-janela")) $("#co-janela").value = "";
     $("#co-escolhe").value = "1";
+    if($("#co-cancelar")) $("#co-cancelar").style.display = "none";
     blocoCotas();
   }catch(e){ aviso("#co-aviso", explicar(e)); }
   finally{ b.disabled = false; b.textContent = "Salvar cota"; }
@@ -4069,6 +4086,7 @@ ABAS.patrocinadores = async function(){
 
         <div id="pt-aviso"></div>
         <button class="btn" id="pt-salvar">Salvar</button>
+        <button class="btn sec" id="pt-cancelar" style="margin-left:6px;display:none;">Cancelar edição</button>
       </div>
 
       <div class="cartao">
@@ -4163,9 +4181,18 @@ ABAS.patrocinadores = async function(){
       $("#pt-lounge").value = t.lounge;
       $("#pt-extras").value = t.extras;   $("#pt-mesa").value = t.mesa;
       $("#pt-mais").open = true;
+      $("#pt-cancelar").style.display = "";
       $("#pt-empresa").focus();
       window.scrollTo({ top:0, behavior:"smooth" });
     }));
+
+    $("#pt-cancelar").addEventListener("click", () => {
+      ["#pt-empresa","#pt-cnpj","#pt-segmento","#pt-vende","#pt-extras","#pt-mesa",
+       "#pt-site","#pt-resumo","#pt-cidade","#pt-estado","#pt-lounge"].forEach(s => $(s).value = "");
+      $("#pt-cota").value = ""; $("#pt-natureza").value = "";
+      $("#pt-cancelar").style.display = "none";
+      DS.limparInvalido($("#pt-empresa"));
+    });
 
     $$(".pt-ia").forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");

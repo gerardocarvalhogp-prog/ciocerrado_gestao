@@ -646,12 +646,9 @@ async function areaRooming(){
       <button class="btn" id="salvar-rooming">Confirmar dados</button>
     </div>
 
-    <div class="cartao" id="cartao-quarto-extra"></div>
-
-    <div class="cartao" id="cartao-lounge"></div>`;
+    <div class="cartao" id="cartao-quarto-extra"></div>`;
 
   carregarQuartoExtra();
-  carregarLounges();
 
   $("#add-pessoa").addEventListener("click", () => {
     ACOMPANHANTES.push({ nome:"", cpf:"", data_nascimento:"", tipo:"adulto",
@@ -745,44 +742,6 @@ async function carregarQuartoExtra(){
       atualizarFatura();
     }catch(e){ aviso("#qe-aviso", explicar(e)); b.disabled = false; }
   }));
-}
-
-// Autodeclaração de visita ao lounge — o patrocinador também pode ler o
-// crachá pelo lado dele, isso aqui é só a via alternativa quando não deu
-// pra parar no leitor dele (ou quem prefere fazer pelo celular).
-async function carregarLounges(){
-  const box = $("#cartao-lounge");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
-
-  let patrocinadores;
-  try{
-    patrocinadores = await rpc("part_listar_patrocinadores", { p_evento_slug: EVENTO });
-  }catch(e){ aviso(box, explicar(e)); return; }
-
-  if(patrocinadores.length === 0){ box.innerHTML = ""; return; }
-
-  box.innerHTML = `
-    <h2>Visitou um lounge?</h2>
-    <p class="sub" style="margin-bottom:12px;">
-      Passou no estande de um patrocinador? Marque aqui — ajuda a organização e o patrocinador.
-    </p>
-    <div class="linha">
-      <div><label>Patrocinador</label>
-        <select id="lg-patro">${patrocinadores.map(p => `<option value="${esc(p.id)}">${esc(p.empresa)}</option>`).join("")}</select></div>
-      <div style="min-width:auto;align-self:flex-end;"><button class="btn sec mini" id="lg-marcar">Marcar visita</button></div>
-    </div>
-    <div id="lg-aviso"></div>`;
-
-  $("#lg-marcar").addEventListener("click", async () => {
-    const btn = $("#lg-marcar");
-    btn.disabled = true;
-    try{
-      const r = await rpc("part_lounge_registrar", {
-        p_evento_slug: EVENTO, p_patrocinador_id: $("#lg-patro").value });
-      aviso("#lg-aviso", r.ja_estava ? "Visita já estava registrada." : "Visita registrada — obrigado!", "ok");
-    }catch(e){ aviso("#lg-aviso", explicar(e)); }
-    finally{ btn.disabled = false; }
-  });
 }
 
 function desenharPessoas(){
