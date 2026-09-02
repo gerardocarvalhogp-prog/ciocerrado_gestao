@@ -17,6 +17,8 @@
 <script src="assets/design-system.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- xlsx (SheetJS) na versao community nao grava imagem em celula nem fundo colorido por celula com controle fino — so exceljs faz isso, so pro mailing com a logo -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -1393,6 +1395,29 @@ async function imprimirCrachasJantar(){
 // tinha como tirar.
 //
 // Agora exporta os dois casos, e a coluna Status diz quem é quem.
+// Mailing no padrão visual que a organização já usa fora do sistema
+// (planilha com logo, título em dourado, colunas ID/NOME/TIPO/EMPRESA/
+// CARGO/SEGMENTO/RAMO ATIVIDADE/LGPD/FONE/EMAIL) — replicado a partir
+// de um exemplo real que o Gerardo mandou. TIPO fica "GESTOR" fixo e
+// RAMO ATIVIDADE/LGPD ficam em branco: o gestao não rastreia essas
+// duas colunas por convidado de jantar, então não tem como preencher
+// sem inventar dado. xlsx (SheetJS) não grava imagem em célula nem
+// fundo colorido fino o bastante — por isso este export usa exceljs,
+// só ele.
+let _logoMailingBase64 = null;
+async function _base64DoLogoMailing(){
+  if(_logoMailingBase64) return _logoMailingBase64;
+  const resp = await fetch("assets/logo-mailing-fundo-branco.png");
+  const blob = await resp.blob();
+  _logoMailingBase64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+  return _logoMailingBase64;
+}
+
 async function exportarMailing(){
   try{
     const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
@@ -1414,13 +1439,83 @@ async function exportarMailing(){
       sufixo = lista === presentes ? "presentes" : "convidados";
     }
 
-    exportar(lista.map(c => ({ ...c, telefone: fone(c.telefone) })),
-      [["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],["segmento","Segmento"],
-       ["cidade","Cidade"],["estado","UF"],["email","E-mail"],
-       ["telefone","Telefone"],["rotulo","Identificação"],["status","Status"]],
-      `Mailing_${sufixo}_${(J.patrocinador_nome||"jantar").replace(/\W+/g,"_")}.xlsx`,
-      "Mailing");
+    await exportarMailingComLogo(lista, sufixo);
   }catch(e){ aviso("#aviso-global", explicar(e)); }
+}
+
+async function exportarMailingComLogo(lista, sufixo){
+  if(typeof ExcelJS === "undefined"){
+    aviso("#aviso-global", "Gerador de Excel com logo não carregou. Recarregue a página.");
+    return;
+  }
+
+  const DOURADO = { argb: "FFBF9000" };
+  const fonteTitulo = { name: "Calibri", size: 28, bold: true, color: { argb: "FFFFFFFF" } };
+  const fonteCabecalho = { name: "Calibri", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+  const fonteDadoCentro = { name: "Calibri", size: 12, bold: true };
+  const fonteDado = { name: "Calibri", size: 12 };
+  const centro = { horizontal: "center", vertical: "middle" };
+  const esquerda = { horizontal: "left", vertical: "middle" };
+  const fillDourado = { type: "pattern", pattern: "solid", fgColor: DOURADO };
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("MAILING JANTARES");
+
+  const larguras = { A: 2.6, B: 5, C: 32, D: 14, E: 38, F: 45, G: 16, H: 20, I: 8, J: 16, K: 40 };
+  Object.entries(larguras).forEach(([col, w]) => { ws.getColumn(col).width = w; });
+
+  ws.mergeCells("E2:K2");
+  const t1 = ws.getCell("E2");
+  t1.value = `MAILING ${(J.patrocinador_nome||"JANTAR").toUpperCase()} E CIO CERRADO`;
+  t1.font = fonteTitulo; t1.fill = fillDourado; t1.alignment = centro;
+
+  ws.mergeCells("E3:K3");
+  const t2 = ws.getCell("E3");
+  t2.value = `${(J.local||"LOCAL A DEFINIR").toUpperCase()}, ${J.data ? dataBR(J.data) : "DATA A DEFINIR"}`;
+  t2.font = fonteTitulo; t2.fill = fillDourado; t2.alignment = centro;
+
+  try{
+    const base64 = await _base64DoLogoMailing();
+    const imgId = wb.addImage({ base64, extension: "png" });
+    ws.addImage(imgId, { tl: { col: 2, row: 1 }, ext: { width: 217, height: 112 } });
+  }catch(e){ /* sem logo nao impede o export do mailing */ }
+
+  const cabecalho = ["ID","NOME","TIPO","EMPRESA","CARGO","SEGMENTO","RAMO ATIVIDADE","LGPD","FONE","EMAIL"];
+  cabecalho.forEach((titulo, i) => {
+    const c = ws.getCell(5, 2 + i);
+    c.value = titulo; c.font = fonteCabecalho; c.fill = fillDourado; c.alignment = { horizontal: "center", vertical: "top" };
+  });
+
+  lista.forEach((g, i) => {
+    const linha = 6 + i;
+    const valores = [
+      i + 1,
+      (g.nome||"").toUpperCase(),
+      "GESTOR",
+      (g.empresa||"").toUpperCase(),
+      (g.cargo||"").toUpperCase(),
+      (g.segmento||"").toUpperCase(),
+      "",
+      "",
+      fone(g.telefone||""),
+      (g.email||"").toUpperCase(),
+    ];
+    valores.forEach((valor, j) => {
+      const c = ws.getCell(linha, 2 + j);
+      c.value = valor;
+      if(j === 0 || j === 2){ c.font = fonteDadoCentro; c.alignment = centro; }
+      else if(j === 8){ c.font = fonteDado; c.alignment = centro; }
+      else{ c.font = fonteDado; c.alignment = esquerda; }
+    });
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `Mailing_${sufixo}_${(J.patrocinador_nome||"jantar").replace(/\W+/g,"_")}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // =====================================================================
