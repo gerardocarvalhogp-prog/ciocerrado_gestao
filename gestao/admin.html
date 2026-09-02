@@ -3527,7 +3527,6 @@ async function blocoCotas(){
               ${Number(c.patrocinadores) ? "" : `<button class="btn perigo mini co-apagar">Remover</button>`}
             </td></tr>`).join("")}</table>`
           : `<div class="vazio" style="margin-top:10px;">Nenhuma cota cadastrada.</div>`}
-        <div id="co-detalhe"></div>
       </div>`;
 
     $("#co-salvar").addEventListener("click", salvarCota);
@@ -3584,7 +3583,20 @@ async function blocoCotas(){
 
     $$(".co-patro").forEach(b => b.addEventListener("click", () => {
       const tr = b.closest("tr");
-      patrocinadoresDaCota(tr.dataset.id, tr.dataset.nome);
+      const existente = tr.nextElementSibling;
+      if(existente && existente.classList.contains("cp-expandido")){
+        existente.remove();
+        return;
+      }
+      // so uma cota expandida por vez — evita a tabela crescer sem fim
+      $$(".cp-expandido").forEach(e => e.remove());
+      const linha = document.createElement("tr");
+      linha.className = "cp-expandido";
+      const td = document.createElement("td");
+      td.colSpan = tr.children.length;
+      linha.appendChild(td);
+      tr.after(linha);
+      patrocinadoresDaCota(td, tr.dataset.id, tr.dataset.nome);
     }));
   }catch(e){ aviso("#bl-cotas", explicar(e)); }
 }
@@ -3592,15 +3604,16 @@ async function blocoCotas(){
 let COTA_UNICA = false;
 
 // Escolher os patrocinadores pela cota, em vez de abrir cada empresa
-// e trocar o campo "cota" um por um.
-async function patrocinadoresDaCota(cotaId, cotaNome){
-  const box = $("#co-detalhe");
-  box.innerHTML = DS.skeletonCartoes(3);
+// e trocar o campo "cota" um por um. Expande inline, logo abaixo da
+// linha da cota clicada — nao navega pra outro lugar da tela.
+async function patrocinadoresDaCota(box, cotaId, cotaNome){
+  box.innerHTML = DS.skeletonCartoes(1);
   try{
     const todos = await rpc("admin_listar_patrocinadores", { p_evento_slug: EVENTO });
 
     box.innerHTML = `
-      <h2 style="margin-top:16px;">Patrocinadores da cota ${esc(cotaNome)}</h2>
+      <div class="cartao" style="margin:8px 0;text-align:left;">
+      <h2 style="margin-top:0;">Patrocinadores da cota ${esc(cotaNome)}</h2>
       <p class="sub">Marque quem pertence a esta cota. Desmarcar deixa a empresa sem cota, não a remove.</p>
       <div class="rolagem" style="max-height:300px;">
         <table>
@@ -3614,7 +3627,8 @@ async function patrocinadoresDaCota(cotaId, cotaNome){
         </table>
       </div>
       <div id="cp-aviso"></div>
-      <button class="btn" id="cp-salvar" style="margin-top:10px;">Salvar cota</button>`;
+      <button class="btn" id="cp-salvar" style="margin-top:10px;">Salvar cota</button>
+      </div>`;
 
     $("#cp-salvar").addEventListener("click", async () => {
       const b = $("#cp-salvar");
