@@ -1465,6 +1465,7 @@ async function carregarIndicacoes(){
   alvo.innerHTML = `
     <h2>Indicar um CIO</h2>
     <p class="sub">Sugira executivos para o evento. A organização faz o convite e você acompanha o status por aqui.</p>
+    <div id="i-resumo"></div>
 
     <div class="cartao">
       <div class="linha">
@@ -1488,7 +1489,22 @@ async function carregarIndicacoes(){
 
   $("#i-nome").addEventListener("input", () => DS.limparInvalido($("#i-nome")));
   $("#i-enviar").addEventListener("click", enviarIndicacao);
+  carregarResumoIndicacoes();
   listarIndicacoes();
+}
+
+async function carregarResumoIndicacoes(){
+  try{
+    const r = await rpc("patro_minhas_indicacoes_resumo", { p_patrocinador_id: PATRO.patrocinador_id });
+    const cheio = r.limite !== null && r.usadas >= r.limite;
+    $("#i-resumo").innerHTML = r.limite === null
+      ? ""
+      : `<p class="sub"><strong>${r.usadas} de ${r.limite}</strong> indicação(ões) usada(s) por essa cota.</p>`;
+    if(cheio){
+      $("#i-enviar").disabled = true;
+      aviso("#i-aviso", "Sua cota já indicou o máximo de CIO(s) — fale com a organização se precisar de mais.");
+    }
+  }catch(e){ /* resumo é so um extra visual — nao trava a tela se falhar */ }
 }
 
 async function enviarIndicacao(){
@@ -1519,6 +1535,7 @@ async function enviarIndicacao(){
 
     ["#i-nome","#i-empresa","#i-cargo","#i-email","#i-telefone","#i-obs"]
       .forEach(s => $(s).value = "");
+    carregarResumoIndicacoes();
     listarIndicacoes();
   }catch(e){
     aviso("#i-aviso", explicar(e));
