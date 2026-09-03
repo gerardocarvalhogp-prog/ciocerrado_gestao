@@ -2820,6 +2820,11 @@ ABAS.atividades = async function(){
         <div style="max-width:140px;"><label>Início</label><input type="time" id="at-inicio"></div>
         <div style="max-width:140px;"><label>Fim</label><input type="time" id="at-fim"></div>
         <div><label>Local</label><input type="text" id="at-local" placeholder="Salão A"></div>
+        <div style="max-width:170px;"><label>Presença</label>
+          <select id="at-tipo">
+            <option value="geral">Geral (todos)</option>
+            <option value="exclusiva">Exclusiva (lista fechada)</option>
+          </select></div>
       </div>
       <div id="at-aviso"></div>
       <button class="btn" id="at-salvar" style="margin-top:8px;">Adicionar</button>
@@ -2836,14 +2841,18 @@ ABAS.atividades = async function(){
       const lista = await rpc("admin_listar_atividades", { p_evento_slug: EVENTO });
       $("#at-lista").innerHTML = lista.length ? `
         <div class="cartao"><div class="rolagem"><table>
-          <tr><th>Atividade</th><th>Quando</th><th>Local</th><th>Presença</th><th></th></tr>
+          <tr><th>Atividade</th><th>Quando</th><th>Local</th><th>Tipo</th><th>Presença</th><th></th></tr>
           ${lista.map(a => `<tr data-id="${esc(a.id)}" data-nome="${esc(a.nome)}">
             <td><strong>${esc(a.nome)}</strong></td>
             <td class="meta">${a.data ? dataBR(a.data) : "—"}
                 ${a.horario_inicio ? ` · ${a.horario_inicio.slice(0,5)}${a.horario_fim ? "–"+a.horario_fim.slice(0,5) : ""}` : ""}</td>
             <td class="meta">${esc(a.local||"—")}</td>
+            <td>${a.tipo_presenca === "exclusiva"
+                  ? `<span class="selo alerta">Exclusiva</span>` : `<span class="meta">Geral</span>`}</td>
             <td><span class="selo ${Number(a.presentes) ? "ok" : "pend"}">${a.presentes} / ${a.esperados}</span></td>
             <td style="white-space:nowrap;">
+              ${a.tipo_presenca === "exclusiva"
+                ? `<button class="btn sec mini at-convidados">Convidados</button>` : ""}
               <button class="btn sec mini at-presenca">Presença</button>
               <a class="btn sec mini" href="checkin.html?atividade=${esc(a.id)}" target="_blank" rel="noopener"
                  style="text-decoration:none;display:inline-block;">Abrir check-in</a>
@@ -2856,6 +2865,10 @@ ABAS.atividades = async function(){
       $$(".at-presenca").forEach(b => b.addEventListener("click", () => {
         const tr = b.closest("tr");
         abrirPresenca(tr.dataset.id, tr.dataset.nome);
+      }));
+      $$(".at-convidados").forEach(b => b.addEventListener("click", () => {
+        const tr = b.closest("tr");
+        abrirConvidadosAtividade(tr.dataset.id, tr.dataset.nome);
       }));
       $$(".at-remover").forEach(b => b.addEventListener("click", async () => {
         const tr = b.closest("tr");
@@ -2878,9 +2891,11 @@ ABAS.atividades = async function(){
         p_data: $("#at-data").value || null,
         p_horario_inicio: $("#at-inicio").value || null,
         p_horario_fim: $("#at-fim").value || null,
-        p_local: $("#at-local").value.trim() || null
+        p_local: $("#at-local").value.trim() || null,
+        p_tipo_presenca: $("#at-tipo").value
       });
       ["#at-nome","#at-data","#at-inicio","#at-fim","#at-local"].forEach(s => $(s).value = "");
+      $("#at-tipo").value = "geral";
       aviso("#at-aviso", "");
       carregarLista();
     }catch(e){ aviso("#at-aviso", explicar(e)); }
@@ -2966,6 +2981,49 @@ ABAS.atividades = async function(){
     });
 
     desenhar();
+  };
+
+  const abrirConvidadosAtividade = async (atividadeId, nome) => {
+    const box = $("#at-presenca");
+    box.innerHTML = DS.skeletonLinhas(3);
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    try{
+      const todos = await rpc("admin_listar_convidados_atividade", { p_atividade_id: atividadeId });
+
+      box.innerHTML = `
+        <div class="cartao">
+          <h2 style="margin-top:0;">Convidados — ${esc(nome)}</h2>
+          <p class="sub">Marque quem participa desta atividade fechada. Só quem estiver marcado aparece no check-in.</p>
+          <div class="rolagem" style="max-height:300px;">
+            <table>
+              <tr><th></th><th>Nome</th><th>Empresa</th></tr>
+              ${todos.map(p => `<tr>
+                <td><input type="checkbox" class="ac-pick" value="${esc(p.participante_id)}" ${p.marcado ? "checked" : ""}></td>
+                <td>${esc(p.nome)}</td>
+                <td class="meta">${esc(p.empresa||"—")}</td>
+              </tr>`).join("") ||
+              `<tr><td colspan="3" style="color:var(--suave)">Nenhum participante aprovado ainda neste evento.</td></tr>`}
+            </table>
+          </div>
+          <div id="ac-aviso"></div>
+          <button class="btn" id="ac-salvar" style="margin-top:10px;">Salvar convidados</button>
+        </div>`;
+
+      $("#ac-salvar").addEventListener("click", async () => {
+        const b = $("#ac-salvar");
+        const ids = $$(".ac-pick:checked", box).map(c => c.value);
+        b.disabled = true; b.textContent = "Salvando…";
+        try{
+          const r = await rpc("admin_definir_convidados_atividade", {
+            p_atividade_id: atividadeId, p_participantes: ids });
+          aviso("#ac-aviso",
+            `${r.na_lista} na lista` + (r.removidos ? ` · ${r.removidos} removido(s)` : ""), "ok");
+          carregarLista();
+        }catch(e){ aviso("#ac-aviso", explicar(e)); }
+        finally{ b.disabled = false; b.textContent = "Salvar convidados"; }
+      });
+    }catch(e){ aviso(box, explicar(e)); }
   };
 
   carregarLista();
