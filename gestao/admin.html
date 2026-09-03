@@ -203,7 +203,6 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
       <div class="aba-grupo">
         <span class="aba-grupo-rotulo" aria-hidden="true">Logística</span>
         <button class="aba" role="tab" data-aba="quartos" aria-selected="false">Quartos</button>
-        <button class="aba" role="tab" data-aba="organizacao" aria-selected="false">Organização</button>
         <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
         <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
         <button class="aba" role="tab" data-aba="arquivos" aria-selected="false">Arquivos</button>
@@ -554,7 +553,7 @@ let SOU_ADMIN = false;
 // (Financeiro, Precos, Equipe, a base real de Cadastro...) sem
 // conseguir escrever em nada disso: achado real do QA de usabilidade.
 const ABAS_SO_ADMIN = new Set([
-  "aprovacoes","cadastro","patrocinadores","estrutura","organizacao",
+  "aprovacoes","cadastro","patrocinadores","estrutura",
   "financeiro","precos","pesquisa","prospeccao","equipe","integracao-app"
 ]);
 
@@ -1647,8 +1646,8 @@ ABAS.cadastro = async function(){
   carregarGestores();
 };
 
-// Painel de edição de um gestor — mesmo espírito do "Pessoas" da aba
-// Organização: abre embaixo da tabela, sem navegar pra outro lugar.
+// Painel de edição de um gestor — mesmo espírito do "Pessoas" dos
+// quartos de equipe: abre embaixo da tabela, sem navegar pra outro lugar.
 function abrirEditarGestor(g){
   const box = $("#g-detalhe");
   box.innerHTML = `
@@ -1809,7 +1808,15 @@ ABAS.quartos = async function(){
     const semQuarto = lista.filter(r => !r.quarto_id).length;
 
     c.innerHTML = `
-      <h1>Separar quartos</h1>
+      <h1>Quartos</h1>
+      <p class="sub">Inventário, quartos de equipe e a separação de quem fica em qual número.</p>
+      ${SOU_ADMIN ? `
+        <div id="bl-quartos">${DS.skeletonCartoes(1)}</div>
+        <div id="bl-categorias"></div>
+        <div id="bl-equipe"></div>
+      ` : ""}
+
+      <h2 style="margin-top:22px;">Separar quartos</h2>
       <p class="sub">${lista.length} reserva(s) · ${semQuarto} ainda sem número · ${livres.length} quarto(s) livre(s).</p>
       <div class="barra">
         <div><label>Buscar</label><input type="text" id="q-busca" placeholder="Empresa ou pessoa"></div>
@@ -1820,6 +1827,12 @@ ABAS.quartos = async function(){
           </select></div>
       </div>
       <div class="cartao"><div class="rolagem"><table id="q-tabela"></table></div></div>`;
+
+    if(SOU_ADMIN){
+      await blocoQuartos();
+      await blocoCategorias();
+      await blocoEquipe();
+    }
 
     // quarto bloqueado pra outro publico nem aparece como opcao — a
     // recusa no banco (admin_alocar_quarto) e so o cinto de seguranca,
@@ -1885,23 +1898,25 @@ async function alocar(el, liberar=false){
 }
 
 // =====================================================================
-// ABA: ORGANIZAÇÃO (quartos para staff, fora do fluxo de patrocinador)
+// QUARTOS DE EQUIPE (staff do evento, fora do fluxo de patrocinador) —
+// vive dentro da aba Quartos, junto do resto da logistica de quarto.
 // =====================================================================
-ABAS.organizacao = async function(){
-  const c = $("#conteudo");
+async function blocoEquipe(){
+  const c = $("#bl-equipe");
+  if(!c) return;
   c.innerHTML = DS.skeletonCartoes(2);
   try{
     const lista = await rpc("admin_listar_quartos_equipe", { p_evento_slug: EVENTO });
 
     c.innerHTML = `
-      <h1>Organização</h1>
+      <h2 style="margin-top:22px;">Quartos de equipe</h2>
       <p class="sub">
         Quartos da equipe e do staff do evento — não entram na cota de nenhum
-        patrocinador. O número do quarto se atribui na aba Quartos, junto com o resto.
+        patrocinador. O número do quarto se atribui em "Separar quartos", logo abaixo.
       </p>
 
       <div class="cartao">
-        <h2>Adicionar ou alterar</h2>
+        <h2 style="margin-top:0;">Adicionar ou alterar</h2>
         <div class="barra">
           <div style="min-width:220px;"><label>Time ou responsável</label>
             <input type="text" id="og-rotulo" placeholder="Coordenação, Segurança, Fotografia…"></div>
@@ -1954,7 +1969,7 @@ ABAS.organizacao = async function(){
       if(!(await DS.confirmar("Esta ação não pode ser desfeita.",
           {titulo:`Remover "${tr.dataset.rotulo}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
       b.disabled = true;
-      try{ await rpc("admin_remover_quarto_equipe", { p_reserva_id: tr.dataset.id }); ABAS.organizacao(); }
+      try{ await rpc("admin_remover_quarto_equipe", { p_reserva_id: tr.dataset.id }); blocoEquipe(); }
       catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
     }));
 
@@ -1964,7 +1979,7 @@ ABAS.organizacao = async function(){
       abrirPessoasEquipe(reg);
     }));
   }catch(e){ aviso(c, explicar(e)); }
-};
+}
 
 async function salvarQuartoEquipe(){
   const rotulo = $("#og-rotulo").value.trim();
@@ -1987,7 +2002,7 @@ async function salvarQuartoEquipe(){
     });
     $("#og-rotulo").value = "";
     delete b.dataset.editando;
-    ABAS.organizacao();
+    blocoEquipe();
   }catch(e){ aviso("#og-aviso", explicar(e)); }
   finally{ b.disabled = false; b.textContent = "Salvar"; }
 }
@@ -2066,7 +2081,7 @@ function abrirPessoasEquipe(reg){
           p_ocupantes: linhas
         });
         aviso("#aviso-global", `Pessoas de "${reg.rotulo}" salvas.`, "ok");
-        ABAS.organizacao();
+        blocoEquipe();
       }catch(e){ aviso("#og-p-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar pessoas"; }
     });
   };
@@ -3361,14 +3376,11 @@ ABAS.estrutura = async function(){
   const c = $("#conteudo");
   c.innerHTML = `
     <h1>Estrutura do evento</h1>
-    <p class="sub">Dados do evento, cotas e inventário de quartos.</p>
+    <p class="sub">Dados do evento e cotas. Inventário e atribuição de quartos ficam na aba Quartos.</p>
     <div id="bl-evento">${DS.skeletonCartoes(2)}</div>
-    <div id="bl-cotas"></div>
-    <div id="bl-quartos"></div>
-    <div id="bl-categorias"></div>`;
+    <div id="bl-cotas"></div>`;
   await blocoEvento();
   await blocoCotas();
-  await blocoQuartos();
 };
 
 async function blocoEvento(){
@@ -5706,7 +5718,7 @@ async function listarEquipe(){
 
 // Quais eventos esta pessoa da staff acompanha — sem isso ela nao ve
 // nenhum (admin sempre ve tudo, essa tela nem aparece pra ela). Mesmo
-// espirito do "Pessoas" da aba Organização: painel que abre embaixo da
+// espirito do "Pessoas" dos quartos de equipe: painel que abre embaixo da
 // linha, sem navegar pra outro lugar.
 async function abrirEventosMembro(id, nome){
   const box = $("#eq-detalhe");
