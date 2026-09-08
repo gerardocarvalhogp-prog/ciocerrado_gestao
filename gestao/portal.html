@@ -1299,6 +1299,13 @@ async function carregarBrindes(){
           </div>
           <div class="b-aviso-envio"></div>
         </div>` : ""}
+      ${b && !["prometido","enviado"].includes(b.status) && (b.transportadora || b.rastreio) ? `
+        <div style="border-top:1px solid var(--linha);margin-top:12px;padding-top:12px;">
+          <p class="sub" style="margin:0 0 4px;">Envio deste brinde</p>
+          <p class="meta" style="margin:0;">
+            ${esc(b.transportadora || "—")} · ${esc(b.rastreio || "—")}
+          </p>
+        </div>` : ""}
     </div>`;
 
   alvo.innerHTML = `

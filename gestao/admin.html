@@ -63,17 +63,51 @@ button{font-family:inherit;cursor:pointer;}
 .ac-modal textarea{font-family:inherit;font-size:var(--tx-base);resize:vertical;}
 
 .wrap{max-width:1120px;margin:0 auto;padding:22px 20px 80px;}
-.abas{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--linha);
-  margin-bottom:22px;overflow-x:auto;}
-/* agrupa as 15 abas por etapa do fluxo — eram uma fileira só, sem hierarquia
-   nenhuma entre "Painel" e "Preços". Ver auditoria de UX de 28/08/2026. */
-.aba-grupo{display:flex;align-items:center;gap:2px;flex:none;}
-.aba-grupo-rotulo{font-family:'IBM Plex Mono',monospace;font-size:10px;
-  text-transform:uppercase;letter-spacing:.07em;color:var(--suave);
-  white-space:nowrap;padding-right:6px;opacity:.75;}
-.aba{background:none;border:none;border-bottom:2px solid transparent;
-  padding:9px 13px;font-size:13.5px;color:var(--suave);white-space:nowrap;}
-.aba[aria-selected="true"]{color:var(--verde);border-bottom-color:var(--verde);font-weight:600;}
+
+/* Menu virou gaveta vertical (tópico → subtópico), escondida por padrão
+   e aberta pelo hambúrguer — as 15 abas em fileira horizontal (mesmo já
+   agrupadas, auditoria de UX de 28/08/2026) ainda quebravam em várias
+   linhas / exigiam rolagem lateral. Pedido do Gerardo, 08/09/2026. */
+.btn-hamb{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+  color:#fff;border-radius:var(--raio);width:34px;height:34px;flex:none;
+  display:flex;align-items:center;justify-content:center;}
+.btn-hamb span{display:block;width:16px;height:2px;background:#fff;border-radius:2px;position:relative;}
+.btn-hamb span::before,.btn-hamb span::after{content:"";position:absolute;left:0;
+  width:16px;height:2px;background:#fff;border-radius:2px;}
+.btn-hamb span::before{top:-5px;}
+.btn-hamb span::after{top:5px;}
+
+.menu-fundo{position:fixed;inset:0;background:rgba(15,30,26,.45);z-index:55;
+  opacity:0;pointer-events:none;transition:opacity .18s ease;}
+.menu-fundo.aberto{opacity:1;pointer-events:auto;}
+
+.menu-nav{position:fixed;top:0;left:0;bottom:0;width:290px;max-width:84vw;
+  background:var(--superficie);z-index:56;overflow-y:auto;
+  box-shadow:10px 0 30px rgba(20,49,43,.2);
+  transform:translateX(-100%);transition:transform .2s ease;padding-bottom:20px;}
+.menu-nav.aberto{transform:translateX(0);}
+.menu-nav-cab{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid var(--linha);
+  position:sticky;top:0;background:var(--superficie);}
+.menu-nav-titulo{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
+.menu-fechar{background:none;border:none;font-size:22px;line-height:1;color:var(--suave);padding:2px 6px;}
+
+.aba-grupo{border-bottom:1px solid var(--linha);}
+.aba-grupo-cab{display:flex;align-items:center;justify-content:space-between;
+  width:100%;background:none;border:none;padding:12px 16px;text-align:left;}
+.aba-grupo-rotulo{font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--suave);}
+.aba-grupo-seta{color:var(--suave);font-size:11px;transition:transform .15s ease;}
+.aba-grupo.aberto .aba-grupo-seta{transform:rotate(180deg);}
+.aba-grupo-itens{display:flex;flex-direction:column;max-height:0;overflow:hidden;
+  transition:max-height .2s ease;}
+.aba-grupo.aberto .aba-grupo-itens{max-height:600px;}
+.aba{display:block;width:100%;text-align:left;background:none;border:none;
+  border-left:3px solid transparent;padding:9px 16px 9px 25px;font-size:13.5px;
+  color:var(--suave);}
+.aba:hover{background:#F1F3EE;}
+.aba[aria-selected="true"]{color:var(--verde);border-left-color:var(--verde);
+  font-weight:600;background:#F1F3EE;}
 .aba .contador{font-family:'IBM Plex Mono',monospace;font-size:10.5px;
   background:var(--ouro);color:#fff;border-radius:10px;padding:1px 6px;margin-left:5px;}
 
@@ -172,6 +206,9 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
 
 <div id="app" class="oculto">
   <header class="topo">
+    <button class="btn-hamb" id="btn-menu" aria-expanded="false" aria-controls="menu-nav" title="Menu">
+      <span></span>
+    </button>
     <div class="marca">CIO Cerrado<span>Painel da organização</span></div>
     <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html" aria-current="page">Painel</a><a href="jantares.html">Jantares</a><a href="checkin.html">Check-in</a></nav>
     <script>
@@ -187,49 +224,89 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
       <button class="sair" id="btn-sair">Sair</button>
     </div>
   </header>
-  <div class="wrap">
-    <div class="abas" role="tablist">
-      <div class="aba-grupo">
-        <span class="aba-grupo-rotulo" aria-hidden="true">Visão geral</span>
-        <button class="aba" role="tab" data-aba="painel" aria-selected="true">Painel</button>
-        <button class="aba" role="tab" data-aba="acompanhamento" aria-selected="false">Acompanhamento</button>
-      </div>
-      <div class="aba-grupo">
-        <span class="aba-grupo-rotulo" aria-hidden="true">Cadastro &amp; aprovação</span>
-        <button class="aba" role="tab" data-aba="aprovacoes" aria-selected="false">Aprovações<span class="contador oculto" id="c-aprov"></span></button>
-        <button class="aba" role="tab" data-aba="cadastro" aria-selected="false">Cadastro<span class="contador oculto" id="c-sug"></span></button>
-        <button class="aba" role="tab" data-aba="patrocinadores" aria-selected="false">Patrocinadores</button>
-      </div>
-      <div class="aba-grupo">
-        <span class="aba-grupo-rotulo" aria-hidden="true">Logística</span>
-        <button class="aba" role="tab" data-aba="quartos" aria-selected="false">Quartos</button>
-        <button class="aba" role="tab" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
-        <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
-        <button class="aba" role="tab" data-aba="arquivos" aria-selected="false">Arquivos</button>
-        <button class="aba" role="tab" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
-        <button class="aba" role="tab" data-aba="atividades" aria-selected="false">Atividades</button>
-        <button class="aba" role="tab" data-aba="estrutura" aria-selected="false">Estrutura</button>
-      </div>
-      <div class="aba-grupo">
-        <span class="aba-grupo-rotulo" aria-hidden="true">Financeiro</span>
-        <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
-        <button class="aba" role="tab" data-aba="precos" aria-selected="false">Preços</button>
-        <button class="aba" role="tab" data-aba="relatorios" aria-selected="false">Relatórios</button>
-      </div>
-      <div class="aba-grupo">
-        <span class="aba-grupo-rotulo" aria-hidden="true">Divulgação</span>
-        <button class="aba" role="tab" data-aba="pesquisa" aria-selected="false">Pesquisa</button>
-        <button class="aba" role="tab" data-aba="prospeccao" aria-selected="false">Prospecção</button>
-      </div>
-      <div class="aba-grupo">
-        <span class="aba-grupo-rotulo" aria-hidden="true">Equipe</span>
-        <button class="aba" role="tab" data-aba="equipe" aria-selected="false">Equipe</button>
-      </div>
-      <div class="aba-grupo">
-        <span class="aba-grupo-rotulo" aria-hidden="true">Integrações</span>
-        <button class="aba" role="tab" data-aba="integracao-app" aria-selected="false">App do evento</button>
+  <div class="menu-fundo" id="menu-fundo"></div>
+  <nav class="menu-nav" id="menu-nav" aria-label="Navegação">
+    <div class="menu-nav-cab">
+      <span class="menu-nav-titulo">Menu</span>
+      <button class="menu-fechar" id="btn-menu-fechar" aria-label="Fechar menu">&times;</button>
+    </div>
+    <div class="aba-grupo">
+      <button class="aba-grupo-cab" type="button" aria-expanded="false">
+        <span class="aba-grupo-rotulo">Visão geral</span>
+        <span class="aba-grupo-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="aba-grupo-itens">
+        <button class="aba" data-aba="painel" aria-selected="true">Painel</button>
+        <button class="aba" data-aba="acompanhamento" aria-selected="false">Acompanhamento</button>
       </div>
     </div>
+    <div class="aba-grupo">
+      <button class="aba-grupo-cab" type="button" aria-expanded="false">
+        <span class="aba-grupo-rotulo">Cadastro &amp; aprovação</span>
+        <span class="aba-grupo-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="aba-grupo-itens">
+        <button class="aba" data-aba="aprovacoes" aria-selected="false">Aprovações<span class="contador oculto" id="c-aprov"></span></button>
+        <button class="aba" data-aba="cadastro" aria-selected="false">Cadastro<span class="contador oculto" id="c-sug"></span></button>
+        <button class="aba" data-aba="patrocinadores" aria-selected="false">Patrocinadores</button>
+      </div>
+    </div>
+    <div class="aba-grupo">
+      <button class="aba-grupo-cab" type="button" aria-expanded="false">
+        <span class="aba-grupo-rotulo">Logística</span>
+        <span class="aba-grupo-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="aba-grupo-itens">
+        <button class="aba" data-aba="quartos" aria-selected="false">Quartos</button>
+        <button class="aba" data-aba="etiquetas" aria-selected="false">Etiquetas</button>
+        <button class="aba" data-aba="brindes" aria-selected="false">Brindes</button>
+        <button class="aba" data-aba="arquivos" aria-selected="false">Arquivos</button>
+        <button class="aba" data-aba="sessoes" aria-selected="false">Mesas e jantares</button>
+        <button class="aba" data-aba="atividades" aria-selected="false">Atividades</button>
+        <button class="aba" data-aba="estrutura" aria-selected="false">Estrutura</button>
+      </div>
+    </div>
+    <div class="aba-grupo">
+      <button class="aba-grupo-cab" type="button" aria-expanded="false">
+        <span class="aba-grupo-rotulo">Financeiro</span>
+        <span class="aba-grupo-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="aba-grupo-itens">
+        <button class="aba" data-aba="financeiro" aria-selected="false">Financeiro</button>
+        <button class="aba" data-aba="precos" aria-selected="false">Preços</button>
+        <button class="aba" data-aba="relatorios" aria-selected="false">Relatórios</button>
+      </div>
+    </div>
+    <div class="aba-grupo">
+      <button class="aba-grupo-cab" type="button" aria-expanded="false">
+        <span class="aba-grupo-rotulo">Divulgação</span>
+        <span class="aba-grupo-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="aba-grupo-itens">
+        <button class="aba" data-aba="pesquisa" aria-selected="false">Pesquisa</button>
+        <button class="aba" data-aba="prospeccao" aria-selected="false">Prospecção</button>
+      </div>
+    </div>
+    <div class="aba-grupo">
+      <button class="aba-grupo-cab" type="button" aria-expanded="false">
+        <span class="aba-grupo-rotulo">Equipe</span>
+        <span class="aba-grupo-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="aba-grupo-itens">
+        <button class="aba" data-aba="equipe" aria-selected="false">Equipe</button>
+      </div>
+    </div>
+    <div class="aba-grupo">
+      <button class="aba-grupo-cab" type="button" aria-expanded="false">
+        <span class="aba-grupo-rotulo">Integrações</span>
+        <span class="aba-grupo-seta" aria-hidden="true">▾</span>
+      </button>
+      <div class="aba-grupo-itens">
+        <button class="aba" data-aba="integracao-app" aria-selected="false">App do evento</button>
+      </div>
+    </div>
+  </nav>
+  <div class="wrap">
     <div id="aviso-global"></div>
     <div id="conteudo">
       <div class="skeleton skeleton-cartao" style="margin-bottom:8px;"></div>
@@ -495,7 +572,24 @@ async function iniciar(){
   $("#app").classList.remove("oculto");
   $("#quem").textContent = user.email;
 
-  $$(".aba").forEach(b => b.addEventListener("click", () => irParaAba(b.dataset.aba, true)));
+  $$(".aba").forEach(b => b.addEventListener("click", () => {
+    irParaAba(b.dataset.aba, true);
+    fecharMenu();
+  }));
+
+  // Cada topico abre/fecha os proprios subtopicos — so um aberto por vez,
+  // igual gaveta de app mobile, pra nao virar uma lista comprida sem fim.
+  $$(".aba-grupo-cab").forEach(cab => cab.addEventListener("click", () => {
+    const grupo = cab.closest(".aba-grupo");
+    const jaAberto = grupo.classList.contains("aberto");
+    $$(".aba-grupo").forEach(g => { g.classList.remove("aberto"); $(".aba-grupo-cab", g).setAttribute("aria-expanded","false"); });
+    if(!jaAberto){ grupo.classList.add("aberto"); cab.setAttribute("aria-expanded","true"); }
+  }));
+
+  $("#btn-menu").addEventListener("click", () => abrirMenu());
+  $("#btn-menu-fechar").addEventListener("click", () => fecharMenu());
+  $("#menu-fundo").addEventListener("click", () => fecharMenu());
+  window.addEventListener("keydown", e => { if(e.key === "Escape") fecharMenu(); });
 
   // Voltar do navegador so mudava a URL — o conteudo ficava parado na
   // ultima aba, porque trocar de aba nunca empilhava historico nenhum.
@@ -517,6 +611,7 @@ function irParaAba(nome, empilhar){
   if(typeof ABAS[nome] !== "function") nome = "painel";
   ABA_ATUAL = nome;
   $$(".aba").forEach(x => x.setAttribute("aria-selected", String(x.dataset.aba === nome)));
+  sincronizarGrupoAberto(nome);
   if(empilhar){
     const u = new URL(location.href);
     u.hash = nome;
@@ -524,6 +619,29 @@ function irParaAba(nome, empilhar){
   }
 
   desenharAba(nome);
+}
+
+// Abre na gaveta o topico de onde a aba atual faz parte, pra quem
+// reabrir o menu ver onde esta em vez de tudo recolhido de novo.
+function sincronizarGrupoAberto(nome){
+  $$(".aba-grupo").forEach(g => {
+    const contem = !!$(`.aba[data-aba="${nome}"]`, g);
+    g.classList.toggle("aberto", contem);
+    $(".aba-grupo-cab", g).setAttribute("aria-expanded", String(contem));
+  });
+}
+
+function abrirMenu(){
+  $("#menu-nav").classList.add("aberto");
+  $("#menu-fundo").classList.add("aberto");
+  $("#btn-menu").setAttribute("aria-expanded", "true");
+  document.body.style.overflow = "hidden";
+}
+function fecharMenu(){
+  $("#menu-nav").classList.remove("aberto");
+  $("#menu-fundo").classList.remove("aberto");
+  $("#btn-menu").setAttribute("aria-expanded", "false");
+  document.body.style.overflow = "";
 }
 
 // Esconder o botao do menu (aplicarRestricoesPapel) nunca foi controle
