@@ -55,15 +55,39 @@ button{font-family:inherit;cursor:pointer;}
 
 .wrap{max-width:940px;margin:0 auto;padding:26px 20px 80px;}
 
-.abas{
-  display:flex;gap:2px;border-bottom:1px solid var(--linha);
-  margin-bottom:26px;overflow-x:auto;
-}
+/* Menu virou gaveta vertical, escondida por padrão e aberta pelo
+   hambúrguer — mesmo padrão do admin.html. Pedido do Gerardo, 08/09/2026. */
+.btn-hamb{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+  color:#fff;border-radius:var(--raio);width:34px;height:34px;flex:none;
+  display:flex;align-items:center;justify-content:center;}
+.btn-hamb span{display:block;width:16px;height:2px;background:#fff;border-radius:2px;position:relative;}
+.btn-hamb span::before,.btn-hamb span::after{content:"";position:absolute;left:0;
+  width:16px;height:2px;background:#fff;border-radius:2px;}
+.btn-hamb span::before{top:-5px;}
+.btn-hamb span::after{top:5px;}
+
+.menu-fundo{position:fixed;inset:0;background:rgba(15,30,26,.45);z-index:55;
+  opacity:0;pointer-events:none;transition:opacity .18s ease;}
+.menu-fundo.aberto{opacity:1;pointer-events:auto;}
+
+.menu-nav{position:fixed;top:0;left:0;bottom:0;width:290px;max-width:84vw;
+  background:var(--superficie);z-index:56;overflow-y:auto;
+  box-shadow:10px 0 30px rgba(20,49,43,.2);
+  transform:translateX(-100%);transition:transform .2s ease;padding-bottom:20px;}
+.menu-nav.aberto{transform:translateX(0);}
+.menu-nav-cab{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid var(--linha);
+  position:sticky;top:0;background:var(--superficie);}
+.menu-nav-titulo{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
+.menu-fechar{background:none;border:none;font-size:22px;line-height:1;color:var(--suave);padding:2px 6px;}
+
 .aba{
-  background:none;border:none;border-bottom:2px solid transparent;
-  padding:10px 14px;font-size:14px;color:var(--suave);white-space:nowrap;
+  display:block;width:100%;text-align:left;background:none;border:none;
+  border-left:3px solid transparent;padding:10px 16px;font-size:14px;color:var(--suave);
 }
-.aba[aria-selected="true"]{color:var(--verde);border-bottom-color:var(--verde);font-weight:600;}
+.aba:hover{background:#F1F3EE;}
+.aba[aria-selected="true"]{color:var(--verde);border-left-color:var(--verde);
+  font-weight:600;background:#F1F3EE;}
 .aba .flag{
   display:inline-block;width:7px;height:7px;border-radius:50%;
   background:var(--ouro);margin-left:5px;vertical-align:middle;
@@ -216,6 +240,9 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
 <!-- ================= APP ================= -->
 <div id="app" class="oculto">
   <header class="topo">
+    <button class="btn-hamb" id="btn-menu" aria-expanded="false" aria-controls="menu-nav" title="Menu">
+      <span></span>
+    </button>
     <div class="marca">CIO Cerrado<span>Portal do patrocinador</span></div>
     <div class="topo-dir">
       <span class="quem" id="quem"></span>
@@ -223,22 +250,26 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
       <button class="sair" id="btn-sair">Sair</button>
     </div>
   </header>
+  <div class="menu-fundo" id="menu-fundo"></div>
+  <nav class="menu-nav" id="menu-nav" aria-label="Navegação">
+    <div class="menu-nav-cab">
+      <span class="menu-nav-titulo">Menu</span>
+      <button class="menu-fechar" id="btn-menu-fechar" aria-label="Fechar menu">&times;</button>
+    </div>
+    <button class="aba" data-aba="quartos" aria-selected="true">Quartos</button>
+    <button class="aba" data-aba="mesa" aria-selected="false">Mesa redonda</button>
+    <button class="aba" data-aba="indicacoes" aria-selected="false">Indicar CIO</button>
+    <button class="aba" data-aba="brindes" aria-selected="false">Brindes</button>
+    <button class="aba" data-aba="convidados" aria-selected="false">Convidados</button>
+    <button class="aba" data-aba="lounge" aria-selected="false">Lounge</button>
+    <button class="aba" data-aba="arquivos" aria-selected="false">Arquivos</button>
+    <button class="aba" data-aba="financeiro" aria-selected="false">Financeiro</button>
+    <button class="aba" data-aba="manual" aria-selected="false">Manual</button>
+  </nav>
 
   <div class="wrap">
     <div id="cabecalho"></div>
     <div id="resumo-pendencias"></div>
-
-    <div class="abas" role="tablist">
-      <button class="aba" role="tab" data-aba="quartos" aria-selected="true">Quartos</button>
-      <button class="aba" role="tab" data-aba="mesa" aria-selected="false">Mesa redonda</button>
-      <button class="aba" role="tab" data-aba="indicacoes" aria-selected="false">Indicar CIO</button>
-      <button class="aba" role="tab" data-aba="brindes" aria-selected="false">Brindes</button>
-      <button class="aba" role="tab" data-aba="convidados" aria-selected="false">Convidados</button>
-      <button class="aba" role="tab" data-aba="lounge" aria-selected="false">Lounge</button>
-      <button class="aba" role="tab" data-aba="arquivos" aria-selected="false">Arquivos</button>
-      <button class="aba" role="tab" data-aba="financeiro" aria-selected="false">Financeiro</button>
-      <button class="aba" role="tab" data-aba="manual" aria-selected="false">Manual</button>
-    </div>
 
     <div id="aviso-global"></div>
 
@@ -658,7 +689,25 @@ function ligarAbas(){
     if(b.dataset.aba === "arquivos")   carregarArquivos();
     if(b.dataset.aba === "financeiro") carregarFinanceiro();
     if(b.dataset.aba === "manual")     carregarManual();
+    fecharMenu();
   }));
+  $("#btn-menu").addEventListener("click", () => abrirMenu());
+  $("#btn-menu-fechar").addEventListener("click", () => fecharMenu());
+  $("#menu-fundo").addEventListener("click", () => fecharMenu());
+  window.addEventListener("keydown", e => { if(e.key === "Escape") fecharMenu(); });
+}
+
+function abrirMenu(){
+  $("#menu-nav").classList.add("aberto");
+  $("#menu-fundo").classList.add("aberto");
+  $("#btn-menu").setAttribute("aria-expanded", "true");
+  document.body.style.overflow = "hidden";
+}
+function fecharMenu(){
+  $("#menu-nav").classList.remove("aberto");
+  $("#menu-fundo").classList.remove("aberto");
+  $("#btn-menu").setAttribute("aria-expanded", "false");
+  document.body.style.overflow = "";
 }
 
 // =====================================================================
