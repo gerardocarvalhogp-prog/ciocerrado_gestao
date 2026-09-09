@@ -575,6 +575,8 @@ async function desenharJantar(){
       </div>
       <div class="barra">
         <div><label>Local</label><input type="text" id="jd-local" value="${esc(J.local||"")}"></div>
+        <div style="max-width:130px;"><label>CEP do local</label>
+          <input type="text" id="jd-cep" placeholder="00000-000" value="${esc(J.cep||"")}"></div>
         <div style="max-width:110px;"><label>Capacidade</label><input type="text" id="jd-cap" value="${J.capacidade}"></div>
         <div><label>Perfil de convidado desejado</label><input type="text" id="jd-perfil" value="${esc(J.perfil_convidado||"")}"></div>
       </div>
@@ -779,7 +781,8 @@ async function salvarDadosJantar(){
       p_capacidade: parseInt($("#jd-cap").value,10) || 8,
       p_status: $("#jd-status").value,
       p_sympla_url: $("#jd-sympla").value.trim() || null,
-      p_mensagem: $("#jd-mensagem").value.trim() || null
+      p_mensagem: $("#jd-mensagem").value.trim() || null,
+      p_cep: $("#jd-cep").value.trim() || null
     });
     aviso("#jd-aviso","Salvo.","ok");
     await abrirJantar(J.id);

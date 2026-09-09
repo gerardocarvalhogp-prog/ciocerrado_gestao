@@ -86,6 +86,7 @@ import sys
 import argparse
 import logging
 import tempfile
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from integracao import Supa, SUPABASE_URL, SUPABASE_SERVICE
@@ -169,11 +170,12 @@ def login_interativo():
         page.get_by_role("button", name="Continuar").click()
 
         # onboarding — so' na primeira vez desta conta; timeout curto,
-        # pula se nao aparecer
+        # pula se nao aparecer. CNPJ da CIO Cerrado Consultoria e
+        # Eventos (dado publico de registro, nao e' segredo).
         try:
             page.get_by_test_id("select-trigger-button").click(timeout=5000)
             page.get_by_role("option", name="CNPJ").click()
-            page.get_by_role("textbox", name="Qual é o número do documento?").fill("")  # TODO CALIBRAR: CNPJ real, se pedir de novo
+            page.get_by_role("textbox", name="Qual é o número do documento?").fill("36.631.120/0001-34")
             page.get_by_role("button", name="Continuar").click()
         except Exception:
             pass
@@ -220,11 +222,17 @@ def criar_evento(page, jantar, producao, debug):
     data_br = f"{dia}/{mes}/{ano}"
     hora = (jantar.get("horario") or "20:00:00")[:5]  # "HH:MM"
 
+    cep = jantar.get("cep") or ""
+    if not cep:
+        raise RuntimeError(
+            f"jantar '{jantar['patrocinador_nome']}' sem CEP cadastrado — "
+            f"preencha em jantares.html antes de rodar o robô.")
+
     page.goto("https://organizador.sympla.com.br/meus-eventos")
     page.get_by_role("button", name="Criar evento presencial").click()
     page.locator("#date-from-create-event-time").fill(data_br)
     page.locator("#date-until-create-event-time").fill(data_br)
-    page.get_by_placeholder("_____-___").fill("")  # TODO CALIBRAR: CEP padrão do local do jantar
+    page.get_by_placeholder("_____-___").fill(cep)
     page.get_by_placeholder("R$").fill("R$ 0,00")
     page.get_by_role("button", name="Continuar").click()
 
@@ -234,28 +242,55 @@ def criar_evento(page, jantar, producao, debug):
     if jantar.get("logo_storage_path"):
         logo_tmp = baixar_logo(jantar["logo_storage_path"])
         page.locator("#upload-event-banner").get_by_text("Clique ou arraste a imagem").click()
-        # a gravação mostrou o input real como o 2º <input type="file"> da
-        # página (o 1º parece ser de outro widget, invisível) —
-        # TODO CALIBRAR se a página mudar de estrutura
-        page.locator('input[type="file"]').nth(1).set_input_files(logo_tmp)
+        # escopado dentro do proprio widget de banner, em vez de um
+        # indice de posicao (input[type=file].nth(1)) que dependia de
+        # quantos outros inputs de arquivo a pagina tivesse em algum
+        # outro lugar
+        page.locator("#upload-event-banner").locator('input[type="file"]').set_input_files(logo_tmp)
 
-    # datas/hora de novo — o modal rápido não pede horário, só data
+    # jantares nao guarda horario de termino — 3h de duracao e' a
+    # mesma janela usada na gravacao que calibrou este script (19h as
+    # 22h). Se passar da meia-noite (jantar comecando depois das 21h),
+    # cai no fim do dia em vez de virar o dia — mais seguro que
+    # arriscar mandar uma data errada pro Sympla.
+    try:
+        hi = datetime.strptime(hora, "%H:%M")
+        hora_fim = min(hi + timedelta(hours=3), hi.replace(hour=23, minute=59)).strftime("%H:%M")
+    except ValueError:
+        hora, hora_fim = "20:00", "23:00"
+
+    def escolher_horario(texto):
+        # combina pelo texto exato do horario (ex.: "19:00") em vez de
+        # um indice de posicao na lista — indice quebra se o Sympla
+        # mudar quantas opcoes aparecem. Prefixo com .first() como
+        # ultimo recurso, se o texto exato nao bater.
+        try:
+            page.get_by_text(texto, exact=True).click(timeout=4000)
+        except Exception:
+            log.warning("    horário '%s' não achado por texto exato, tentando por prefixo", texto)
+            page.get_by_text(f"{texto.split(':')[0]}:").first.click()
+
     page.locator("#date-from-create-event-time").click()
     page.get_by_role("cell", name=str(int(dia))).click()
     page.locator("#time-from-create-event-time").click()
-    page.get_by_text(f"{hora.split(':')[0]}:").first.click()
+    escolher_horario(hora)
     page.locator("#date-until-create-event-time").click()
     page.get_by_role("cell", name=str(int(dia))).click()
     page.locator("#time-until-create-event-time").click()
-    page.get_by_text(f"{hora.split(':')[0]}:").nth(4).click()  # TODO CALIBRAR: índice frágil, depende de quantos horários aparecem na lista
+    escolher_horario(hora_fim)
 
     if jantar.get("mensagem"):
         page.locator(".note-editable").first.fill(jantar["mensagem"])
 
     if jantar.get("local"):
         page.get_by_role("combobox", name="Endereço", exact=True).fill(jantar["local"])
-        # TODO CALIBRAR: confirme se precisa escolher uma opção da lista
-        # de autocomplete depois de preencher, ou se o texto livre basta
+        # se aparecer uma lista de sugestao (autocomplete de endereco),
+        # escolhe a primeira — se nao aparecer nada em 3s, segue com o
+        # texto livre mesmo
+        try:
+            page.get_by_role("option").first.click(timeout=3000)
+        except Exception:
+            pass
 
     page.get_by_text("Ingresso gratuito").click()
     page.get_by_role("textbox", name="Ex. 100").fill(str(jantar.get("capacidade") or 8))
@@ -282,10 +317,23 @@ def criar_evento(page, jantar, producao, debug):
     # segundo clique, em "Meus eventos") fica por conta do organizador,
     # de propósito: é o checkpoint humano antes do evento ir ao ar.
     page.wait_for_load_state("networkidle")
-    gerenciar = page.locator("a").filter(has_text="Gerenciar").nth(1)  # TODO CALIBRAR
-    gerenciar.click()
-    page.wait_for_load_state("networkidle")
+    abrir_evento_na_lista(page, titulo)
     return page.url
+
+
+# ---------------------------------------------------------------------
+# acha o evento pelo TITULO na lista "Meus eventos" e abre a página de
+# gerenciamento dele — em vez de um índice de posição (que dependia de
+# quantos outros eventos/links a lista tivesse), usa o título, que é
+# determinístico (mesmo texto que criar_evento gerou). name= faz
+# combinação parcial por padrão, então bate mesmo com o prefixo de
+# status ("Em análise ...", "Publicado ...") que aparece junto na
+# gravação.
+# ---------------------------------------------------------------------
+def abrir_evento_na_lista(page, titulo):
+    page.goto("https://organizador.sympla.com.br/meus-eventos")
+    page.get_by_role("row", name=titulo).get_by_role("link").click()
+    page.wait_for_load_state("networkidle")
 
 
 # ---------------------------------------------------------------------
@@ -301,10 +349,8 @@ def mandar_convites(page, jantar, confirmados, producao, debug):
 
     log.info("  %s: %d confirmado(s) para convidar.", jantar["patrocinador_nome"], len(confirmados))
 
-    # TODO CALIBRAR: a gravação chegou aqui navegando pela lista de
-    # "Meus eventos" e clicando no evento — não há um padrão de URL
-    # direta confirmado. Ajuste pra abrir o evento certo (por
-    # sympla_url ou pelo título) antes de clicar no link abaixo.
+    titulo = f"Jantar CIO Cerrado — {jantar['patrocinador_nome']}"
+    abrir_evento_na_lista(page, titulo)
     page.get_by_role("link", name="Convite por E-mail").click()
 
     if jantar.get("mensagem"):
