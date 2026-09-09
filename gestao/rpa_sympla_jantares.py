@@ -268,6 +268,20 @@ def criar_evento(page, jantar, producao, debug):
 
     page.goto("https://organizador.sympla.com.br/meus-eventos")
     page.get_by_role("button", name="Criar evento presencial").click()
+
+    # popup de novidade ("Seu evento, ainda mais organizado") que a
+    # Sympla mostra às vezes por cima do formulário — achado no print
+    # de erro real: enquanto ele está aberto, os campos por baixo
+    # ficam desabilitados (não "não encontrados" — a tela travava
+    # exatamente no fill do CEP com "element is not enabled"). Esc é a
+    # forma mais generica de fechar esse tipo de popup; não quebra
+    # nada se ele não aparecer.
+    page.wait_for_timeout(800)
+    try:
+        page.keyboard.press("Escape")
+    except Exception:
+        pass
+
     page.locator("#date-from-create-event-time").fill(data_br)
     page.locator("#date-until-create-event-time").fill(data_br)
     page.get_by_placeholder("_____-___").fill(cep)
