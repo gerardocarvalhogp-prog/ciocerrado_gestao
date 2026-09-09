@@ -285,15 +285,19 @@ def criar_evento(page, jantar, producao, debug):
         hora, hora_fim = "20:00", "23:00"
 
     def escolher_horario(texto):
-        # combina pelo texto exato do horario (ex.: "19:00") em vez de
-        # um indice de posicao na lista — indice quebra se o Sympla
-        # mudar quantas opcoes aparecem. Prefixo com .first() como
-        # ultimo recurso, se o texto exato nao bater.
-        try:
-            page.get_by_text(texto, exact=True).click(timeout=4000)
-        except Exception:
-            log.warning("    horário '%s' não achado por texto exato, tentando por prefixo", texto)
-            page.get_by_text(f"{texto.split(':')[0]}:").first.click()
+        # o seletor de hora e' o plugin xdsoft_datetimepicker — cada
+        # opcao e' um <div class="xdsoft_time" data-hour="19"
+        # data-minute="30">, dentro de uma lista ROLAVEL. Bater pelos
+        # atributos data-hour/data-minute e' preciso (nao depende do
+        # texto renderizado nem de posicao); scroll_into_view_if_needed
+        # e' o que faltava antes — o Playwright recusa clicar em algo
+        # que existe no HTML mas esta fora da area visivel da rolagem
+        # ("element is not visible"), que foi exatamente o erro visto
+        # na validacao real.
+        h, m = texto.split(":")
+        item = page.locator(f'.xdsoft_time[data-hour="{int(h)}"][data-minute="{int(m)}"]')
+        item.scroll_into_view_if_needed(timeout=4000)
+        item.click(timeout=4000)
 
     page.locator("#date-from-create-event-time").click()
     page.get_by_role("cell", name=str(int(dia))).click()
