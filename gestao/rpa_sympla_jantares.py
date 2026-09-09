@@ -247,9 +247,16 @@ def abrir_pagina_logada(p, debug):
 
 
 # ---------------------------------------------------------------------
-# cria o evento pro jantar — sequência calibrada numa gravação real:
-# modal rápido (datas + CEP + preço) → formulário completo (nome,
-# banner, datas/hora de novo, descrição, endereço, ingresso) → publicar.
+# cria o evento pro jantar.
+#
+# A gravacao original (playwright codegen) mostrou um "modal rapido"
+# (data + CEP + preco) antes do formulario completo — mas testado
+# contra a conta de producao de verdade, "Criar evento presencial"
+# vai direto pra UMA pagina so, com todas as secoes numeradas (Nome,
+# Imagem, Classificacao, Data e horario, Local, Ingressos...). O
+# "modal rapido" pode ter sido removido pela Sympla, ou so' aparece
+# em algum outro caminho — o que importa e' que essa pagina unica e'
+# o que a conta real mostra hoje, entao e' isso que o robo segue.
 # ---------------------------------------------------------------------
 def criar_evento(page, jantar, producao, debug):
     titulo = f"Jantar CIO Cerrado — {jantar['patrocinador_nome']}"
@@ -272,22 +279,14 @@ def criar_evento(page, jantar, producao, debug):
     # popup de novidade ("Seu evento, ainda mais organizado") que a
     # Sympla mostra às vezes por cima do formulário — achado no print
     # de erro real: enquanto ele está aberto, os campos por baixo
-    # ficam desabilitados (não "não encontrados" — a tela travava
-    # exatamente no fill do CEP com "element is not enabled"). Esc
-    # sozinho não fechou (testado); o X real é
-    # <span class="icon icon-icon-close">, achado inspecionando a
-    # tela de verdade.
+    # ficam desabilitados (não "não encontrados"). Esc sozinho não
+    # fechou (testado); o X real é <span class="icon icon-icon-close">,
+    # achado inspecionando a tela de verdade.
     page.wait_for_timeout(800)
     try:
         page.locator(".icon-icon-close").click(timeout=3000)
     except Exception:
         pass
-
-    page.locator("#date-from-create-event-time").fill(data_br)
-    page.locator("#date-until-create-event-time").fill(data_br)
-    page.get_by_placeholder("_____-___").fill(cep)
-    page.get_by_placeholder("R$").fill("R$ 0,00")
-    page.get_by_role("button", name="Continuar").click()
 
     page.get_by_role("textbox", name="Nome do evento").fill(titulo)
 
@@ -341,15 +340,25 @@ def criar_evento(page, jantar, producao, debug):
     if jantar.get("mensagem"):
         page.locator(".note-editable").first.fill(jantar["mensagem"])
 
-    if jantar.get("local"):
-        page.get_by_role("combobox", name="Endereço", exact=True).fill(jantar["local"])
-        # se aparecer uma lista de sugestao (autocomplete de endereco),
-        # escolhe a primeira — se nao aparecer nada em 3s, segue com o
-        # texto livre mesmo
-        try:
-            page.get_by_role("option").first.click(timeout=3000)
-        except Exception:
-            pass
+    # "4. Onde o seu evento vai acontecer" — o dropdown "Local" vem com
+    # um endereco salvo de evento anterior escolhido por padrao (a
+    # conta ja tem historico); nao da pra digitar CEP direto nele —
+    # so' escolhendo "Em um novo endereço" e' que aparece o campo de
+    # texto livre. O CEP nunca e' preenchido em campo proprio: vai
+    # junto do texto do endereco, que e' provavelmente um autocomplete
+    # do Google (por isso o clique na primeira sugestao depois).
+    page.get_by_role("combobox", name="Local").select_option(label="Em um novo endereço")
+
+    cep_fmt = f"{cep[:5]}-{cep[5:]}" if len(cep) == 8 else cep
+    endereco_texto = f"{jantar['local']}, {cep_fmt}" if jantar.get("local") else cep_fmt
+    campo_endereco = page.get_by_role("textbox", name="Informe o endereço ou o nome do local do evento")
+    campo_endereco.fill(endereco_texto)
+    # autocomplete de endereco (provavelmente Google Places) — escolhe
+    # a primeira sugestao se aparecer; segue com o texto livre se nao
+    try:
+        page.get_by_role("option").first.click(timeout=3000)
+    except Exception:
+        pass
 
     page.get_by_text("Ingresso gratuito").click()
     page.get_by_role("textbox", name="Ex. 100").fill(str(jantar.get("capacidade") or 8))
