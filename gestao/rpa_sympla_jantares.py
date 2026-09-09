@@ -273,12 +273,13 @@ def criar_evento(page, jantar, producao, debug):
     # Sympla mostra às vezes por cima do formulário — achado no print
     # de erro real: enquanto ele está aberto, os campos por baixo
     # ficam desabilitados (não "não encontrados" — a tela travava
-    # exatamente no fill do CEP com "element is not enabled"). Esc é a
-    # forma mais generica de fechar esse tipo de popup; não quebra
-    # nada se ele não aparecer.
+    # exatamente no fill do CEP com "element is not enabled"). Esc
+    # sozinho não fechou (testado); o X real é
+    # <span class="icon icon-icon-close">, achado inspecionando a
+    # tela de verdade.
     page.wait_for_timeout(800)
     try:
-        page.keyboard.press("Escape")
+        page.locator(".icon-icon-close").click(timeout=3000)
     except Exception:
         pass
 
