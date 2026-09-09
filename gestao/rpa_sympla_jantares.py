@@ -348,10 +348,25 @@ def criar_evento(page, jantar, producao, debug):
         # coincidencia, no de fim) bate em DOIS elementos identicos e
         # o Playwright recusa ("strict mode violation"). :visible
         # filtra so' o que esta aberto de verdade nesse momento.
+        # Achado real (2ª rodada): "Element is not attached to the DOM"
+        # no scroll — a lista parece re-renderizar os itens conforme
+        # rola (só existe no HTML o que está perto da posição atual),
+        # então o elemento pode sumir entre localizar e clicar.
+        # Reconsulta o locator a cada tentativa (não reusa referência
+        # antiga) e tenta de novo se isso acontecer.
         h, m = texto.split(":")
-        item = page.locator(f'.xdsoft_time[data-hour="{int(h)}"][data-minute="{int(m)}"]:visible')
-        item.scroll_into_view_if_needed(timeout=4000)
-        item.click(timeout=4000)
+        selector = f'.xdsoft_time[data-hour="{int(h)}"][data-minute="{int(m)}"]:visible'
+        ultimo_erro = None
+        for _ in range(6):
+            try:
+                item = page.locator(selector)
+                item.scroll_into_view_if_needed(timeout=4000)
+                item.click(timeout=4000)
+                return
+            except Exception as e:
+                ultimo_erro = e
+                page.wait_for_timeout(300)
+        raise ultimo_erro
 
     page.locator("#date-from-create-event-time").click()
     page.get_by_role("cell", name=str(int(dia))).click()
