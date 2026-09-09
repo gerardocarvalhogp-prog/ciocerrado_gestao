@@ -387,7 +387,10 @@ def criar_evento(page, jantar, producao, debug):
 
     cep_fmt = f"{cep[:5]}-{cep[5:]}" if len(cep) == 8 else cep
     endereco_texto = f"{jantar['local']}, {cep_fmt}" if jantar.get("local") else cep_fmt
-    campo_endereco = page.get_by_role("textbox", name="Informe o endereço ou o nome do local do evento")
+    # o texto do rotulo acima do campo nao vira o nome acessivel dele
+    # (nao e' um <label for> de verdade) — o placeholder "Endereço" e'
+    # o que da pra bater com certeza
+    campo_endereco = page.get_by_placeholder("Endereço", exact=True)
     campo_endereco.fill(endereco_texto)
     # autocomplete de endereco (provavelmente Google Places) — escolhe
     # a primeira sugestao se aparecer; segue com o texto livre se nao
