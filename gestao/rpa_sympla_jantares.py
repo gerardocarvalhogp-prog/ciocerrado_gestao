@@ -381,7 +381,9 @@ def criar_evento(page, jantar, producao, debug):
     page.locator("label", has_text="Local").first.locator(
         "xpath=following::span[contains(@class,'select2-selection')][1]"
     ).click()
-    page.get_by_text("Em um novo endereço", exact=True).click()
+    # role=treeitem, nao texto puro: o texto bate tambem no <option>
+    # escondido do select original por baixo do Select2
+    page.get_by_role("treeitem", name="Em um novo endereço").click()
 
     cep_fmt = f"{cep[:5]}-{cep[5:]}" if len(cep) == 8 else cep
     endereco_texto = f"{jantar['local']}, {cep_fmt}" if jantar.get("local") else cep_fmt
