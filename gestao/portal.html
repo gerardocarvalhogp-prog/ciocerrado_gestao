@@ -128,6 +128,13 @@ textarea{min-height:64px;resize:vertical;}
 .btn.mini{padding:5px 11px;font-size:12.5px;}
 .btn.perigo{background:transparent;color:var(--erro);border:1px solid #E4CFCB;}
 
+.pessoa{
+  border:1px solid var(--linha);border-radius:var(--raio);
+  padding:13px;margin-bottom:10px;background:var(--papel);
+}
+.pessoa-cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.pessoa-cab strong{font-family:'Archivo',sans-serif;font-size:13.5px;}
+
 /* ---------- fila de escolha (signature) ---------- */
 .fila{
   background:var(--superficie);border:1px solid var(--linha);
@@ -854,36 +861,78 @@ async function abrirEditor(ed, q){
   ed.querySelector(".salvar").addEventListener("click", () => salvarQuarto(ed, q));
 }
 
+// Mesmos campos, rótulos e validação do rooming do CIO (rooming.html
+// · desenharPessoas) — só muda o "Ocupante N" no lugar de "Familiar N".
 function campoOcupante(o, i){
   const d = document.createElement("div");
-  d.className = "linha ocupante";
+  d.className = "pessoa ocupante";
   d.innerHTML = `
-    <div>
-      <label>Ocupante ${i+1} — nome</label>
-      <input type="text" class="f-nome" value="${esc(o.nome)}" placeholder="Nome completo">
+    <div class="pessoa-cab"><strong>Ocupante ${i+1}</strong></div>
+    <div class="linha">
+      <div><label>Nome completo</label>
+        <input type="text" class="f-nome" value="${esc(o.nome)}" placeholder="Nome completo"></div>
+      <div style="max-width:150px;"><label>Tipo</label>
+        <select class="f-tipo">
+          <option value="adulto"  ${o.tipo!=="crianca" ? "selected":""}>Adulto</option>
+          <option value="crianca" ${o.tipo==="crianca" ? "selected":""}>Criança</option>
+        </select></div>
     </div>
-    <div>
-      <label>CPF</label>
-      <input type="text" class="f-cpf" value="${esc(o.cpf)}" placeholder="000.000.000-00">
+    <div class="linha">
+      <div><label>CPF</label>
+        <input type="text" class="f-cpf" value="${esc(o.cpf)}" placeholder="000.000.000-00"></div>
+      <div><label>Data de nascimento</label>
+        <input type="date" class="f-nasc" value="${esc(o.data_nascimento || "")}"
+               title="Define a faixa de cobrança e o crachá"></div>
+      <div style="max-width:150px;">
+        <label>Transfer</label>
+        <label class="check" style="padding-top:8px;">
+          <input type="checkbox" class="f-ocup-transfer" ${o.usa_transfer ? "checked" : ""}> Usa
+        </label>
+      </div>
+      <div style="max-width:170px;">
+        <label>Sai de</label>
+        <select class="f-ocup-origem" ${o.usa_transfer ? "" : "disabled"}>
+          <option value="">—</option>
+          <option value="GYN" ${o.transfer_origem === "GYN" ? "selected" : ""}>Goiânia</option>
+          <option value="BSB" ${o.transfer_origem === "BSB" ? "selected" : ""}>Brasília</option>
+        </select>
+      </div>
     </div>
-    <div style="max-width:150px;">
-      <label>Transfer</label>
-      <label class="check" style="padding-top:8px;">
-        <input type="checkbox" class="f-ocup-transfer" ${o.usa_transfer ? "checked" : ""}> Usa
+    <div class="linha">
+      <label class="check">
+        <input type="checkbox" class="f-mobilidade" ${o.dificuldade_mobilidade ? "checked":""}>
+        Dificuldade de mobilidade
       </label>
+      <label class="check">
+        <input type="checkbox" class="f-alergia" ${o.tem_alergia ? "checked":""}> Tem alergia
+      </label>
+      ${o.tipo === "crianca" ? `<label class="check">
+        <input type="checkbox" class="f-berco" ${o.precisa_berco ? "checked":""}> Precisa de berço
+      </label>` : ""}
     </div>
-    <div style="max-width:160px;">
-      <label>Sai de</label>
-      <select class="f-ocup-origem" ${o.usa_transfer ? "" : "disabled"}>
-        <option value="">—</option>
-        <option value="GYN" ${o.transfer_origem === "GYN" ? "selected" : ""}>Goiânia</option>
-        <option value="BSB" ${o.transfer_origem === "BSB" ? "selected" : ""}>Brasília</option>
-      </select>
+    <div class="linha">
+      <div><label>Detalhe da alergia</label>
+        <input type="text" class="f-alergia-detalhe" value="${esc(o.alergia_detalhe || "")}"
+               ${o.tem_alergia ? "" : "disabled"} placeholder="Ex.: camarão, amendoim…"></div>
+      <div><label>Observações</label>
+        <input type="text" class="f-obs" value="${esc(o.observacoes || "")}"
+               placeholder="Algo que a equipe deva saber"></div>
     </div>`;
+
+  d.querySelector(".f-tipo").addEventListener("change", e => {
+    o.tipo = e.target.value;
+    // recria so este cartao pra mostrar/esconder "precisa de berco"
+    d.replaceWith(campoOcupante(o, i));
+  });
   d.querySelector(".f-ocup-transfer").addEventListener("change", e => {
     const sel = d.querySelector(".f-ocup-origem");
     sel.disabled = !e.target.checked;
     if(!e.target.checked) sel.value = "";
+  });
+  d.querySelector(".f-alergia").addEventListener("change", e => {
+    const det = d.querySelector(".f-alergia-detalhe");
+    det.disabled = !e.target.checked;
+    if(!e.target.checked) det.value = "";
   });
   return d;
 }
@@ -897,13 +946,25 @@ async function salvarQuarto(ed, q){
   const lista = $$(".ocupante", ed).map(r => ({
     nome: r.querySelector(".f-nome").value.trim(),
     cpf:  r.querySelector(".f-cpf").value.trim(),
-    tipo: "adulto",
+    tipo: r.querySelector(".f-tipo").value,
+    data_nascimento: r.querySelector(".f-nasc").value || null,
     usa_transfer: r.querySelector(".f-ocup-transfer").checked,
-    transfer_origem: r.querySelector(".f-ocup-origem").value || null
+    transfer_origem: r.querySelector(".f-ocup-origem").value || null,
+    dificuldade_mobilidade: r.querySelector(".f-mobilidade").checked,
+    tem_alergia: r.querySelector(".f-alergia").checked,
+    alergia_detalhe: r.querySelector(".f-alergia-detalhe").value.trim() || null,
+    precisa_berco: r.querySelector(".f-berco")?.checked || false,
+    observacoes: r.querySelector(".f-obs").value.trim() || null
   })).filter(o => o.nome !== "");
 
   if(lista.length === 0){
     aviso(alvoAviso, "Informe pelo menos um ocupante para salvar o quarto.");
+    return;
+  }
+
+  const semNascCrianca = lista.find(o => o.tipo === "crianca" && !o.data_nascimento);
+  if(semNascCrianca){
+    aviso(alvoAviso, `Informe a data de nascimento de ${semNascCrianca.nome} — define a faixa de cobrança e o crachá.`);
     return;
   }
 
