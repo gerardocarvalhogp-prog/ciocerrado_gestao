@@ -365,10 +365,23 @@ def criar_evento(page, jantar, producao, debug):
     # escolhido por padrao (a conta ja tem historico); nao da pra
     # digitar CEP direto nele — so' escolhendo "Em um novo endereço"
     # e' que aparece o campo de texto livre. O CEP nunca e' preenchido
-    # em campo proprio: vai
-    # junto do texto do endereco, que e' provavelmente um autocomplete
-    # do Google (por isso o clique na primeira sugestao depois).
-    page.get_by_role("combobox", name="Local").select_option(label="Em um novo endereço")
+    # em campo proprio: vai junto do texto do endereco, que e'
+    # provavelmente um autocomplete do Google (por isso o clique na
+    # primeira sugestao depois).
+    #
+    # E' Select2 (achado inspecionando: <span class="select2-selection__arrow">) —
+    # esconde o <select> original e desenha uma caixa customizada por
+    # cima, sem role=combobox de verdade. select_option() nao serve;
+    # e' clique na caixa (achada pela proximidade do rotulo "Local",
+    # via XPath "following" — nao depende de id/name do select
+    # escondido) + clique na opcao na lista que abre.
+    # .first: "Nome do Local" (que aparece logo depois) tambem contem
+    # a palavra "Local" e bateria no has_text — o rotulo "Local"
+    # sozinho e' sempre o primeiro dos dois no documento
+    page.locator("label", has_text="Local").first.locator(
+        "xpath=following::span[contains(@class,'select2-selection')][1]"
+    ).click()
+    page.get_by_text("Em um novo endereço", exact=True).click()
 
     cep_fmt = f"{cep[:5]}-{cep[5:]}" if len(cep) == 8 else cep
     endereco_texto = f"{jantar['local']}, {cep_fmt}" if jantar.get("local") else cep_fmt
