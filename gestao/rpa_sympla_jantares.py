@@ -356,11 +356,16 @@ def criar_evento(page, jantar, producao, debug):
     if jantar.get("mensagem"):
         page.locator(".note-editable").first.fill(jantar["mensagem"])
 
-    # "4. Onde o seu evento vai acontecer" — o dropdown "Local" vem com
-    # um endereco salvo de evento anterior escolhido por padrao (a
-    # conta ja tem historico); nao da pra digitar CEP direto nele —
-    # so' escolhendo "Em um novo endereço" e' que aparece o campo de
-    # texto livre. O CEP nunca e' preenchido em campo proprio: vai
+    # "4. Onde o seu evento vai acontecer" — a pagina parece montar
+    # secoes conforme rola (formulario longo), entao o campo "Local"
+    # pode nao existir ainda no DOM se o robo nao rolar ate la antes.
+    page.get_by_text("Onde o seu evento vai acontecer").scroll_into_view_if_needed(timeout=5000)
+
+    # o dropdown "Local" vem com um endereco salvo de evento anterior
+    # escolhido por padrao (a conta ja tem historico); nao da pra
+    # digitar CEP direto nele — so' escolhendo "Em um novo endereço"
+    # e' que aparece o campo de texto livre. O CEP nunca e' preenchido
+    # em campo proprio: vai
     # junto do texto do endereco, que e' provavelmente um autocomplete
     # do Google (por isso o clique na primeira sugestao depois).
     page.get_by_role("combobox", name="Local").select_option(label="Em um novo endereço")
