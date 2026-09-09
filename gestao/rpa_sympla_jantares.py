@@ -17,48 +17,55 @@
 # painel, feita na mao — entao quem faz esse papel aqui e' um robo que
 # clica no painel como um humano clicaria.
 #
-# ESTE SCRIPT E' UM PONTO DE PARTIDA, NAO ESTA CALIBRADO
+# CALIBRADO A PARTIR DE UMA GRAVACAO REAL (playwright codegen)
 #
-# Escrito sem acesso ao painel de produtor do Sympla (o ambiente onde
-# isto foi escrito nao alcanca sympla.com.br) — os seletores de tela
-# abaixo (marcados "# TODO CALIBRAR") sao placeholders plausiveis, nao
-# testados contra a pagina real. Antes de rodar isto de verdade:
+# Os seletores abaixo vieram de uma gravacao de verdade, criando um
+# evento e mandando convite no painel de producao do Sympla — nao sao
+# mais placeholder. Ainda assim, teste com --debug antes de confiar em
+# --producao: o Sympla pode mudar a tela a qualquer momento, sem
+# aviso, e um seletor que sumiu quebra o robo sem dar meio-termo.
 #
-#   1. Rode `playwright codegen https://produtores.sympla.com.br` na
-#      sua maquina, faca o login e o fluxo de criar um evento na mao
-#      uma vez — o codegen grava um script Python com os seletores
-#      reais de cada clique.
-#   2. Troque os seletores marcados TODO abaixo pelos que o codegen
-#      gravou.
-#   3. Rode com --debug (abre o navegador visivel, sem --producao) pra
-#      ver o robo passar pelo formulario antes de confiar nele.
+# LOGIN EM DUAS ETAPAS, SEPARADO DO RESTO
+#
+# O login do Sympla pede senha + codigo por e-mail + codigo por
+# WhatsApp (2FA em duas camadas) — nao da pra automatizar sozinho, o
+# robo nao le seu e-mail nem seu WhatsApp. Por isso o login e' um passo
+# A PARTE (--login), interativo, rodado por voce UMA VEZ (ou toda vez
+# que a sessao expirar): abre o navegador visivel, pede os codigos no
+# terminal, e SALVA a sessao autenticada num arquivo
+# (sympla_sessao.json). --criar e --convites reaproveitam esse arquivo
+# depois — sem repetir OTP a cada execucao, do jeito que a Sympla
+# reconhece o dispositivo quando "Mantenha-me conectado" fica marcado.
 #
 # SEGURANCA POR PADRAO
 #
 #   - Sem --producao, o robo entra, preenche o formulario, TIRA UM
-#     PRINT de cada etapa e PARA antes de clicar em publicar/salvar de
-#     verdade — mesmo modo seguro do integracao.py (--producao explicito
-#     pra valer).
-#   - Mesmo em --producao, o evento e' salvo como RASCUNHO quando o
-#     Sympla permitir (# TODO CALIBRAR: confirme se o passo de
-#     "publicar" e' separado do de "salvar" no fluxo de voces) — quem
-#     decide publicar de verdade e manda convite continua sendo voce,
-#     olhando o rascunho antes. Ninguem confirma inscricao nem recebe
-#     e-mail so' porque este script rodou.
+#     PRINT de cada etapa e PARA antes de publicar/enviar de verdade —
+#     mesmo modo seguro do integracao.py (--producao explicito pra
+#     valer).
+#   - O robo publica o evento (clica "Publicar Evento" + "Entendi") mas
+#     PARA AI — a gravacao mostrou que todo evento novo entra "Em
+#     analise" no Sympla antes de ficar visivel de verdade, e so' sai
+#     dali com um segundo clique manual em "Meus eventos". Isso vira o
+#     checkpoint humano antes do evento ficar publico: o organizador
+#     confere e publica de verdade quando quiser, o robo nao decide
+#     isso sozinho.
 #   - As credenciais de login (SYMPLA_EMAIL/SYMPLA_SENHA) sao mais
 #     sensiveis que o SYMPLA_TOKEN (a de login abre o painel inteiro,
 #     nao so' leitura) — nunca commitar, so' no .env local ou no
-#     Agendador de Tarefas, igual as outras chaves.
+#     Agendador de Tarefas, igual as outras chaves. sympla_sessao.json
+#     tambem e' sensivel (uma sessao logada de verdade) — nao commitar.
 #
 # USO
 #
 #   pip install playwright
 #   playwright install chromium
 #
-#   python rpa_sympla_jantares.py --criar             # modo seguro, so mostra
-#   python rpa_sympla_jantares.py --criar --producao  # cria/salva rascunho de verdade
+#   python rpa_sympla_jantares.py --login              # uma vez, interativo (pede os OTP)
+#   python rpa_sympla_jantares.py --criar               # modo seguro, so mostra
+#   python rpa_sympla_jantares.py --criar --producao    # cria/publica de verdade
 #   python rpa_sympla_jantares.py --convites --producao
-#   python rpa_sympla_jantares.py --debug --criar     # navegador visivel, p/ calibrar
+#   python rpa_sympla_jantares.py --debug --criar       # navegador visivel, p/ recalibrar
 #
 # VARIAVEIS DE AMBIENTE (alem de SUPABASE_URL/SUPABASE_SERVICE_KEY, ja
 # usadas por integracao.py — reaproveitadas daqui, mesmo .env e mesmo
@@ -68,13 +75,10 @@
 #   SYMPLA_SENHA
 #
 # A migration 20260909210000 corrigiu is_admin()/is_staff() pra
-# reconhecer current_user = 'service_role' (antes so' reconheciam
-# e-mail cadastrado em `admins`, e o JWT da service_role nao carrega
-# e-mail nenhum — is_admin() dava falso pra ela). Por isso este script
-# usa so' a service_role pra tudo, igual o integracao.py: RPC
-# (jantar_listar_para_sympla, jantar_convidados_listar,
-# jantar_marcar_sympla) e download da logo no storage, sem precisar de
-# uma segunda credencial de staff.
+# reconhecer a service_role tambem (nao so' e-mail cadastrado em
+# admins) — por isso este script usa so' a service_role pra tudo,
+# igual o integracao.py, sem precisar de uma segunda credencial de
+# staff.
 # =====================================================================
 
 import os
@@ -101,6 +105,7 @@ SYMPLA_EMAIL = os.environ.get("SYMPLA_EMAIL", "")
 SYMPLA_SENHA = os.environ.get("SYMPLA_SENHA", "")
 
 STORAGE_BUCKET = "jantar-uploads"
+SESSAO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sympla_sessao.json")
 
 
 # ---------------------------------------------------------------------
@@ -122,115 +127,218 @@ def baixar_logo(storage_path):
 
 
 # ---------------------------------------------------------------------
-# login no painel de produtor — sessao reaproveitada pelas duas etapas
+# login interativo — roda uma vez (ou quando a sessao expirar), pede os
+# codigos de OTP no terminal, salva a sessao autenticada em disco.
+#
+# A gravacao mostrou um passo de CNPJ/telefone que so' apareceu no
+# PRIMEIRO login desta conta (onboarding) — por isso os dois blocos
+# "se aparecer" abaixo, com timeout curto, em vez de esperar por algo
+# que so' existe na primeira vez.
 # ---------------------------------------------------------------------
-def logar(page):
+def login_interativo():
+    from playwright.sync_api import sync_playwright
+
     if not SYMPLA_EMAIL or not SYMPLA_SENHA:
         raise SystemExit("Faltam SYMPLA_EMAIL / SYMPLA_SENHA no ambiente.")
 
-    page.goto("https://produtores.sympla.com.br/login")  # TODO CALIBRAR: URL de login real
-    page.fill("#email", SYMPLA_EMAIL)                     # TODO CALIBRAR: seletor do campo e-mail
-    page.fill("#senha", SYMPLA_SENHA)                      # TODO CALIBRAR: seletor do campo senha
-    page.click("button[type=submit]")                      # TODO CALIBRAR: botao de entrar
-    page.wait_for_load_state("networkidle")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        page = context.new_page()
+
+        page.goto("https://produtores.sympla.com.br/")
+
+        # popup de marketing que apareceu na gravacao — melhor esforco,
+        # nao trava o login se nao aparecer
+        try:
+            page.locator("#hs-interactives-modal-overlay").click(timeout=3000)
+        except Exception:
+            pass
+
+        page.get_by_role("banner").get_by_role("link", name="Crie seu evento agora").click()
+        page.get_by_test_id("signin-email-button").get_by_text("Continuar com e-mail e senha").click()
+        page.get_by_role("textbox", name="E-mail*").fill(SYMPLA_EMAIL)
+        page.get_by_role("textbox", name="Senha*").fill(SYMPLA_SENHA)
+        page.get_by_test_id("signin-keep-me-connected-checkbox").check()
+        page.get_by_role("button", name="Entrar").click()
+
+        log.info("Verifique seu e-mail: a Sympla mandou um código de confirmação.")
+        codigo = input("Código do e-mail (6 dígitos): ").strip()
+        for i, digito in enumerate(codigo[:6]):
+            page.locator(f"#otp-{i}").fill(digito)
+        page.get_by_role("button", name="Continuar").click()
+
+        # onboarding — so' na primeira vez desta conta; timeout curto,
+        # pula se nao aparecer
+        try:
+            page.get_by_test_id("select-trigger-button").click(timeout=5000)
+            page.get_by_role("option", name="CNPJ").click()
+            page.get_by_role("textbox", name="Qual é o número do documento?").fill("")  # TODO CALIBRAR: CNPJ real, se pedir de novo
+            page.get_by_role("button", name="Continuar").click()
+        except Exception:
+            pass
+
+        try:
+            page.get_by_test_id("whatsapp-button").click(timeout=5000)
+            log.info("Verifique seu WhatsApp: a Sympla mandou um segundo código.")
+            codigo2 = input("Código do WhatsApp (6 dígitos): ").strip()
+            for i, digito in enumerate(codigo2[:6]):
+                page.locator(f"#otp-{i}").fill(digito)
+            page.get_by_role("button", name="Continuar").click()
+        except Exception:
+            pass
+
+        page.get_by_role("link", name="ÁREA DO PRODUTOR").click()
+        page.wait_for_load_state("networkidle")
+
+        context.storage_state(path=SESSAO_PATH)
+        log.info("Sessão salva em %s — --criar e --convites reaproveitam ela.", SESSAO_PATH)
+        browser.close()
+
+
+def abrir_pagina_logada(p, debug):
+    if not os.path.exists(SESSAO_PATH):
+        raise SystemExit(
+            f"Nenhuma sessão salva ({SESSAO_PATH}). Rode primeiro: "
+            f"python rpa_sympla_jantares.py --login")
+    browser = p.chromium.launch(headless=not debug)
+    context = browser.new_context(storage_state=SESSAO_PATH)
+    return browser, context.new_page()
 
 
 # ---------------------------------------------------------------------
-# cria (ou abre o rascunho de) um evento pro jantar
+# cria o evento pro jantar — sequência calibrada numa gravação real:
+# modal rápido (datas + CEP + preço) → formulário completo (nome,
+# banner, datas/hora de novo, descrição, endereço, ingresso) → publicar.
 # ---------------------------------------------------------------------
 def criar_evento(page, jantar, producao, debug):
     titulo = f"Jantar CIO Cerrado — {jantar['patrocinador_nome']}"
     log.info("Criando evento: %s", titulo)
 
-    page.goto("https://produtores.sympla.com.br/evento/criar")  # TODO CALIBRAR
-    page.fill("#nome-evento", titulo)                             # TODO CALIBRAR
-    if jantar.get("data"):
-        page.fill("#data-evento", jantar["data"])                 # TODO CALIBRAR
-    if jantar.get("horario"):
-        page.fill("#horario-evento", jantar["horario"])           # TODO CALIBRAR
-    if jantar.get("local"):
-        page.fill("#local-evento", jantar["local"])                # TODO CALIBRAR
-    if jantar.get("mensagem"):
-        page.fill("#descricao-evento", jantar["mensagem"])         # TODO CALIBRAR
+    data_str = jantar["data"]  # AAAA-MM-DD, vindo do banco
+    ano, mes, dia = data_str.split("-")
+    data_br = f"{dia}/{mes}/{ano}"
+    hora = (jantar.get("horario") or "20:00:00")[:5]  # "HH:MM"
+
+    page.goto("https://organizador.sympla.com.br/meus-eventos")
+    page.get_by_role("button", name="Criar evento presencial").click()
+    page.locator("#date-from-create-event-time").fill(data_br)
+    page.locator("#date-until-create-event-time").fill(data_br)
+    page.get_by_placeholder("_____-___").fill("")  # TODO CALIBRAR: CEP padrão do local do jantar
+    page.get_by_placeholder("R$").fill("R$ 0,00")
+    page.get_by_role("button", name="Continuar").click()
+
+    page.get_by_role("textbox", name="Nome do evento").fill(titulo)
 
     logo_tmp = None
     if jantar.get("logo_storage_path"):
         logo_tmp = baixar_logo(jantar["logo_storage_path"])
-        page.set_input_files("#banner-evento", logo_tmp)            # TODO CALIBRAR
+        page.locator("#upload-event-banner").get_by_text("Clique ou arraste a imagem").click()
+        # a gravação mostrou o input real como o 2º <input type="file"> da
+        # página (o 1º parece ser de outro widget, invisível) —
+        # TODO CALIBRAR se a página mudar de estrutura
+        page.locator('input[type="file"]').nth(1).set_input_files(logo_tmp)
+
+    # datas/hora de novo — o modal rápido não pede horário, só data
+    page.locator("#date-from-create-event-time").click()
+    page.get_by_role("cell", name=str(int(dia))).click()
+    page.locator("#time-from-create-event-time").click()
+    page.get_by_text(f"{hora.split(':')[0]}:").first.click()
+    page.locator("#date-until-create-event-time").click()
+    page.get_by_role("cell", name=str(int(dia))).click()
+    page.locator("#time-until-create-event-time").click()
+    page.get_by_text(f"{hora.split(':')[0]}:").nth(4).click()  # TODO CALIBRAR: índice frágil, depende de quantos horários aparecem na lista
+
+    if jantar.get("mensagem"):
+        page.locator(".note-editable").first.fill(jantar["mensagem"])
+
+    if jantar.get("local"):
+        page.get_by_role("combobox", name="Endereço", exact=True).fill(jantar["local"])
+        # TODO CALIBRAR: confirme se precisa escolher uma opção da lista
+        # de autocomplete depois de preencher, ou se o texto livre basta
+
+    page.get_by_text("Ingresso gratuito").click()
+    page.get_by_role("textbox", name="Ex. 100").fill(str(jantar.get("capacidade") or 8))
+    page.get_by_role("textbox", name="Ingresso único, Meia-Entrada").fill("Convidado")
+    page.get_by_role("button", name="Criar Ingresso").click()
 
     if debug:
         page.screenshot(path=f"/tmp/rpa_sympla_{jantar['id']}_preenchido.png")
         log.info("Print salvo em /tmp/rpa_sympla_%s_preenchido.png — confira antes de prosseguir.",
                   jantar["id"])
 
-    if not producao:
-        log.warning("MODO SEGURO: formulario preenchido, nada salvo. Use --producao para valer.")
-        if logo_tmp:
-            os.unlink(logo_tmp)
-        return None
-
-    # TODO CALIBRAR: confirme se existe um botao "Salvar rascunho"
-    # separado de "Publicar" — clique no de RASCUNHO. Publicar de
-    # verdade e' decisao do organizador, olhando a pagina antes.
-    page.click("button#salvar-rascunho")                          # TODO CALIBRAR
-
-    page.wait_for_load_state("networkidle")
-    url_evento = page.url                                          # TODO CALIBRAR: confirme que a URL final e' a do evento
-
     if logo_tmp:
         os.unlink(logo_tmp)
 
-    return url_evento
+    if not producao:
+        log.warning("MODO SEGURO: formulário preenchido, nada publicado. Use --producao para valer.")
+        return None
+
+    page.get_by_role("checkbox", name="Ao publicar este evento,").check()
+    page.get_by_role("button", name="Publicar Evento").click()
+    page.get_by_role("button", name="Entendi").click()
+
+    # O evento entra "Em análise" no Sympla — publicar de verdade (o
+    # segundo clique, em "Meus eventos") fica por conta do organizador,
+    # de propósito: é o checkpoint humano antes do evento ir ao ar.
+    page.wait_for_load_state("networkidle")
+    gerenciar = page.locator("a").filter(has_text="Gerenciar").nth(1)  # TODO CALIBRAR
+    gerenciar.click()
+    page.wait_for_load_state("networkidle")
+    return page.url
 
 
 # ---------------------------------------------------------------------
-# importa a lista de confirmados como convidados/cortesia do evento
+# importa a lista de confirmados como convite por e-mail do evento —
+# a tela usa UM textarea com todos os e-mails colados, não um convite
+# por vez (mais simples do que eu tinha imaginado antes de ver a
+# gravação real).
 # ---------------------------------------------------------------------
-def mandar_convites(page, supa, jantar, producao, debug):
-    convidados = supa.rpc("jantar_convidados_listar", {"p_jantar_id": jantar["id"]}) or []
-    confirmados = [c for c in convidados if c.get("status") in ("confirmado", "compareceu")]
-
+def mandar_convites(page, jantar, confirmados, producao, debug):
     if not confirmados:
         log.info("  %s: nenhum confirmado ainda, pulando.", jantar["patrocinador_nome"])
         return False
 
     log.info("  %s: %d confirmado(s) para convidar.", jantar["patrocinador_nome"], len(confirmados))
 
-    sympla_id = jantar["sympla_url"].rsplit("__", 1)[-1] if "__" in (jantar.get("sympla_url") or "") else None
-    if not sympla_id:
-        log.warning("  sympla_url sem __<id> no final — não dá pra abrir a tela de convidados direto.")
-        return False
+    # TODO CALIBRAR: a gravação chegou aqui navegando pela lista de
+    # "Meus eventos" e clicando no evento — não há um padrão de URL
+    # direta confirmado. Ajuste pra abrir o evento certo (por
+    # sympla_url ou pelo título) antes de clicar no link abaixo.
+    page.get_by_role("link", name="Convite por E-mail").click()
 
-    page.goto(f"https://produtores.sympla.com.br/evento/{sympla_id}/convidados")  # TODO CALIBRAR
+    if jantar.get("mensagem"):
+        page.locator(".note-editable").fill(jantar["mensagem"])
 
-    # TODO CALIBRAR: confirme se e' upload de CSV/planilha ou
-    # preenchimento linha a linha — a maioria das plataformas usa CSV
-    # pra lote. Se for CSV, montar o arquivo aqui com
-    # nome/email/telefone de `confirmados` e usar page.set_input_files.
-    for c in confirmados:
-        page.fill("#convite-nome", c.get("nome", ""))               # TODO CALIBRAR
-        page.fill("#convite-email", c.get("email", ""))              # TODO CALIBRAR
-        if debug:
-            page.screenshot(path=f"/tmp/rpa_sympla_{jantar['id']}_convite_preview.png")
-            break  # so' um print de exemplo em modo debug, nao itera todo mundo
+    page.get_by_text("Lista específica").click()
+    emails = "\n".join(c["email"] for c in confirmados if c.get("email"))
+    page.get_by_role("textbox", name="Cole ou digite os e-mails dos").fill(emails)
+    page.get_by_role("button", name="Adicionar").click()
+
+    if debug:
+        page.screenshot(path=f"/tmp/rpa_sympla_{jantar['id']}_convite_preview.png")
 
     if not producao:
         log.warning("MODO SEGURO: convites não enviados. Use --producao para valer.")
         return False
 
-    # TODO CALIBRAR: botao real de confirmar o lote de convites
-    page.click("button#confirmar-convites")                          # TODO CALIBRAR
+    page.locator("#btn-send").click()
     page.wait_for_load_state("networkidle")
     return True
 
 
 def main():
     ap = argparse.ArgumentParser(description="RPA: cria evento de jantar no Sympla e manda convites")
-    ap.add_argument("--criar", action="store_true", help="cria evento (rascunho) para jantares pendentes")
+    ap.add_argument("--login", action="store_true", help="login interativo (pede os OTP), salva a sessão")
+    ap.add_argument("--criar", action="store_true", help="cria evento para jantares pendentes")
     ap.add_argument("--convites", action="store_true", help="importa convidados confirmados para eventos já criados")
-    ap.add_argument("--producao", action="store_true", help="salva/envia de verdade (padrão é modo seguro)")
-    ap.add_argument("--debug", action="store_true", help="navegador visível + prints em /tmp, para calibrar seletores")
+    ap.add_argument("--producao", action="store_true", help="publica/envia de verdade (padrão é modo seguro)")
+    ap.add_argument("--debug", action="store_true", help="navegador visível + prints em /tmp, para recalibrar")
     args = ap.parse_args()
+
+    if args.login:
+        login_interativo()
+        return 0
 
     if not (args.criar or args.convites):
         ap.print_help()
@@ -242,7 +350,7 @@ def main():
         raise SystemExit("Faltam dependências: pip install playwright && playwright install chromium")
 
     if not args.producao:
-        log.warning("MODO SEGURO: nada será salvo/enviado no Sympla. Use --producao para valer.")
+        log.warning("MODO SEGURO: nada será publicado/enviado no Sympla. Use --producao para valer.")
 
     supa = Supa(SUPABASE_URL, SUPABASE_SERVICE)
     fila = supa.rpc("jantar_listar_para_sympla", {}) or []
@@ -252,16 +360,14 @@ def main():
         log.info("--- Criar evento: %d jantar(es) pendente(s) ---", len(pendentes))
         if pendentes:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=not args.debug)
-                page = browser.new_page()
-                logar(page)
+                browser, page = abrir_pagina_logada(p, args.debug)
                 for jantar in pendentes:
                     try:
                         url = criar_evento(page, jantar, args.producao, args.debug)
                         if url:
                             supa.rpc("jantar_marcar_sympla",
                                      {"p_id": jantar["id"], "p_sympla_url": url, "p_status": "criado"})
-                            log.info("  %s: criado em %s", jantar["patrocinador_nome"], url)
+                            log.info("  %s: enviado para análise em %s", jantar["patrocinador_nome"], url)
                     except Exception as e:
                         log.error("  %s: falhou — %s", jantar["patrocinador_nome"], e)
                 browser.close()
@@ -271,12 +377,12 @@ def main():
         log.info("--- Convites: %d evento(s) já criado(s) ---", len(prontos))
         if prontos:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=not args.debug)
-                page = browser.new_page()
-                logar(page)
+                browser, page = abrir_pagina_logada(p, args.debug)
                 for jantar in prontos:
                     try:
-                        enviado = mandar_convites(page, supa, jantar, args.producao, args.debug)
+                        convidados = supa.rpc("jantar_convidados_listar", {"p_jantar_id": jantar["id"]}) or []
+                        confirmados = [c for c in convidados if c.get("status") in ("confirmado", "compareceu")]
+                        enviado = mandar_convites(page, jantar, confirmados, args.producao, args.debug)
                         if enviado:
                             supa.rpc("jantar_marcar_sympla",
                                      {"p_id": jantar["id"], "p_sympla_url": None, "p_status": "convites_enviados"})

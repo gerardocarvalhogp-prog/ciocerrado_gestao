@@ -234,28 +234,41 @@ de chamar API, clicando no painel de produtor como um humano clicaria.
 Onde a logo e a mensagem do jantar ficam: `jantares.html`, dentro de cada jantar
 ("Dados do jantar" e "Logo para a página do evento") — preenche aqui, o robô lê dali.
 
-**Este script não está calibrado** — foi escrito sem acesso ao painel de produtor do
-Sympla (o ambiente onde foi escrito não alcança sympla.com.br), então os seletores de
-tela estão marcados `# TODO CALIBRAR` com valores plausíveis, não testados contra a
-página real. Antes de rodar em `--producao`:
+**Calibrado a partir de uma gravação real** (`playwright codegen`, criando um evento e
+mandando convite de verdade no painel) — os seletores não são mais placeholder. Ainda
+assim, teste com `--debug` antes de confiar em `--producao`: o Sympla pode mudar a tela
+a qualquer momento, sem aviso, e um seletor que sumiu quebra o robô sem meio-termo. Uns
+poucos pontos ficaram marcados `# TODO CALIBRAR` no código — passos que a gravação não
+deixou claros o suficiente (CEP padrão do local, se a busca de endereço exige escolher
+uma opção da lista, o link direto pra tela de convite de um evento já criado).
 
 ```bash
 pip install playwright
 playwright install chromium
-playwright codegen https://produtores.sympla.com.br   # grava os seletores reais
 ```
 
-Faça o login e o fluxo de criar um evento na mão uma vez pelo `codegen`, e troque cada
-`# TODO CALIBRAR` do script pelo seletor que ele gravou. Use `--debug` (navegador
-visível + prints em `/tmp`) para conferir o robô passando pelo formulário antes de
-confiar nele.
+O login do Sympla pede senha **e** dois códigos de confirmação (e-mail e WhatsApp) — não
+dá pra automatizar sozinho, então é um passo à parte, rodado uma vez (ou quando a sessão
+expirar):
 
 ```bash
-python rpa_sympla_jantares.py --criar               # modo seguro, só mostra
-python rpa_sympla_jantares.py --criar --producao    # cria/salva rascunho de verdade
+python rpa_sympla_jantares.py --login               # interativo, pede os dois códigos
+python rpa_sympla_jantares.py --criar                # modo seguro, só mostra
+python rpa_sympla_jantares.py --criar --producao     # cria e publica de verdade
 python rpa_sympla_jantares.py --convites --producao
-python rpa_sympla_jantares.py --debug --criar       # navegador visível, p/ calibrar
+python rpa_sympla_jantares.py --debug --criar        # navegador visível, p/ recalibrar
 ```
+
+`--login` salva a sessão autenticada em `sympla_sessao.json`, ao lado do script —
+`--criar`/`--convites` reaproveitam esse arquivo depois, sem repetir OTP a cada execução
+(mesmo princípio do "Mantenha-me conectado" marcado no login). **Esse arquivo é tão
+sensível quanto uma senha** (é uma sessão logada de verdade) — já está no `.gitignore`,
+nunca commitar.
+
+O robô publica o evento (clica "Publicar Evento" + "Entendi") mas para aí: a gravação
+mostrou que todo evento novo entra "Em análise" no Sympla antes de ficar visível de
+verdade, e só sai dali com um segundo clique manual em "Meus eventos" — isso vira o
+checkpoint humano antes do evento ir ao ar, sem precisar de nenhuma lógica extra no robô.
 
 Variáveis de ambiente extras (mesmo `.env` do `integracao.py`):
 
@@ -265,7 +278,9 @@ SYMPLA_SENHA=...
 ```
 
 Mais sensível que o `SYMPLA_TOKEN` (abre o painel inteiro, não só leitura) — nunca vai
-pro `.html` nem é commitada, só no `.env` local ou no Agendador de Tarefas.
+pro `.html` nem é commitada, só no `.env` local ou no Agendador de Tarefas. Se essa senha
+já apareceu em algum lugar fora do `.env` (chat, print, etc.), troque ela no painel do
+Sympla — mais barato trocar do que confiar que ninguém mais viu.
 
 **Achado ao validar isto, e já corrigido:** `is_admin()`/`is_staff()` só reconheciam
 e-mail cadastrado em `admins` — e o token `service_role`, que `integracao.py` já usa pra
