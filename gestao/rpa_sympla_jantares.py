@@ -223,6 +223,19 @@ def login_interativo():
             browser.close()
 
 
+def salvar_print_erro(page, jantar_id):
+    # mesma ideia do print automatico do --login: qualquer falha em
+    # --criar/--convites salva a tela no momento exato do erro, pra
+    # nao precisar pedir print na mao a cada tentativa
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            f"rpa_sympla_erro_{jantar_id}.png")
+    try:
+        page.screenshot(path=caminho)
+        log.error("    print da tela no momento da falha salvo em %s", caminho)
+    except Exception:
+        pass
+
+
 def abrir_pagina_logada(p, debug):
     if not os.path.exists(SESSAO_PATH):
         raise SystemExit(
@@ -444,6 +457,7 @@ def main():
                                      {"p_id": jantar["id"], "p_sympla_url": url, "p_status": "criado"})
                             log.info("  %s: enviado para análise em %s", jantar["patrocinador_nome"], url)
                     except Exception as e:
+                        salvar_print_erro(page, jantar["id"])
                         log.error("  %s: falhou — %s", jantar["patrocinador_nome"], e)
                 browser.close()
 
@@ -462,6 +476,7 @@ def main():
                             supa.rpc("jantar_marcar_sympla",
                                      {"p_id": jantar["id"], "p_sympla_url": None, "p_status": "convites_enviados"})
                     except Exception as e:
+                        salvar_print_erro(page, jantar["id"])
                         log.error("  %s: falhou — %s", jantar["patrocinador_nome"], e)
                 browser.close()
 
