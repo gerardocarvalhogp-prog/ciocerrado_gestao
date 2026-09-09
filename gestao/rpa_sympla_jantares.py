@@ -131,10 +131,24 @@ def baixar_logo(storage_path):
 # login interativo — roda uma vez (ou quando a sessao expirar), pede os
 # codigos de OTP no terminal, salva a sessao autenticada em disco.
 #
+# A home do Sympla (popup de marketing, campanha, cookie banner) muda
+# de visita pra visita — automatizar o caminho ate o formulario de
+# e-mail/senha se mostrou a parte mais fragil do fluxo inteiro (dois
+# erros diferentes, em pontos diferentes, nas duas primeiras
+# tentativas). Em vez de tentar adivinhar cada variante de popup, essa
+# parte agora e' MANUAL: o navegador fica visivel, voce mesmo clica
+# ate a tela de e-mail e senha (ou ate loga direto se o Sympla lembrar
+# do dispositivo) e aperta Enter no terminal — o script so' assume a
+# partir dali, onde a tela e' mais estavel (formulario de login de
+# verdade, nao pagina de campanha).
+#
 # A gravacao mostrou um passo de CNPJ/telefone que so' apareceu no
 # PRIMEIRO login desta conta (onboarding) — por isso os dois blocos
 # "se aparecer" abaixo, com timeout curto, em vez de esperar por algo
 # que so' existe na primeira vez.
+#
+# Qualquer erro daqui pra frente tira um print automatico — nao
+# precisa mais pedir prints na mao a cada tentativa.
 # ---------------------------------------------------------------------
 def login_interativo():
     from playwright.sync_api import sync_playwright
@@ -147,55 +161,66 @@ def login_interativo():
         context = browser.new_context()
         page = context.new_page()
 
-        page.goto("https://produtores.sympla.com.br/")
-
-        # popup de marketing que apareceu na gravacao — melhor esforco,
-        # nao trava o login se nao aparecer
         try:
-            page.locator("#hs-interactives-modal-overlay").click(timeout=3000)
-        except Exception:
-            pass
+            page.goto("https://produtores.sympla.com.br/")
 
-        page.get_by_role("banner").get_by_role("link", name="Crie seu evento agora").click()
-        page.get_by_test_id("signin-email-button").get_by_text("Continuar com e-mail e senha").click()
-        page.get_by_role("textbox", name="E-mail*").fill(SYMPLA_EMAIL)
-        page.get_by_role("textbox", name="Senha*").fill(SYMPLA_SENHA)
-        page.get_by_test_id("signin-keep-me-connected-checkbox").check()
-        page.get_by_role("button", name="Entrar").click()
+            input(
+                "\nUma janela do Chrome abriu. Navegue nela até a tela de "
+                "e-mail e senha (ex.: 'Crie seu evento agora' > 'Continuar "
+                "com e-mail e senha'). Se o Sympla já te logar direto "
+                "(lembrou do dispositivo), pule pra 'ÁREA DO PRODUTOR' e "
+                "não precisa fazer mais nada aqui — feche essa janela e "
+                "cancele este script (Ctrl+C), o login já está pronto.\n"
+                "Quando o formulário de e-mail e senha estiver na tela, "
+                "pressione Enter aqui: ")
 
-        log.info("Verifique seu e-mail: a Sympla mandou um código de confirmação.")
-        codigo = input("Código do e-mail (6 dígitos): ").strip()
-        for i, digito in enumerate(codigo[:6]):
-            page.locator(f"#otp-{i}").fill(digito)
-        page.get_by_role("button", name="Continuar").click()
+            page.get_by_role("textbox", name="E-mail*").fill(SYMPLA_EMAIL)
+            page.get_by_role("textbox", name="Senha*").fill(SYMPLA_SENHA)
+            page.get_by_test_id("signin-keep-me-connected-checkbox").check()
+            page.get_by_role("button", name="Entrar").click()
 
-        # onboarding — so' na primeira vez desta conta; timeout curto,
-        # pula se nao aparecer. CNPJ da CIO Cerrado Consultoria e
-        # Eventos (dado publico de registro, nao e' segredo).
-        try:
-            page.get_by_test_id("select-trigger-button").click(timeout=5000)
-            page.get_by_role("option", name="CNPJ").click()
-            page.get_by_role("textbox", name="Qual é o número do documento?").fill("36.631.120/0001-34")
-            page.get_by_role("button", name="Continuar").click()
-        except Exception:
-            pass
-
-        try:
-            page.get_by_test_id("whatsapp-button").click(timeout=5000)
-            log.info("Verifique seu WhatsApp: a Sympla mandou um segundo código.")
-            codigo2 = input("Código do WhatsApp (6 dígitos): ").strip()
-            for i, digito in enumerate(codigo2[:6]):
+            log.info("Verifique seu e-mail: a Sympla mandou um código de confirmação.")
+            codigo = input("Código do e-mail (6 dígitos): ").strip()
+            for i, digito in enumerate(codigo[:6]):
                 page.locator(f"#otp-{i}").fill(digito)
             page.get_by_role("button", name="Continuar").click()
+
+            # onboarding — so' na primeira vez desta conta; timeout curto,
+            # pula se nao aparecer. CNPJ da CIO Cerrado Consultoria e
+            # Eventos (dado publico de registro, nao e' segredo).
+            try:
+                page.get_by_test_id("select-trigger-button").click(timeout=5000)
+                page.get_by_role("option", name="CNPJ").click()
+                page.get_by_role("textbox", name="Qual é o número do documento?").fill("36.631.120/0001-34")
+                page.get_by_role("button", name="Continuar").click()
+            except Exception:
+                pass
+
+            try:
+                page.get_by_test_id("whatsapp-button").click(timeout=5000)
+                log.info("Verifique seu WhatsApp: a Sympla mandou um segundo código.")
+                codigo2 = input("Código do WhatsApp (6 dígitos): ").strip()
+                for i, digito in enumerate(codigo2[:6]):
+                    page.locator(f"#otp-{i}").fill(digito)
+                page.get_by_role("button", name="Continuar").click()
+            except Exception:
+                pass
+
+            page.get_by_role("link", name="ÁREA DO PRODUTOR").click()
+            page.wait_for_load_state("networkidle")
+
+            context.storage_state(path=SESSAO_PATH)
+            log.info("Sessão salva em %s — --criar e --convites reaproveitam ela.", SESSAO_PATH)
         except Exception:
-            pass
-
-        page.get_by_role("link", name="ÁREA DO PRODUTOR").click()
-        page.wait_for_load_state("networkidle")
-
-        context.storage_state(path=SESSAO_PATH)
-        log.info("Sessão salva em %s — --criar e --convites reaproveitam ela.", SESSAO_PATH)
-        browser.close()
+            print_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rpa_sympla_login_erro.png")
+            try:
+                page.screenshot(path=print_path)
+                log.error("Deu erro — print da tela no momento da falha salvo em %s", print_path)
+            except Exception:
+                pass
+            raise
+        finally:
+            browser.close()
 
 
 def abrir_pagina_logada(p, debug):

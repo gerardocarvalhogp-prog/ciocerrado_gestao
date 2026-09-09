@@ -8,6 +8,7 @@
 .env.*
 *.key
 sympla_sessao.json
+rpa_sympla_login_erro.png
 
 # Sistema
 Thumbs.db
