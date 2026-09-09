@@ -3256,19 +3256,53 @@ const ROTULO_FAT = {
 const SELO_FAT = {
   estimada:"pend", emitida:"alerta", paga:"ok", cancelada:"erro"
 };
+const ROTULO_PAG = { aberto:"Em aberto", parcial:"Parcial", pago:"Pago" };
 
 ABAS.financeiro = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
 
   try{
-    const r = await rpc("admin_financeiro_resumo", { p_evento_slug: EVENTO });
+    const [r, rc, cotasFin] = await Promise.all([
+      rpc("admin_financeiro_resumo", { p_evento_slug: EVENTO }),
+      rpc("admin_financeiro_cotas_resumo", { p_evento_slug: EVENTO }),
+      rpc("admin_listar_financeiro_cotas", { p_evento_slug: EVENTO })
+    ]);
 
     c.innerHTML = `
       <h1>Financeiro</h1>
+
+      <h2>Cota (contrato)</h2>
+      <p class="sub">Valor contratado por empresa e status de pagamento — separado dos adicionais abaixo.</p>
+      <div class="cartao">
+        <p class="meta" style="margin:0;">
+          <strong style="font-size:15px;color:var(--verde);">${moeda(rc.contratado)}</strong>
+          contratado ·
+          ${moeda(rc.pago)} pago ·
+          ${moeda(rc.em_aberto)} em aberto
+          ${Number(rc.qtd_vencidas) ? ` · <span class="selo erro">${rc.qtd_vencidas} vencida(s), ${moeda(rc.vencido)}</span>` : ""}
+        </p>
+      </div>
+      <div class="cartao"><div class="rolagem"><table>
+        <tr><th>Empresa</th><th>Cota</th><th>Valor</th><th>Status</th><th>Vencimento</th><th></th></tr>
+        ${cotasFin.length ? cotasFin.map(f => `<tr data-id="${esc(f.id)}" data-empresa="${esc(f.empresa)}"
+                              data-valor="${f.valor_contratado ?? ""}" data-status="${esc(f.status_pagamento)}"
+                              data-vencimento="${esc(f.data_vencimento||"")}" data-pagamento="${esc(f.data_pagamento||"")}"
+                              data-obs="${esc(f.observacao_pagamento||"")}">
+          <td><strong>${esc(f.empresa)}</strong></td>
+          <td class="meta">${esc(f.cota||"sem cota")}</td>
+          <td>${f.valor_contratado != null ? moeda(f.valor_contratado) : "—"}</td>
+          <td><span class="selo ${f.status_pagamento==="pago"?"ok":f.vencido?"erro":"pend"}">
+                ${f.vencido ? "Vencido" : ROTULO_PAG[f.status_pagamento]||f.status_pagamento}</span></td>
+          <td class="meta">${f.data_vencimento ? dataBR(f.data_vencimento) : "—"}</td>
+          <td><button class="btn sec mini fc-marcar">Alterar</button></td>
+        </tr>`).join("") : `<tr><td colspan="6" style="color:var(--suave)">Nenhum patrocinador ativo neste evento.</td></tr>`}
+      </table></div></div>
+      <div id="fc-detalhe"></div>
+
+      <h2 style="margin-top:26px;">Adicionais</h2>
       <p class="sub">
         Valores adicionais de familiar, criança, transfer e quarto extra.
-        A cota do patrocinador não entra aqui — ela é do contrato.
       </p>
 
       <div class="cartao">
@@ -3301,6 +3335,9 @@ ABAS.financeiro = async function(){
       <div id="fi-aviso"></div>
       <div class="cartao"><div class="rolagem"><table id="fi-tabela"></table></div></div>
       <div id="fi-detalhe"></div>`;
+
+    $$(".fc-marcar").forEach(b =>
+      b.addEventListener("click", () => abrirMarcarCota(b.closest("tr"))));
 
     let FAT = [];
 
@@ -3481,6 +3518,58 @@ function abrirMarcar(tr){
   });
 }
 
+function abrirMarcarCota(tr){
+  const box = $("#fc-detalhe");
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+  box.innerHTML = `
+    <h2 style="margin-top:16px;">Cota · ${esc(tr.dataset.empresa)}</h2>
+    <div class="cartao">
+      <div class="barra">
+        <div style="max-width:170px;"><label>Valor contratado</label>
+          <input type="text" id="fc-valor" placeholder="Ex.: 50000" value="${esc(tr.dataset.valor||"")}"></div>
+        <div style="max-width:170px;"><label>Status</label>
+          <select id="fc-status">
+            ${["aberto","parcial","pago"].map(s =>
+              `<option value="${s}" ${s===tr.dataset.status?"selected":""}>${ROTULO_PAG[s]}</option>`).join("")}
+          </select></div>
+        <div style="max-width:180px;"><label>Vencimento</label>
+          <input type="date" id="fc-venc" value="${esc(tr.dataset.vencimento||"")}"></div>
+        <div style="max-width:180px;"><label>Data do pagamento</label>
+          <input type="date" id="fc-pgto" value="${esc(tr.dataset.pagamento||"")}"></div>
+      </div>
+      <div class="barra">
+        <div><label>Observação</label><input type="text" id="fc-obs" value="${esc(tr.dataset.obs||"")}"></div>
+      </div>
+      <div id="fc-aviso"></div>
+      <button class="btn" id="fc-salvar">Salvar</button>
+      <button class="btn sec" id="fc-cancelar" style="margin-left:6px;">Fechar</button>
+    </div>`;
+
+  $("#fc-cancelar").addEventListener("click", () => box.innerHTML = "");
+
+  $("#fc-salvar").addEventListener("click", async () => {
+    const b = $("#fc-salvar");
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      await rpc("admin_definir_pagamento_patrocinador", {
+        p_id: tr.dataset.id,
+        p_valor_contratado: parseFloat($("#fc-valor").value.replace(",",".")) || null,
+        p_status_pagamento: $("#fc-status").value,
+        p_data_vencimento: $("#fc-venc").value || null,
+        p_data_pagamento: $("#fc-pgto").value || null,
+        p_observacao: $("#fc-obs").value.trim() || null
+      });
+      aviso("#aviso-global", `${tr.dataset.empresa}: cota atualizada.`, "ok");
+      box.innerHTML = "";
+      ABAS.financeiro();
+    }catch(e){
+      aviso("#fc-aviso", explicar(e));
+      b.disabled = false; b.textContent = "Salvar";
+    }
+  });
+}
+
 // =====================================================================
 // ABA: ESTRUTURA  (evento · cotas · quartos)
 // =====================================================================
@@ -3646,9 +3735,15 @@ async function blocoCotas(){
             <input type="text" id="co-limite-ind" placeholder="sem limite"></div>
           <div style="max-width:150px;"><label>Escolhe convidados</label>
             <select id="co-escolhe"><option value="1">Sim</option><option value="0">Não (sorteio)</option></select></div>
+          <div style="max-width:150px;"><label>Valor sugerido</label>
+            <input type="text" id="co-valor" placeholder="Ex.: 50000"></div>
           <div style="min-width:auto;"><button class="btn" id="co-salvar">Salvar cota</button>
             <button class="btn sec" id="co-cancelar" style="margin-left:6px;display:none;">Cancelar edição</button></div>
         </div>
+        <p class="meta" style="margin:0 0 8px;">
+          Valor sugerido é referência para o cadastro do patrocinador — o valor de fato
+          contratado por empresa fica na aba Financeiro, porque pode divergir da tabela.
+        </p>
         <p class="meta" style="margin:0 0 8px;">
           A cota pode misturar tipos — 2 duplos e 2 singles, por exemplo. Deixe zero no que não usar.
           "Escolhe convidados" em Não tira a cota da fila de escolha — as vagas dela são preenchidas
@@ -3681,14 +3776,16 @@ async function blocoCotas(){
                             data-up-logo="${c.upload_logo?1:0}" data-up-banner="${c.upload_banner?1:0}"
                             data-up-revista="${c.upload_arte_revista?1:0}" data-up-apresentacao="${c.upload_apresentacao?1:0}"
                             data-up-video="${c.upload_video?1:0}" data-up-prazo="${esc(c.prazo_upload || "")}"
-                            data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}">
+                            data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}"
+                            data-valor="${c.valor_sugerido ?? ""}">
             ${COTA_UNICA ? "" : `<td class="meta">${c.ordem_prioridade}</td>
               <td class="meta">${c.janela_horas ? c.janela_horas + "h" : "sem limite"}
                 ${c.prazo_indicacao
                    ? `<br>teto ${dataBR(c.prazo_indicacao)}` + (c.prazo_indicacao < HOJE_ISO
                        ? ` <span class="selo pend">vencido</span>` : "")
                    : ""}</td>`}
-            <td><strong>${esc(c.nome)}</strong></td>
+            <td><strong>${esc(c.nome)}</strong>
+                ${c.valor_sugerido ? `<br><span class="meta">${moeda(c.valor_sugerido)}</span>` : ""}</td>
             <td>${esc(comp(c.quartos))}<br><span class="meta">${c.total_quartos} no total</span></td>
             <td>${c.vagas_mesa_redonda || "—"}</td>
             <td>${c.tem_reuniao_exclusiva ? "Sim" : "—"}</td>
@@ -3736,12 +3833,13 @@ async function blocoCotas(){
       $("#co-up-apresentacao").checked = t.upApresentacao === "1";
       $("#co-up-video").checked = t.upVideo === "1";
       $("#co-up-prazo").value = t.upPrazo || "";
+      $("#co-valor").value = t.valor || "";
       $("#co-cancelar").style.display = "";
       $("#co-nome").focus();
     }));
 
     $("#co-cancelar").addEventListener("click", () => {
-      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo"]
+      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor"]
         .forEach(s => $(s).value = "");
       ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
         .forEach(s => $(s).checked = false);
@@ -3872,9 +3970,10 @@ async function salvarCota(){
       p_upload_arte_revista: $("#co-up-revista").checked,
       p_upload_apresentacao: $("#co-up-apresentacao").checked,
       p_upload_video: $("#co-up-video").checked,
-      p_prazo_upload: $("#co-up-prazo").value || null
+      p_prazo_upload: $("#co-up-prazo").value || null,
+      p_valor_sugerido: parseFloat($("#co-valor").value.replace(",",".")) || null
     });
-    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo"]
+    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor"]
       .forEach(s => $(s).value = "");
     ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
       .forEach(s => $(s).checked = false);
