@@ -313,6 +313,15 @@ def criar_evento(page, jantar, producao, debug):
             page.locator(".box-icon-img").first.click()
         fc_info.value.set_files(logo_tmp)
 
+    # "Classifique seu evento" — Assunto e' obrigatorio e sempre o
+    # mesmo pros jantares do CIO Cerrado (confirmado pelo organizador).
+    # Mesmo padrao Select2 do campo Local: clique na caixa (achada pela
+    # proximidade do rotulo) + clique na opcao pelo texto.
+    page.locator("label", has_text="Assunto").first.locator(
+        "xpath=following::span[contains(@class,'select2-selection')][1]"
+    ).click()
+    page.get_by_role("treeitem", name="Empreendedorismo").click()
+
     # jantares nao guarda horario de termino — 3h de duracao e' a
     # mesma janela usada na gravacao que calibrou este script (19h as
     # 22h). Se passar da meia-noite (jantar comecando depois das 21h),
