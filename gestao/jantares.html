@@ -579,17 +579,41 @@ async function desenharJantar(){
         <div><label>Perfil de convidado desejado</label><input type="text" id="jd-perfil" value="${esc(J.perfil_convidado||"")}"></div>
       </div>
       <div class="barra">
-        <div style="min-width:100%;"><label>Link do Sympla (inscrição)</label>
+        <div style="min-width:100%;"><label>Mensagem/descrição para a página de inscrição</label>
+          <textarea id="jd-mensagem" rows="4"
+            placeholder="Texto que vai na página do evento no Sympla — o que é o jantar, o que esperar, dress code, etc.">${esc(J.mensagem||"")}</textarea>
+        </div>
+      </div>
+      <div class="barra">
+        <div><label>Link do Sympla (inscrição)</label>
           <input type="text" id="jd-sympla" placeholder="https://sympla.com.br/..."
                  value="${esc(J.sympla_url||"")}">
           ${J.sympla_url ? `<span class="meta">
             <a href="${esc(J.sympla_url)}" target="_blank" rel="noopener">abrir a página de inscrição</a>
           </span>` : ""}
         </div>
+        <div><label>Status no Sympla</label>
+          <span class="selo ${J.sympla_status==="convites_enviados"?"ok":J.sympla_status==="criado"?"alerta":"pend"}" style="display:inline-block;margin-top:6px;">
+            ${{pendente:"Ainda não criado",criado:"Criado — falta convite",convites_enviados:"Criado e com convites"}[J.sympla_status]||esc(J.sympla_status)}
+          </span>
+        </div>
       </div>
       <div id="jd-aviso"></div>
       <button class="btn sec" id="jd-salvar">Salvar</button>
       <button class="btn perigo" id="jd-remover" style="margin-left:6px;">Remover jantar</button>
+    </div>
+
+    <div class="cartao">
+      <h2>Logo para a página do evento</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Fica guardada aqui pronta pra criação do evento no Sympla — na mão ou pelo robô,
+        já que o Sympla não tem como buscar ela sozinho.
+      </p>
+      <div class="barra">
+        <div><label>Arquivo (PNG ou JPG)</label><input type="file" id="jl-arquivo" accept="image/png,image/jpeg"></div>
+      </div>
+      <div id="jl-aviso"></div>
+      <div id="jl-preview"></div>
     </div>
 
     <div class="cartao">
@@ -703,6 +727,8 @@ async function desenharJantar(){
   $("#jd-patro").addEventListener("input", () => DS.limparInvalido($("#jd-patro")));
   $("#jd-salvar").addEventListener("click", salvarDadosJantar);
   $("#jd-remover").addEventListener("click", removerJantar);
+  $("#jl-arquivo").addEventListener("change", enviarLogoJantar);
+  carregarLogoJantar();
   $("#js-arquivo").addEventListener("change", lerPlanilhaSympla);
   $("#js-importar").addEventListener("click", importarConvidadosSympla);
   $("#pr-rodar").addEventListener("click", rodarProspeccaoJantar);
@@ -752,12 +778,64 @@ async function salvarDadosJantar(){
       p_perfil_convidado: $("#jd-perfil").value.trim() || null,
       p_capacidade: parseInt($("#jd-cap").value,10) || 8,
       p_status: $("#jd-status").value,
-      p_sympla_url: $("#jd-sympla").value.trim() || null
+      p_sympla_url: $("#jd-sympla").value.trim() || null,
+      p_mensagem: $("#jd-mensagem").value.trim() || null
     });
     aviso("#jd-aviso","Salvo.","ok");
     await abrirJantar(J.id);
   }catch(e){ aviso("#jd-aviso", explicar(e)); }
   finally{ b.disabled = false; b.textContent = "Salvar"; }
+}
+
+// Logo do jantar, pronta pra criação do evento no Sympla (na mão ou
+// pelo robô — o Sympla não tem como buscar o arquivo sozinho). Mesmo
+// padrão de bucket privado + signed URL que os uploads de patrocinador
+// já usam.
+async function carregarLogoJantar(){
+  const box = $("#jl-preview");
+  if(!J.logo_storage_path){ box.innerHTML = ""; return; }
+  try{
+    const { data, error } = await sb.storage.from("jantar-uploads").createSignedUrl(J.logo_storage_path, 300);
+    if(error) throw error;
+    box.innerHTML = `
+      <img src="${esc(data.signedUrl)}" alt="Logo do jantar" style="max-width:220px;max-height:120px;display:block;margin-top:8px;border-radius:var(--raio);">
+      <button class="btn sec mini" id="jl-remover" style="margin-top:8px;">Remover logo</button>`;
+    $("#jl-remover").addEventListener("click", async () => {
+      if(!(await DS.confirmar("A logo enviada será apagada.", {titulo:"Remover logo?", tom:"perigo", textoConfirmar:"Remover"}))) return;
+      try{
+        await rpc("jantar_definir_logo", { p_id: J.id, p_storage_path: null });
+        await sb.storage.from("jantar-uploads").remove([J.logo_storage_path]);
+        J.logo_storage_path = null;
+        carregarLogoJantar();
+      }catch(e){ aviso("#jl-aviso", explicar(e)); }
+    });
+  }catch(e){ box.innerHTML = ""; }
+}
+
+async function enviarLogoJantar(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const input = ev.target;
+  input.style.display = "none";
+  aviso("#jl-aviso", `Enviando ${file.name}…`, "ok");
+  try{
+    const pathAntigo = J.logo_storage_path;
+    const caminho = `${J.id}/logo-${Date.now()}-${file.name}`;
+    const up = await sb.storage.from("jantar-uploads").upload(caminho, file, { upsert: false });
+    if(up.error) throw up.error;
+
+    await rpc("jantar_definir_logo", { p_id: J.id, p_storage_path: caminho });
+    if(pathAntigo) await sb.storage.from("jantar-uploads").remove([pathAntigo]);
+
+    J.logo_storage_path = caminho;
+    aviso("#jl-aviso", "Logo enviada.", "ok");
+    carregarLogoJantar();
+  }catch(e){
+    aviso("#jl-aviso", explicar(e));
+  }finally{
+    input.style.display = "";
+    input.value = "";
+  }
 }
 
 async function lerPlanilhaSympla(ev){

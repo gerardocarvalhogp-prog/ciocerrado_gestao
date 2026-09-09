@@ -221,6 +221,77 @@ em nada — vale conferir a lista antes do primeiro disparo real.
 O Sympla nunca aprova ninguém sozinho: inscrição nova entra como
 `pendente` e espera decisão humana no painel.
 
+### Criar o evento do jantar no Sympla — `rpa_sympla_jantares.py`
+
+A API pública do Sympla **só lê** (eventos, participantes, checkin) — não existe
+endpoint para criar evento, subir logo/banner ou lançar convite/cortesia. Confirmado
+antes de escrever este script: a biblioteca cliente de referência da API só expõe
+métodos de leitura, e a própria Sympla descreve a API pública como "obter informações
+dos eventos criados por você". Criar e configurar evento continua sendo ação só do
+painel — então `rpa_sympla_jantares.py` automatiza o **navegador** (Playwright) em vez
+de chamar API, clicando no painel de produtor como um humano clicaria.
+
+Onde a logo e a mensagem do jantar ficam: `jantares.html`, dentro de cada jantar
+("Dados do jantar" e "Logo para a página do evento") — preenche aqui, o robô lê dali.
+
+**Este script não está calibrado** — foi escrito sem acesso ao painel de produtor do
+Sympla (o ambiente onde foi escrito não alcança sympla.com.br), então os seletores de
+tela estão marcados `# TODO CALIBRAR` com valores plausíveis, não testados contra a
+página real. Antes de rodar em `--producao`:
+
+```bash
+pip install playwright
+playwright install chromium
+playwright codegen https://produtores.sympla.com.br   # grava os seletores reais
+```
+
+Faça o login e o fluxo de criar um evento na mão uma vez pelo `codegen`, e troque cada
+`# TODO CALIBRAR` do script pelo seletor que ele gravou. Use `--debug` (navegador
+visível + prints em `/tmp`) para conferir o robô passando pelo formulário antes de
+confiar nele.
+
+```bash
+python rpa_sympla_jantares.py --criar               # modo seguro, só mostra
+python rpa_sympla_jantares.py --criar --producao    # cria/salva rascunho de verdade
+python rpa_sympla_jantares.py --convites --producao
+python rpa_sympla_jantares.py --debug --criar       # navegador visível, p/ calibrar
+```
+
+Variáveis de ambiente extras (mesmo `.env` do `integracao.py`):
+
+```
+SUPABASE_ANON_KEY=...     # a mesma anon key que já está no admin.html/jantares.html
+CERRADO_STAFF_EMAIL=...   # login de um admin/staff JÁ CADASTRADO no sistema, com senha definida
+CERRADO_STAFF_SENHA=...
+SYMPLA_EMAIL=...          # login do painel de produtor do Sympla — NÃO é o SYMPLA_TOKEN da API
+SYMPLA_SENHA=...
+```
+
+Duas credenciais diferentes, por dois motivos diferentes:
+
+- `CERRADO_STAFF_EMAIL`/`SENHA` loga no **nosso** sistema — é o que autoriza chamar
+  `jantar_listar_para_sympla`/`jantar_convidados_listar`. **Achado ao validar isto:**
+  essas RPCs (como a maioria do schema) exigem `_exige_staff()`/`_exige_admin()`, que só
+  reconhecem e-mail cadastrado em `admins` — e o token `service_role` que `integracao.py`
+  já usa **não carrega e-mail nenhum** no JWT. Testado localmente: `is_admin()` dá falso
+  para uma chamada autenticada só como `service_role`. Isso quer dizer que
+  `jantar_importar_convidados_sympla` (a RPC que `integracao.py --jantares` já chama
+  hoje, do mesmo jeito, com a `service_role`) pode já estar falhando silenciosamente em
+  produção — vale conferir o log do Agendador de Tarefas. Por isso este script novo loga
+  como staff de verdade em vez de reusar a `service_role` para RPC — mais simples e
+  robusto do que alterar um guard de segurança compartilhado, o que eu preferi não fazer
+  por conta própria.
+- `SYMPLA_EMAIL`/`SENHA` loga no **painel do Sympla**, pro robô clicar lá — mais
+  sensível que o `SYMPLA_TOKEN` (abre o painel inteiro, não só leitura).
+
+Nenhuma das quatro vai pro `.html` nem é commitada — só no `.env` local ou no
+Agendador de Tarefas, igual as outras chaves.
+
+Por padrão o evento é salvo como **rascunho**, nunca publicado sozinho (confirme no
+código, `# TODO CALIBRAR`, se o Sympla separa "salvar rascunho" de "publicar" no fluxo
+de vocês) — publicar de verdade e mandar convite continua sendo decisão sua, olhando o
+rascunho antes.
+
 ---
 
 ## 7. Decisões que valem saber
