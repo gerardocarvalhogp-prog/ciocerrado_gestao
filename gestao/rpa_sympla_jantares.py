@@ -61,27 +61,20 @@
 #   python rpa_sympla_jantares.py --debug --criar     # navegador visivel, p/ calibrar
 #
 # VARIAVEIS DE AMBIENTE (alem de SUPABASE_URL/SUPABASE_SERVICE_KEY, ja
-# usadas por integracao.py — reaproveitadas daqui, mesmo .env):
+# usadas por integracao.py — reaproveitadas daqui, mesmo .env e mesmo
+# cliente Supa):
 #
-#   SUPABASE_ANON_KEY     a mesma anon key do admin.html/jantares.html
-#   CERRADO_STAFF_EMAIL   login de um admin/staff JA CADASTRADO no sistema
-#   CERRADO_STAFF_SENHA   (aba Equipe do admin.html — precisa ter senha definida)
-#   SYMPLA_EMAIL          login do painel de produtor do Sympla (nao o SYMPLA_TOKEN da API)
+#   SYMPLA_EMAIL   login do painel de produtor do Sympla (nao o SYMPLA_TOKEN da API)
 #   SYMPLA_SENHA
 #
-# POR QUE DOIS LOGINS DIFERENTES (CERRADO_STAFF_* E SYMPLA_*)
-#
-# CERRADO_STAFF_* entra no NOSSO sistema — e' o que autoriza chamar
-# jantar_convidados_listar, jantar_listar_para_sympla etc., que exigem
-# _exige_staff()/_exige_admin() (checam e-mail contra a tabela
-# `admins`). O SUPABASE_SERVICE_KEY (service_role) NAO serve pra isso:
-# testado localmente, o JWT do service_role nao carrega e-mail nenhum,
-# entao is_admin()/is_staff() dao falso pra ele — e' por isso que este
-# script loga como uma conta de staff de verdade em vez de usar a
-# chave de servico pra tudo (que so' e' usada aqui pra baixar a logo do
-# storage, onde service_role bypassa RLS de verdade). SYMPLA_EMAIL/
-# SYMPLA_SENHA e' outra coisa: login no PAINEL DO SYMPLA, pro robo
-# clicar la.
+# A migration 20260909210000 corrigiu is_admin()/is_staff() pra
+# reconhecer current_user = 'service_role' (antes so' reconheciam
+# e-mail cadastrado em `admins`, e o JWT da service_role nao carrega
+# e-mail nenhum — is_admin() dava falso pra ela). Por isso este script
+# usa so' a service_role pra tudo, igual o integracao.py: RPC
+# (jantar_listar_para_sympla, jantar_convidados_listar,
+# jantar_marcar_sympla) e download da logo no storage, sem precisar de
+# uma segunda credencial de staff.
 # =====================================================================
 
 import os
@@ -91,7 +84,7 @@ import logging
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from integracao import SUPABASE_URL, SUPABASE_SERVICE  # so' as constantes, pro download da logo
+from integracao import Supa, SUPABASE_URL, SUPABASE_SERVICE
 
 try:
     from dotenv import load_dotenv
@@ -104,51 +97,15 @@ import requests
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("rpa_sympla")
 
-SUPABASE_ANON     = os.environ.get("SUPABASE_ANON_KEY", "")
-STAFF_EMAIL       = os.environ.get("CERRADO_STAFF_EMAIL", "")
-STAFF_SENHA       = os.environ.get("CERRADO_STAFF_SENHA", "")
-SYMPLA_EMAIL      = os.environ.get("SYMPLA_EMAIL", "")
-SYMPLA_SENHA      = os.environ.get("SYMPLA_SENHA", "")
+SYMPLA_EMAIL = os.environ.get("SYMPLA_EMAIL", "")
+SYMPLA_SENHA = os.environ.get("SYMPLA_SENHA", "")
 
 STORAGE_BUCKET = "jantar-uploads"
-SCHEMA = "gestao"
-
-
-class SupaStaff:
-    """Chama RPC do schema gestao autenticado como staff de verdade —
-    _exige_staff()/_exige_admin() olham auth.jwt()->>'email', que so'
-    existe com login de usuario real (nao com a service_role key)."""
-
-    def __init__(self, url, anon_key, email, senha):
-        if not url or not anon_key or not email or not senha:
-            raise SystemExit(
-                "Faltam SUPABASE_URL / SUPABASE_ANON_KEY / CERRADO_STAFF_EMAIL / "
-                "CERRADO_STAFF_SENHA no ambiente.")
-        self.base = url.rstrip("/") + "/rest/v1"
-        r = requests.post(
-            f"{url.rstrip('/')}/auth/v1/token?grant_type=password",
-            headers={"apikey": anon_key, "Content-Type": "application/json"},
-            json={"email": email, "password": senha}, timeout=30)
-        r.raise_for_status()
-        token = r.json()["access_token"]
-        self.h = {
-            "apikey": anon_key,
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Accept-Profile": SCHEMA,
-            "Content-Profile": SCHEMA,
-        }
-
-    def rpc(self, funcao, args):
-        r = requests.post(f"{self.base}/rpc/{funcao}", headers=self.h, json=args, timeout=30)
-        r.raise_for_status()
-        return r.json() if r.text else None
 
 
 # ---------------------------------------------------------------------
 # storage: baixa a logo do bucket privado pra um arquivo temporario,
-# pra anexar no input de upload do Sympla — aqui sim service_role, que
-# bypassa RLS de storage de verdade (nao passa por _exige_staff())
+# pra anexar no input de upload do Sympla
 # ---------------------------------------------------------------------
 def baixar_logo(storage_path):
     url = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{STORAGE_BUCKET}/{storage_path}"
@@ -287,7 +244,7 @@ def main():
     if not args.producao:
         log.warning("MODO SEGURO: nada será salvo/enviado no Sympla. Use --producao para valer.")
 
-    supa = SupaStaff(SUPABASE_URL, SUPABASE_ANON, STAFF_EMAIL, STAFF_SENHA)
+    supa = Supa(SUPABASE_URL, SUPABASE_SERVICE)
     fila = supa.rpc("jantar_listar_para_sympla", {}) or []
 
     if args.criar:

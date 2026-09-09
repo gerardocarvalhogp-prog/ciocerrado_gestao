@@ -260,32 +260,31 @@ python rpa_sympla_jantares.py --debug --criar       # navegador visível, p/ cal
 Variáveis de ambiente extras (mesmo `.env` do `integracao.py`):
 
 ```
-SUPABASE_ANON_KEY=...     # a mesma anon key que já está no admin.html/jantares.html
-CERRADO_STAFF_EMAIL=...   # login de um admin/staff JÁ CADASTRADO no sistema, com senha definida
-CERRADO_STAFF_SENHA=...
-SYMPLA_EMAIL=...          # login do painel de produtor do Sympla — NÃO é o SYMPLA_TOKEN da API
+SYMPLA_EMAIL=...     # login do painel de produtor do Sympla — NÃO é o SYMPLA_TOKEN da API
 SYMPLA_SENHA=...
 ```
 
-Duas credenciais diferentes, por dois motivos diferentes:
+Mais sensível que o `SYMPLA_TOKEN` (abre o painel inteiro, não só leitura) — nunca vai
+pro `.html` nem é commitada, só no `.env` local ou no Agendador de Tarefas.
 
-- `CERRADO_STAFF_EMAIL`/`SENHA` loga no **nosso** sistema — é o que autoriza chamar
-  `jantar_listar_para_sympla`/`jantar_convidados_listar`. **Achado ao validar isto:**
-  essas RPCs (como a maioria do schema) exigem `_exige_staff()`/`_exige_admin()`, que só
-  reconhecem e-mail cadastrado em `admins` — e o token `service_role` que `integracao.py`
-  já usa **não carrega e-mail nenhum** no JWT. Testado localmente: `is_admin()` dá falso
-  para uma chamada autenticada só como `service_role`. Isso quer dizer que
-  `jantar_importar_convidados_sympla` (a RPC que `integracao.py --jantares` já chama
-  hoje, do mesmo jeito, com a `service_role`) pode já estar falhando silenciosamente em
-  produção — vale conferir o log do Agendador de Tarefas. Por isso este script novo loga
-  como staff de verdade em vez de reusar a `service_role` para RPC — mais simples e
-  robusto do que alterar um guard de segurança compartilhado, o que eu preferi não fazer
-  por conta própria.
-- `SYMPLA_EMAIL`/`SENHA` loga no **painel do Sympla**, pro robô clicar lá — mais
-  sensível que o `SYMPLA_TOKEN` (abre o painel inteiro, não só leitura).
-
-Nenhuma das quatro vai pro `.html` nem é commitada — só no `.env` local ou no
-Agendador de Tarefas, igual as outras chaves.
+**Achado ao validar isto, e já corrigido:** `is_admin()`/`is_staff()` só reconheciam
+e-mail cadastrado em `admins` — e o token `service_role`, que `integracao.py` já usa pra
+tudo, não carrega e-mail nenhum no JWT. Testado localmente: `is_admin()` dava falso para
+uma chamada autenticada só como `service_role`, então qualquer RPC gateada por
+`_exige_admin()`/`_exige_staff()` (a maioria do schema) recusava a `service_role` — a
+chave mais privilegiada era, ironicamente, a única que não conseguia chamar essas
+funções. Isso incluía `jantar_importar_convidados_sympla`, que `integracao.py --jantares`
+já chama hoje do mesmo jeito: pode ter estado falhando silenciosamente em produção — vale
+conferir o log do Agendador de Tarefas depois de aplicar esta migration. Corrigido na
+raiz (migration `20260909210000`): `is_admin()`/`is_staff()` agora aceitam
+`auth.jwt() ->> 'role' = 'service_role'` também, não só o e-mail — não é uma brecha
+nova, a `service_role` já bypassa RLS por completo em qualquer chamada direta a tabela,
+então só alinha o mesmo nível de confiança pra chamada de RPC. (Tentativa inicial usou
+`current_user = 'service_role'` — quebrou na validação local: dentro de função
+`SECURITY DEFINER`, `current_user` vira o dono da função, não o papel de quem chamou, e
+não sobrevive a duas camadas empilhadas — `auth.jwt()->>'role'` lê uma claim do JWT,
+imune a isso.) Por isso este script (e qualquer RPC nova) usa só a `service_role` de
+sempre, sem precisar de uma segunda credencial de staff.
 
 Por padrão o evento é salvo como **rascunho**, nunca publicado sozinho (confirme no
 código, `# TODO CALIBRAR`, se o Sympla separa "salvar rascunho" de "publicar" no fluxo
