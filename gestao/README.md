@@ -143,7 +143,39 @@ Sem essa etapa, o painel funciona normalmente — só os botões
 
 ---
 
-## 5. Integrações
+## 5. Edge Function de e-mail
+
+`admin.html` já mantém a fila de notificação (aba Equipe → "Fila de e-mail") e chama
+esta função para despachá-la — mas ela nunca manda nada de verdade sem os dois passos
+abaixo, de propósito:
+
+```bash
+supabase functions deploy enviar-notificacoes
+supabase secrets set RESEND_API_KEY=re_...       # a conta é a do gerardocarvalhogp@gmail.com
+supabase secrets set AMBIENTE=producao            # sem isso, so' monta e mostra — nao envia
+```
+
+**`AMBIENTE=producao` é o interruptor real.** Sem essa variável (ou com qualquer outro
+valor), a função monta cada e-mail da fila, devolve no JSON de resposta para conferência
+e **não** chama o Resend nem marca nada como enviado — a fila fica intacta. É o modo de
+teste, e é o padrão: mesma lógica do `--producao` do `integracao.py`, produção é sempre
+flag explícita, nunca comportamento default. Só depois de setar as três coisas acima o
+botão "Enviar toda a fila" do admin dispara e-mail de verdade.
+
+Sem `RESEND_API_KEY` configurada (com `AMBIENTE=producao` setado), a função recusa
+rodar — melhor falhar visível do que fingir que enviou. Confira também que
+`ciocerrado.com.br` está com SPF/DKIM verificados no painel do Resend: sem isso o
+Resend aceita a chamada e devolve 200, mas o e-mail não chega em ninguém.
+
+Tipos de notificação já disparados pelo sistema hoje: `inscricao_aprovada`,
+`autocadastro_recebido`, `convite_evento`, `rooming_ok`, `cobranca_<etapa>`. O botão
+"Enviar teste para mim" (aba Equipe) manda só uma mensagem para o próprio e-mail de
+quem clicou, sem tocar no resto da fila — use para conferir a configuração antes de
+soltar a fila inteira em cima de gente real.
+
+---
+
+## 6. Integrações
 
 `integracao.py` roda fora do banco, no Agendador de Tarefas — mesmo
 lugar do `rotina_cerrado.py`.
@@ -191,7 +223,7 @@ O Sympla nunca aprova ninguém sozinho: inscrição nova entra como
 
 ---
 
-## 6. Decisões que valem saber
+## 7. Decisões que valem saber
 
 **Portão do contrato.** O rooming só abre com inscrição aprovada *e*
 contrato assinado. As duas condições são checadas no banco, não só na tela.
@@ -291,7 +323,7 @@ exemplo. A geração das reservas respeita a composição.
 
 ---
 
-## 7. Segurança
+## 8. Segurança
 
 A chave `anon` está publicada dentro dos cinco `.html` — é assim que o
 Supabase funciona. Por isso a pergunta que importa não é "quem tem a
@@ -371,7 +403,7 @@ por senha, mas é um clique.
 supabase db advisors --linked --type security
 ```
 
-## 8. O que ainda não existe
+## 9. O que ainda não existe
 
 - Pagamento da fatura (hoje o valor é calculado e comunicado, não cobrado)
 - Webhook do Autentique — o status é lido por polling, não em tempo real
