@@ -3265,10 +3265,20 @@ ABAS.relatorios = function(){
       <button class="btn sec" id="r-pesquisa">Carregar</button>
       <div id="box-pesquisa"></div>
     </div>
+
+    <div class="cartao">
+      <h2>Relatório do Lounge</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Patrocinadores com número de lounge, uma linha por contato — mesmo formato do mailing list.
+      </p>
+      <button class="btn sec" id="r-lounge">Carregar</button>
+      <div id="box-lounge"></div>
+    </div>
 `;
 
   $("#r-mailing").addEventListener("click",  () => relMailing());
   $("#r-pesquisa").addEventListener("click", () => relPesquisa());
+  $("#r-lounge").addEventListener("click",   () => relLounge());
 };
 
 // Puxa todas as paginas: o Data API corta em 1000 linhas por resposta.
@@ -3327,6 +3337,27 @@ async function relPesquisa(){
       ["colaboradores","Colaboradores"],["colaboradores_ti","Colaboradores de TI"],
       ["erp_atual","ERP atual"]
     ], "pesquisa-cio-cerrado.xlsx", "Pesquisa"));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+async function relLounge(){
+  const box = $("#box-lounge");
+  box.innerHTML = DS.skeletonCartoes(3);
+  try{
+    const l = await rpc("admin_rel_lounge", { p_evento_slug: EVENTO });
+    box.innerHTML = `
+      <p class="meta" style="margin:10px 0;">${l.length} registro(s).</p>
+      <button class="btn sec mini" id="x-lounge">Exportar Excel</button>
+      <div class="rolagem" style="max-height:280px;margin-top:10px;">
+        <table><tr><th>Lounge</th><th>Empresa</th><th>Cota</th><th>Contato</th><th>E-mail</th></tr>
+        ${l.slice(0,100).map(r => `<tr><td>${esc(r.lounge)}</td><td>${esc(r.empresa)}</td>
+          <td class="meta">${esc(r.cota||"—")}</td><td class="meta">${esc(r.contato_nome||"sem contato cadastrado")}</td>
+          <td class="meta">${esc(r.contato_email||"—")}</td></tr>`).join("")}</table>
+      </div>`;
+    $("#x-lounge").addEventListener("click", () => exportar(l, [
+      ["lounge","LOUNGE"],["empresa","EMPRESA"],["cota","COTA"],["segmento","SEGMENTO"],
+      ["site","SITE"],["contato_nome","CONTATO"],["contato_email","E-MAIL"],["contato_telefone","TELEFONE"]
+    ], "relatorio-lounge-cio-cerrado.xlsx", "Lounge"));
   }catch(e){ aviso(box, explicar(e)); }
 }
 
@@ -5817,11 +5848,34 @@ ABAS.equipe = async function(){
         O teste manda uma mensagem só para o seu e-mail e não toca no resto da fila —
         use para conferir a configuração antes de disparar avisos para outras pessoas.
       </p>
+    </div>
+
+    <div class="cartao">
+      <h2>Materiais do CIO</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Catálogo de fornecedores e revistas — links externos que aparecem na área do CIO
+        (rooming.html). Valem para todo evento, não só o selecionado aqui em cima.
+      </p>
+      <div class="barra">
+        <div style="max-width:150px;"><label>Tipo</label>
+          <select id="mc-tipo">
+            <option value="catalogo">Catálogo</option>
+            <option value="revista">Revista</option>
+          </select></div>
+        <div><label>Título</label><input type="text" id="mc-titulo" placeholder="Ex.: Edição de setembro"></div>
+        <div><label>URL</label><input type="text" id="mc-url" placeholder="https://…"></div>
+        <div style="max-width:90px;"><label>Ordem</label><input type="text" id="mc-ordem" placeholder="0"></div>
+        <div style="min-width:auto;"><button class="btn" id="mc-salvar">Salvar</button></div>
+      </div>
+      <div id="mc-aviso"></div>
+      <div id="mc-lista" style="margin-top:10px;">${DS.skeletonLinhas(2)}</div>
     </div>`;
 
   $("#eq-salvar").addEventListener("click", salvarMembro);
   listarEquipe();
   carregarFilaEmail();
+  $("#mc-salvar").addEventListener("click", salvarMaterialCio);
+  listarMateriaisCio();
 
   // Teste isolado: enfileira uma mensagem para o proprio usuario e
   // dispara SO ela. Sem isso, a unica forma de testar seria mandar a
@@ -5908,6 +5962,71 @@ async function carregarFilaEmail(){
       $("#nt-erros").innerHTML = "";
     }
   }catch(e){ aviso("#nt-resumo", explicar(e)); }
+}
+
+const ROTULO_MATERIAL_CIO = { catalogo: "Catálogo", revista: "Revista" };
+
+async function listarMateriaisCio(){
+  try{
+    const l = await rpc("admin_listar_materiais_cio", {});
+    $("#mc-lista").innerHTML = l.length ? `<table>
+      <tr><th>Tipo</th><th>Título</th><th>URL</th><th>Ativo</th><th></th></tr>
+      ${l.map(m => `<tr data-id="${esc(m.id)}" data-tipo="${esc(m.tipo)}"
+                        data-titulo="${esc(m.titulo)}" data-url="${esc(m.url)}"
+                        data-ordem="${m.ordem}" data-ativo="${m.ativo?1:0}">
+        <td class="meta">${esc(ROTULO_MATERIAL_CIO[m.tipo]||m.tipo)}</td>
+        <td>${esc(m.titulo)}</td>
+        <td class="meta"><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.url)}</a></td>
+        <td>${m.ativo ? "Sim" : `<span class="selo pend">Não</span>`}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn sec mini mc-editar">Editar</button>
+          <button class="btn perigo mini mc-apagar">Remover</button>
+        </td></tr>`).join("")}</table>`
+      : `<div class="vazio">Nenhum material cadastrado.</div>`;
+
+    $$(".mc-editar", $("#mc-lista")).forEach(b => b.addEventListener("click", () => {
+      const t = b.closest("tr").dataset;
+      $("#mc-tipo").value = t.tipo;
+      $("#mc-titulo").value = t.titulo;
+      $("#mc-url").value = t.url;
+      $("#mc-ordem").value = t.ordem;
+      $("#mc-salvar").dataset.editando = b.closest("tr").dataset.id;
+      $("#mc-titulo").focus();
+    }));
+
+    $$(".mc-apagar", $("#mc-lista")).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!(await DS.confirmar("Some da área do CIO imediatamente.",
+          {titulo:`Remover "${tr.dataset.titulo}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+      b.disabled = true;
+      try{ await rpc("admin_remover_material_cio", { p_id: tr.dataset.id }); listarMateriaisCio(); }
+      catch(e){ aviso("#mc-aviso", explicar(e)); b.disabled = false; }
+    }));
+  }catch(e){ aviso("#mc-lista", explicar(e)); }
+}
+
+async function salvarMaterialCio(){
+  const titulo = $("#mc-titulo").value.trim();
+  const url = $("#mc-url").value.trim();
+  if(!titulo || !url){
+    aviso("#mc-aviso", "Informe título e URL.");
+    return;
+  }
+
+  const b = $("#mc-salvar");
+  const editando = b.dataset.editando || null;
+  b.disabled = true; b.textContent = "Salvando…";
+  try{
+    await rpc("admin_salvar_material_cio", {
+      p_id: editando, p_tipo: $("#mc-tipo").value,
+      p_titulo: titulo, p_url: url,
+      p_ordem: parseInt($("#mc-ordem").value,10) || 0, p_ativo: true
+    });
+    $("#mc-titulo").value = ""; $("#mc-url").value = ""; $("#mc-ordem").value = "";
+    delete b.dataset.editando;
+    listarMateriaisCio();
+  }catch(e){ aviso("#mc-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Salvar"; }
 }
 
 async function listarEquipe(){

@@ -494,10 +494,36 @@ function desenhar(){
     <p class="sub">${esc(STATUS.empresa || "")}</p>
     <div class="trilha">${trilha()}</div>
     <div id="aviso-global"></div>
-    <div id="area"></div>`;
+    <div id="area"></div>
+    <div id="materiais"></div>`;
 
   if(STATUS.rooming_liberado) areaRooming();
   else areaBloqueada();
+  carregarMateriais();
+}
+
+// Catálogo de fornecedores e revistas — links externos cadastrados
+// pela organização (admin.html, aba Equipe). Não depende de rooming
+// liberado nem contrato assinado: quem está inscrito já pode ver.
+async function carregarMateriais(){
+  const box = $("#materiais");
+  try{
+    const l = await rpc("part_listar_materiais_cio", { p_evento_slug: EVENTO });
+    if(l.length === 0){ box.innerHTML = ""; return; }
+
+    const grupos = { catalogo: [], revista: [] };
+    l.forEach(m => (grupos[m.tipo] || []).push(m));
+
+    const bloco = (titulo, itens) => itens.length ? `
+      <h2 style="margin-top:22px;">${titulo}</h2>
+      <div class="cartao">
+        ${itens.map(m => `<div style="margin-bottom:8px;">
+          <a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.titulo)}</a>
+        </div>`).join("")}
+      </div>` : "";
+
+    box.innerHTML = bloco("Catálogo de fornecedores", grupos.catalogo) + bloco("Revistas", grupos.revista);
+  }catch(e){ box.innerHTML = ""; }
 }
 
 // A trilha diz exatamente onde a pessoa está e o que falta.
