@@ -223,6 +223,18 @@ def login_interativo():
             browser.close()
 
 
+def fechar_popup_se_houver(page):
+    # o popup de novidade ("Seu evento, ainda mais organizado") nao
+    # aparece so' uma vez no inicio — voltou a aparecer bloqueando o
+    # upload da logo, bem mais adiante no formulario. Chamar isso
+    # antes de qualquer clique que possa esbarrar num popup e' mais
+    # seguro do que fechar so' uma vez la no comeco.
+    try:
+        page.locator(".icon-icon-close").click(timeout=2000)
+    except Exception:
+        pass
+
+
 def salvar_print_erro(page, jantar_id):
     # mesma ideia do print automatico do --login: qualquer falha em
     # --criar/--convites salva a tela no momento exato do erro, pra
@@ -277,22 +289,21 @@ def criar_evento(page, jantar, producao, debug):
     page.get_by_role("button", name="Criar evento presencial").click()
 
     # popup de novidade ("Seu evento, ainda mais organizado") que a
-    # Sympla mostra às vezes por cima do formulário — achado no print
-    # de erro real: enquanto ele está aberto, os campos por baixo
-    # ficam desabilitados (não "não encontrados"). Esc sozinho não
+    # Sympla mostra por cima do formulário — acontece mais de uma vez
+    # na mesma sessão (voltou a aparecer mais adiante, bloqueando o
+    # upload da logo), não só na abertura da tela. Esc sozinho não
     # fechou (testado); o X real é <span class="icon icon-icon-close">,
-    # achado inspecionando a tela de verdade.
+    # achado inspecionando a tela de verdade. fechar_popup_se_houver()
+    # e' chamado de novo antes de cada clique que ja esbarrou nele.
     page.wait_for_timeout(800)
-    try:
-        page.locator(".icon-icon-close").click(timeout=3000)
-    except Exception:
-        pass
+    fechar_popup_se_houver(page)
 
     page.get_by_role("textbox", name="Nome do evento").fill(titulo)
 
     logo_tmp = None
     if jantar.get("logo_storage_path"):
         logo_tmp = baixar_logo(jantar["logo_storage_path"])
+        fechar_popup_se_houver(page)
         # .box-icon-img e' o elemento clicavel de verdade (achado
         # testando contra a tela real) — expect_file_chooser() escuta o
         # dialogo de arquivo que esse clique abre, sem precisar
@@ -360,15 +371,17 @@ def criar_evento(page, jantar, producao, debug):
     except Exception:
         pass
 
+    fechar_popup_se_houver(page)
     page.get_by_text("Ingresso gratuito").click()
     page.get_by_role("textbox", name="Ex. 100").fill(str(jantar.get("capacidade") or 8))
     page.get_by_role("textbox", name="Ingresso único, Meia-Entrada").fill("Convidado")
     page.get_by_role("button", name="Criar Ingresso").click()
 
     if debug:
-        page.screenshot(path=f"/tmp/rpa_sympla_{jantar['id']}_preenchido.png")
-        log.info("Print salvo em /tmp/rpa_sympla_%s_preenchido.png — confira antes de prosseguir.",
-                  jantar["id"])
+        print_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   f"rpa_sympla_{jantar['id']}_preenchido.png")
+        page.screenshot(path=print_path)
+        log.info("Print salvo em %s — confira antes de prosseguir.", print_path)
 
     if logo_tmp:
         os.unlink(logo_tmp)
@@ -377,6 +390,7 @@ def criar_evento(page, jantar, producao, debug):
         log.warning("MODO SEGURO: formulário preenchido, nada publicado. Use --producao para valer.")
         return None
 
+    fechar_popup_se_houver(page)
     page.get_by_role("checkbox", name="Ao publicar este evento,").check()
     page.get_by_role("button", name="Publicar Evento").click()
     page.get_by_role("button", name="Entendi").click()
@@ -419,6 +433,7 @@ def mandar_convites(page, jantar, confirmados, producao, debug):
 
     titulo = f"Jantar CIO Cerrado — {jantar['patrocinador_nome']}"
     abrir_evento_na_lista(page, titulo)
+    fechar_popup_se_houver(page)
     page.get_by_role("link", name="Convite por E-mail").click()
 
     if jantar.get("mensagem"):
@@ -430,12 +445,16 @@ def mandar_convites(page, jantar, confirmados, producao, debug):
     page.get_by_role("button", name="Adicionar").click()
 
     if debug:
-        page.screenshot(path=f"/tmp/rpa_sympla_{jantar['id']}_convite_preview.png")
+        print_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   f"rpa_sympla_{jantar['id']}_convite_preview.png")
+        page.screenshot(path=print_path)
+        log.info("Print salvo em %s", print_path)
 
     if not producao:
         log.warning("MODO SEGURO: convites não enviados. Use --producao para valer.")
         return False
 
+    fechar_popup_se_houver(page)
     page.locator("#btn-send").click()
     page.wait_for_load_state("networkidle")
     return True
