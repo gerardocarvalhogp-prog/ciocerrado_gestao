@@ -1707,6 +1707,26 @@ const ROTULO_STATUS_UPLOAD = {
   aprovado: { texto: "Aprovado", classe: "ok" },
   rejeitado: { texto: "Rejeitado — reenvie", classe: "pend" }
 };
+// So video nao exige PDF — os outros 4 tipos, sim.
+const EXIGE_PDF_UPLOAD = { logo:true, banner:true, arte_revista:true, apresentacao:true, video:false };
+
+function extensaoArquivo(nome){
+  const m = /\.([a-z0-9]+)$/i.exec(nome||"");
+  return m ? m[1].toUpperCase() : "";
+}
+
+// Le largura/altura no navegador antes de enviar — so faz sentido pra
+// imagem; PDF/video devolve null nos dois e a coluna fica vazia.
+function dimensoesImagem(file){
+  if(!file.type.startsWith("image/")) return Promise.resolve({ largura:null, altura:null });
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ largura: img.naturalWidth, altura: img.naturalHeight }); };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve({ largura:null, altura:null }); };
+    img.src = url;
+  });
+}
 
 async function carregarArquivos(){
   const alvo = $("#painel-arquivos");
@@ -1731,25 +1751,40 @@ async function carregarArquivos(){
     </p>
     <div id="arq-lista"></div>`;
 
+  // logo pode vir em varias ordens (1..N, conforme a cota); os outros
+  // 4 tipos sempre tem uma linha so (ordem=1) — o rotulo so numera
+  // quando ha mais de uma
+  const porTipo = {};
+  lista.forEach(a => (porTipo[a.tipo] = porTipo[a.tipo] || []).push(a));
+
   const box = $("#arq-lista");
   box.innerHTML = lista.map(a => {
     const st = a.upload_id ? ROTULO_STATUS_UPLOAD[a.status] : null;
+    const rotulo = ROTULO_UPLOAD[a.tipo] || a.tipo;
+    const titulo = porTipo[a.tipo].length > 1 ? `${rotulo} ${a.ordem}` : rotulo;
+    const exigePdf = EXIGE_PDF_UPLOAD[a.tipo];
     return `
-    <div class="cartao" data-tipo="${esc(a.tipo)}" data-path="${esc(a.storage_path||"")}" style="margin-bottom:12px;">
+    <div class="cartao" data-tipo="${esc(a.tipo)}" data-ordem="${a.ordem}" data-path="${esc(a.storage_path||"")}" style="margin-bottom:12px;">
       <div class="cartao-cab">
-        <h3 style="margin:0;">${esc(ROTULO_UPLOAD[a.tipo] || a.tipo)}</h3>
+        <h3 style="margin:0;">${esc(titulo)}</h3>
         ${st ? `<span class="selo ${st.classe}">${st.texto}</span>` : ""}
       </div>
       ${a.upload_id ? `
         <p class="meta" style="margin:6px 0;">${esc(a.nome_arquivo||"")}
+          ${extensaoArquivo(a.nome_arquivo) ? ` · ${extensaoArquivo(a.nome_arquivo)}` : ""}
           ${a.tamanho_bytes ? ` · ${(a.tamanho_bytes/1024/1024).toFixed(1)} MB` : ""}
+          ${a.largura && a.altura ? ` · ${a.largura}×${a.altura}px` : ""}
           · enviado ${dataBR((a.enviado_em||"").slice(0,10))}</p>
         ${a.status === "rejeitado" && a.observacao_admin
           ? `<p class="fila-nota">Motivo: ${esc(a.observacao_admin)}</p>` : ""}
-      ` : `<p class="meta" style="margin:6px 0;">Nenhum arquivo enviado ainda.</p>`}
-      <input type="file" class="arq-arquivo">
+      ` : `<p class="meta" style="margin:6px 0;">Nenhum arquivo enviado ainda.
+        ${exigePdf ? " Aceita só PDF." : ""}</p>`}
+      <input type="file" class="arq-arquivo" ${exigePdf ? 'accept=".pdf,application/pdf"' : ""}>
       <div class="arq-aviso"></div>
-      ${a.upload_id ? `<button class="btn perigo mini arq-remover" style="margin-top:8px;">Remover</button>` : ""}
+      <div style="margin-top:8px;">
+        ${a.upload_id ? `<button class="btn sec mini arq-ver">Visualizar</button>` : ""}
+        ${a.upload_id ? `<button class="btn perigo mini arq-remover" style="margin-left:6px;">Remover</button>` : ""}
+      </div>
     </div>`;
   }).join("");
 
@@ -1758,8 +1793,16 @@ async function carregarArquivos(){
     if(!file) return;
     const cartao = input.closest(".cartao");
     const tipo = cartao.dataset.tipo;
+    const ordem = cartao.dataset.ordem;
     const pathAntigo = cartao.dataset.path;
     const avisoEl = cartao.querySelector(".arq-aviso");
+
+    if(EXIGE_PDF_UPLOAD[tipo] && file.type !== "application/pdf"){
+      aviso(avisoEl, "Só é aceito arquivo em PDF para este item.");
+      input.value = "";
+      return;
+    }
+
     // desabilitar o <input type="file"> apaga o nome do arquivo escolhido
     // em alguns navegadores (parece que "esqueceu" o que a pessoa
     // acabou de escolher) — esconder em vez de desabilitar evita isso
@@ -1767,14 +1810,16 @@ async function carregarArquivos(){
     aviso(avisoEl, `Enviando ${file.name}…`, "ok");
 
     try{
-      const caminho = `${PATRO.patrocinador_id}/${tipo}/${Date.now()}-${file.name}`;
+      const { largura, altura } = await dimensoesImagem(file);
+      const caminho = `${PATRO.patrocinador_id}/${tipo}/${ordem}-${Date.now()}-${file.name}`;
       const up = await sb.storage.from("patrocinador-uploads").upload(caminho, file, { upsert: false });
       if(up.error) throw up.error;
 
       await rpc("patro_registrar_upload", {
         p_patrocinador_id: PATRO.patrocinador_id,
         p_tipo: tipo, p_storage_path: caminho,
-        p_nome_arquivo: file.name, p_tamanho_bytes: file.size
+        p_nome_arquivo: file.name, p_tamanho_bytes: file.size,
+        p_ordem: parseInt(ordem, 10), p_largura: largura, p_altura: altura
       });
 
       if(pathAntigo){
@@ -1789,15 +1834,25 @@ async function carregarArquivos(){
     }
   }));
 
+  box.querySelectorAll(".arq-ver").forEach(btn => btn.addEventListener("click", async () => {
+    const path = btn.closest(".cartao").dataset.path;
+    try{
+      const { data, error } = await sb.storage.from("patrocinador-uploads").createSignedUrl(path, 300);
+      if(error) throw error;
+      window.open(data.signedUrl, "_blank");
+    }catch(e){ aviso("#aviso-global", explicar(e)); }
+  }));
+
   box.querySelectorAll(".arq-remover").forEach(btn => btn.addEventListener("click", async () => {
     const cartao = btn.closest(".cartao");
     const path = cartao.dataset.path;
+    const tipo = cartao.dataset.tipo, ordem = Number(cartao.dataset.ordem);
     if(!(await DS.confirmar("O arquivo enviado será apagado.",
-        {titulo:`Remover ${ROTULO_UPLOAD[cartao.dataset.tipo]}?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+        {titulo:`Remover ${ROTULO_UPLOAD[tipo]}?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
     btn.disabled = true;
     try{
       const lista2 = await rpc("patro_meus_uploads", { p_patrocinador_id: PATRO.patrocinador_id });
-      const item = lista2.find(x => x.tipo === cartao.dataset.tipo);
+      const item = lista2.find(x => x.tipo === tipo && x.ordem === ordem);
       if(item?.upload_id) await rpc("patro_remover_upload", { p_upload_id: item.upload_id });
       if(path) await sb.storage.from("patrocinador-uploads").remove([path]);
       carregarArquivos();

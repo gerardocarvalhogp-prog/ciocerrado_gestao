@@ -2665,22 +2665,32 @@ ABAS.arquivos = async function(){
         p_evento_slug: EVENTO, p_status: $("#ar-status").value || null
       });
 
+      const extensao = nome => { const m = /\.([a-z0-9]+)$/i.exec(nome||""); return m ? m[1].toUpperCase() : ""; };
+      const porTipoEmpresa = {};
+      lista.forEach(u => (porTipoEmpresa[u.patrocinador_id + "|" + u.tipo] =
+        porTipoEmpresa[u.patrocinador_id + "|" + u.tipo] || []).push(u));
+
       $("#ar-tabela").innerHTML = lista.length ? `
         <tr><th>Empresa</th><th>Tipo</th><th>Arquivo</th><th>Enviado</th><th>Situação</th><th></th></tr>
-        ${lista.map(u => `<tr data-id="${esc(u.id)}" data-path="${esc(u.storage_path)}">
+        ${lista.map(u => {
+          const grupo = porTipoEmpresa[u.patrocinador_id + "|" + u.tipo];
+          const rotuloTipo = ROTULO_TIPO_UPLOAD[u.tipo] || u.tipo;
+          return `<tr data-id="${esc(u.id)}" data-path="${esc(u.storage_path)}">
           <td><strong>${esc(u.empresa)}</strong></td>
-          <td>${esc(ROTULO_TIPO_UPLOAD[u.tipo] || u.tipo)}</td>
+          <td>${esc(grupo.length > 1 ? `${rotuloTipo} ${u.ordem}` : rotuloTipo)}</td>
           <td>${esc(u.nome_arquivo||"—")}
-              ${u.tamanho_bytes ? `<br><span class="meta">${(u.tamanho_bytes/1024/1024).toFixed(1)} MB</span>` : ""}</td>
+              ${extensao(u.nome_arquivo) ? `<br><span class="meta">${extensao(u.nome_arquivo)}` +
+                (u.tamanho_bytes ? ` · ${(u.tamanho_bytes/1024/1024).toFixed(1)} MB` : "") +
+                (u.largura && u.altura ? ` · ${u.largura}×${u.altura}px` : "") + `</span>` : ""}</td>
           <td class="meta">${dataBR((u.enviado_em||"").slice(0,10))}</td>
           <td><span class="selo ${u.status==='aprovado'?'ok':u.status==='rejeitado'?'pend':''}">${ROTULO_STATUS_UPLOAD_ADMIN[u.status]||u.status}</span>
               ${u.observacao_admin ? `<br><span class="meta">${esc(u.observacao_admin)}</span>` : ""}</td>
           <td style="white-space:nowrap;">
-            <button class="btn sec mini ar-baixar">Baixar</button>
+            <button class="btn sec mini ar-baixar">Visualizar</button>
             ${SOU_ADMIN ? `<button class="btn mini ar-aprovar">Aprovar</button>
               <button class="btn perigo mini ar-rejeitar">Rejeitar</button>` : ""}
           </td>
-        </tr>`).join("")}`
+        </tr>`;}).join("")}`
         : `<tr><td style="color:var(--suave)">Nenhum arquivo enviado ainda.</td></tr>`;
 
       $$(".ar-baixar", c).forEach(b => b.addEventListener("click", async () => {
@@ -3750,7 +3760,7 @@ async function blocoCotas(){
           por sorteio em Mesas e jantares, não pelo próprio patrocinador.
         </p>
         <div class="barra" style="align-items:flex-end;">
-          <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-logo"> Logo</label></div>
+          <div style="max-width:110px;"><label>Logos (qtd.)</label><input type="text" id="co-up-logo" placeholder="0"></div>
           <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-banner"> Banner</label></div>
           <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-revista"> Arte de revista</label></div>
           <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-apresentacao"> Apresentação</label></div>
@@ -3773,7 +3783,7 @@ async function blocoCotas(){
                             data-mesa="${c.vagas_mesa_redonda}"
                             data-limite-ind="${c.limite_indicacoes ?? ""}"
                             data-escolhe="${c.escolhe_convidados === false ? 0 : 1}"
-                            data-up-logo="${c.upload_logo?1:0}" data-up-banner="${c.upload_banner?1:0}"
+                            data-up-logo="${c.upload_logo_qtd||0}" data-up-banner="${c.upload_banner?1:0}"
                             data-up-revista="${c.upload_arte_revista?1:0}" data-up-apresentacao="${c.upload_apresentacao?1:0}"
                             data-up-video="${c.upload_video?1:0}" data-up-prazo="${esc(c.prazo_upload || "")}"
                             data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}"
@@ -3793,7 +3803,7 @@ async function blocoCotas(){
             <td class="meta">${c.limite_indicacoes ?? "sem limite"}</td>
             <td>${c.escolhe_convidados === false ? `<span class="selo alerta">Sorteio</span>` : "Sim"}</td>
             <td class="meta">${[
-                c.upload_logo && "Logo", c.upload_banner && "Banner",
+                c.upload_logo_qtd > 0 && `Logo (${c.upload_logo_qtd})`, c.upload_banner && "Banner",
                 c.upload_arte_revista && "Arte", c.upload_apresentacao && "Apresentação",
                 c.upload_video && "Vídeo"
               ].filter(Boolean).join(", ") || "—"}</td>
@@ -3827,7 +3837,7 @@ async function blocoCotas(){
       $("#co-jantar").value = t.jantar;
       $("#co-limite-ind").value = t.limiteInd || "";
       $("#co-escolhe").value = t.escolhe;
-      $("#co-up-logo").checked = t.upLogo === "1";
+      $("#co-up-logo").value = t.upLogo || "";
       $("#co-up-banner").checked = t.upBanner === "1";
       $("#co-up-revista").checked = t.upRevista === "1";
       $("#co-up-apresentacao").checked = t.upApresentacao === "1";
@@ -3839,9 +3849,9 @@ async function blocoCotas(){
     }));
 
     $("#co-cancelar").addEventListener("click", () => {
-      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor"]
+      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
         .forEach(s => $(s).value = "");
-      ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
+      ["#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
         .forEach(s => $(s).checked = false);
       if($("#co-ordem"))  $("#co-ordem").value  = "";
       if($("#co-prazo"))  $("#co-prazo").value  = "";
@@ -3965,7 +3975,7 @@ async function salvarCota(){
       p_janela_horas: parseInt($("#co-janela")?.value, 10) || null,
       p_limite_indicacoes: parseInt($("#co-limite-ind").value, 10) || null,
       p_escolhe_convidados: $("#co-escolhe").value === "1",
-      p_upload_logo: $("#co-up-logo").checked,
+      p_upload_logo_qtd: parseInt($("#co-up-logo").value,10) || 0,
       p_upload_banner: $("#co-up-banner").checked,
       p_upload_arte_revista: $("#co-up-revista").checked,
       p_upload_apresentacao: $("#co-up-apresentacao").checked,
@@ -3973,9 +3983,9 @@ async function salvarCota(){
       p_prazo_upload: $("#co-up-prazo").value || null,
       p_valor_sugerido: parseFloat($("#co-valor").value.replace(",",".")) || null
     });
-    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor"]
+    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
       .forEach(s => $(s).value = "");
-    ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
+    ["#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
       .forEach(s => $(s).checked = false);
     if($("#co-ordem"))  $("#co-ordem").value  = "";
     if($("#co-prazo"))  $("#co-prazo").value  = "";
