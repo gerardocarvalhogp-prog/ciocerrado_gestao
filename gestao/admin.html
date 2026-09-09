@@ -4368,7 +4368,8 @@ ABAS.patrocinadores = async function(){
         ${lista.length ? `<table>
           <tr><th><input type="checkbox" id="pt-marcar-todos"></th>
               <th>Empresa</th><th>Cota</th><th>O que vende</th><th>Quartos</th><th>Usuários</th><th></th></tr>
-          ${lista.map(p => `<tr data-id="${esc(p.id)}" data-empresa="${esc(p.empresa)}"
+          ${lista.map(p => `<tr data-id="${esc(p.id)}" data-empresa-id="${esc(p.empresa_id)}"
+                                data-empresa="${esc(p.empresa)}"
                                 data-cota="${esc(p.cota||"")}" data-cnpj="${esc(p.cnpj||"")}"
                                 data-seg="${esc(p.segmento||"")}" data-vende="${esc(p.o_que_vende||"")}"
                                 data-site="${esc(p.site||"")}" data-resumo="${esc(p.resumo||"")}"
@@ -4527,7 +4528,7 @@ ABAS.patrocinadores = async function(){
 
     $$(".pt-usuarios").forEach(b => b.addEventListener("click", () => {
       const tr = b.closest("tr");
-      abrirUsuarios(tr.dataset.id, tr.dataset.empresa);
+      abrirUsuarios(tr.dataset.empresaId, tr.dataset.empresa);
     }));
   }catch(e){ aviso(c, explicar(e)); }
 };
@@ -4640,18 +4641,19 @@ async function enriquecerUmGestor(id, nome, empresa){
     .filter(k => String(d[k] || "").trim()).length;
 }
 
-async function abrirUsuarios(id, empresa){
+async function abrirUsuarios(empresaId, empresa){
   const box = $("#pt-detalhe");
   box.innerHTML = DS.skeletonCartoes(3);
   box.scrollIntoView({ behavior:"smooth", block:"nearest" });
 
   try{
-    const l = await rpc("admin_listar_usuarios_patro", { p_patrocinador_id: id });
+    const l = await rpc("admin_listar_usuarios_patro", { p_empresa_id: empresaId });
     box.innerHTML = `
       <div class="cartao">
         <h2>Usuários · ${esc(empresa)}</h2>
         <p class="sub" style="margin-bottom:12px;">
-          Todos veem os mesmos quartos. O login é por link no e-mail — o endereço precisa estar exato.
+          Cadastro único da empresa — vale para todo evento em que ela participar, não só o atual.
+          O login é por link no e-mail — o endereço precisa estar exato.
         </p>
         <div class="barra">
           <div><label>E-mail</label><input type="email" id="up-email"></div>
@@ -4682,11 +4684,11 @@ async function abrirUsuarios(id, empresa){
       b.disabled = true; b.textContent = "Salvando…";
       try{
         await rpc("admin_salvar_usuario_patro", {
-          p_patrocinador_id: id, p_email: email,
+          p_empresa_id: empresaId, p_email: email,
           p_nome: $("#up-nome").value.trim() || null,
           p_telefone: $("#up-tel").value.trim() || null
         });
-        abrirUsuarios(id, empresa);
+        abrirUsuarios(empresaId, empresa);
       }catch(e){ aviso("#up-aviso", explicar(e)); }
       finally{ b.disabled = false; b.textContent = "Adicionar"; }
     });
@@ -4695,7 +4697,7 @@ async function abrirUsuarios(id, empresa){
       b.disabled = true;
       try{
         await rpc("admin_remover_usuario_patro", { p_id: b.closest("tr").dataset.id });
-        abrirUsuarios(id, empresa);
+        abrirUsuarios(empresaId, empresa);
       }catch(e){ aviso("#up-aviso", explicar(e)); b.disabled = false; }
     }));
   }catch(e){ aviso(box, explicar(e)); }
