@@ -279,12 +279,14 @@ def criar_evento(page, jantar, producao, debug):
     logo_tmp = None
     if jantar.get("logo_storage_path"):
         logo_tmp = baixar_logo(jantar["logo_storage_path"])
-        page.locator("#upload-event-banner").get_by_text("Clique ou arraste a imagem").click()
-        # escopado dentro do proprio widget de banner, em vez de um
-        # indice de posicao (input[type=file].nth(1)) que dependia de
-        # quantos outros inputs de arquivo a pagina tivesse em algum
-        # outro lugar
-        page.locator("#upload-event-banner").locator('input[type="file"]').set_input_files(logo_tmp)
+        # .box-icon-img e' o elemento clicavel de verdade (achado
+        # testando contra a tela real) — expect_file_chooser() escuta o
+        # dialogo de arquivo que esse clique abre, sem precisar
+        # adivinhar QUAL <input type=file> da pagina e' o certo (a
+        # pagina pode ter varios escondidos; contar indice quebra fácil)
+        with page.expect_file_chooser() as fc_info:
+            page.locator(".box-icon-img").first.click()
+        fc_info.value.set_files(logo_tmp)
 
     # jantares nao guarda horario de termino — 3h de duracao e' a
     # mesma janela usada na gravacao que calibrou este script (19h as
