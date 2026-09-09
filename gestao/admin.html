@@ -5889,10 +5889,16 @@ ABAS.equipe = async function(){
         { body: { id: t.id } });
       if(error) throw error;
       if(data?.erro) throw new Error(data.erro);
-      aviso("#nt-aviso", data.enviadas
-        ? `Teste enviado para ${t.destinatario}. Se não chegar em alguns minutos, confira se o domínio está verificado no Resend.`
-        : `Não saiu: ${data.com_erro} com erro. Veja o detalhe na fila.`,
-        data.enviadas ? "ok" : "erro");
+      if(data.modo === "teste"){
+        const p = data.previa?.[0];
+        aviso("#nt-aviso", `Modo de teste (nenhum e-mail sai daqui): assunto "${esc(p?.assunto||"")}" ` +
+          `para ${esc(p?.destinatario||"")}. Para enviar de verdade, configure AMBIENTE=producao na function.`, "ok");
+      } else {
+        aviso("#nt-aviso", data.enviadas
+          ? `Teste enviado para ${t.destinatario}. Se não chegar em alguns minutos, confira se o domínio está verificado no Resend.`
+          : `Não saiu: ${data.com_erro} com erro. Veja o detalhe na fila.`,
+          data.enviadas ? "ok" : "erro");
+      }
       carregarFilaEmail();
     }catch(e){
       const m = explicar(e);
@@ -5918,10 +5924,16 @@ ABAS.equipe = async function(){
       const { data, error } = await sb.functions.invoke("enviar-notificacoes", { body: {} });
       if(error) throw error;
       if(data?.erro) throw new Error(data.erro);
-      aviso("#nt-aviso",
-        `${data.enviadas} enviado(s)` +
-        (data.com_erro ? ` · ${data.com_erro} com erro` : "") + ".",
-        data.com_erro ? "erro" : "ok");
+      if(data.modo === "teste"){
+        aviso("#nt-aviso", `Modo de teste (nenhum e-mail sai daqui): ${data.previa?.length||0} montado(s) — ` +
+          `${(data.previa||[]).map(p=>esc(p.destinatario)).join(", ")}. ` +
+          `Para enviar de verdade, configure AMBIENTE=producao na function.`, "ok");
+      } else {
+        aviso("#nt-aviso",
+          `${data.enviadas} enviado(s)` +
+          (data.com_erro ? ` · ${data.com_erro} com erro` : "") + ".",
+          data.com_erro ? "erro" : "ok");
+      }
       carregarFilaEmail();
     }catch(e){
       // erro mais provável aqui é a chave do Resend não estar configurada —

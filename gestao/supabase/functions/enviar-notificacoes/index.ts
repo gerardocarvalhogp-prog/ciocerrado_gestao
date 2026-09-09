@@ -25,9 +25,21 @@
 // as RPCs (notificacoes_pendentes / notificacao_marcar) checam papel na
 // primeira linha, como todo o resto do schema. Assim nao existe caminho
 // para disparar e-mail sem estar logado como equipe.
+//
+// MODO DE TESTE (regra do projeto: nenhum disparo real fora de
+// producao). Por padrao AMBIENTE nao e 'producao' — a funcao MONTA os
+// e-mails, devolve no JSON de resposta (para conferencia), e marca
+// cada notificacao como enviada SEM chamar o Resend. So sai e-mail de
+// verdade com:
+//
+//   supabase secrets set AMBIENTE=producao
+//
+// igual ao --producao do integracao.py: producao e sempre flag
+// explicita, nunca o padrao.
 // =====================================================================
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
+const PRODUCAO = (Deno.env.get("AMBIENTE") ?? "").trim().toLowerCase() === "producao";
 
 // Remetente oficial. Fica como padrao no codigo para nao depender de
 // mais um secret — REMETENTE so precisa existir se um dia mudar.
@@ -73,7 +85,7 @@ async function rpc(nome: string, params: unknown, autorizacao: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
-  if (!RESEND_KEY) {
+  if (PRODUCAO && !RESEND_KEY) {
     return json({ erro: "RESEND_API_KEY nao configurada no projeto." }, 500);
   }
 
@@ -100,6 +112,26 @@ Deno.serve(async (req) => {
 
     if (!Array.isArray(fila) || fila.length === 0) {
       return json({ ok: true, enviadas: 0, com_erro: 0, mensagem: "Nada na fila." });
+    }
+
+    // Fora de producao: monta e devolve os e-mails no JSON, sem chamar
+    // o Resend e sem marcar nada como enviado — a fila fica intacta
+    // para quando AMBIENTE=producao estiver de fato configurado.
+    if (!PRODUCAO) {
+      const previa = fila.map((n: any) => ({
+        id: n.id,
+        destinatario: n.destinatario,
+        assunto: n.assunto ?? "CIO Cerrado",
+        corpo: (n.corpo && String(n.corpo).trim())
+          ? String(n.corpo)
+          : `${n.assunto}\n\nEquipe CIO Cerrado`,
+      }));
+      return json({
+        ok: true, modo: "teste", enviadas: 0, com_erro: 0,
+        mensagem: `Modo de teste: ${previa.length} e-mail(s) montado(s), nenhum enviado. ` +
+          "Configure AMBIENTE=producao para disparar de verdade.",
+        previa,
+      });
     }
 
     let enviadas = 0, comErro = 0;

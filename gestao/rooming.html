@@ -495,11 +495,135 @@ function desenhar(){
     <div class="trilha">${trilha()}</div>
     <div id="aviso-global"></div>
     <div id="area"></div>
-    <div id="materiais"></div>`;
+    <div id="materiais"></div>
+    <div id="meusdados"></div>
+    <div id="indicar"></div>`;
 
   if(STATUS.rooming_liberado) areaRooming();
   else areaBloqueada();
   carregarMateriais();
+  carregarMeusDados();
+  carregarIndicar();
+}
+
+// Corrigir os proprios dados de cadastro (telefone, cargo, empresa,
+// segmento, cidade/estado, linkedin) — nao depende de rooming liberado.
+// Email nao entra: e' a chave de identidade do login.
+async function carregarMeusDados(){
+  const box = $("#meusdados");
+  let d;
+  try{
+    const linhas = await rpc("part_meus_dados", { p_evento_slug: EVENTO });
+    d = linhas?.[0];
+    if(!d){ box.innerHTML = ""; return; }
+  }catch(e){ box.innerHTML = ""; return; }
+
+  box.innerHTML = `
+    <h2 style="margin-top:22px;">Meus dados</h2>
+    <div class="cartao">
+      <p class="sub" style="margin-bottom:14px;">
+        Encontrou algo errado no seu cadastro? Corrija aqui.
+      </p>
+      <div class="barra">
+        <div><label>Nome</label><input type="text" id="md-nome" value="${esc(d.nome||"")}"></div>
+        <div><label>Telefone</label><input type="text" id="md-telefone" value="${esc(d.telefone||"")}"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>Cargo</label><input type="text" id="md-cargo" value="${esc(d.cargo||"")}"></div>
+        <div><label>Empresa</label><input type="text" id="md-empresa" value="${esc(d.empresa||"")}"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>Segmento</label><input type="text" id="md-segmento" value="${esc(d.segmento||"")}"></div>
+        <div><label>Cidade</label><input type="text" id="md-cidade" value="${esc(d.cidade||"")}"></div>
+        <div style="max-width:90px;"><label>UF</label><input type="text" id="md-estado" maxlength="2" value="${esc(d.estado||"")}"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>LinkedIn</label><input type="text" id="md-linkedin" placeholder="https://linkedin.com/in/…" value="${esc(d.linkedin||"")}"></div>
+      </div>
+      <div id="md-aviso" style="margin-top:10px;"></div>
+      <button class="btn" id="md-salvar" style="margin-top:6px;">Salvar</button>
+    </div>`;
+
+  $("#md-salvar").addEventListener("click", async () => {
+    const b = $("#md-salvar");
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      await rpc("part_salvar_meus_dados", {
+        p_evento_slug: EVENTO,
+        p_nome: $("#md-nome").value.trim(),
+        p_telefone: $("#md-telefone").value.trim() || null,
+        p_cargo: $("#md-cargo").value.trim() || null,
+        p_empresa: $("#md-empresa").value.trim() || null,
+        p_segmento: $("#md-segmento").value.trim() || null,
+        p_cidade: $("#md-cidade").value.trim() || null,
+        p_estado: $("#md-estado").value.trim() || null,
+        p_linkedin: $("#md-linkedin").value.trim() || null,
+      });
+      aviso("#md-aviso", "Dados atualizados.", "ok");
+      carregar();
+    }catch(e){
+      aviso("#md-aviso", explicar(e));
+    }finally{ b.disabled = false; b.textContent = "Salvar"; }
+  });
+}
+
+// Indicar outra pessoa para o evento: cria uma inscricao pendente, que
+// cai na mesma fila de aprovacao de qualquer outra origem — a
+// organizacao decide, ninguem recebe e-mail sem essa aprovacao.
+async function carregarIndicar(){
+  const box = $("#indicar");
+  let minhas = [];
+  try{ minhas = await rpc("part_minhas_indicacoes", { p_evento_slug: EVENTO }); }
+  catch(e){ box.innerHTML = ""; return; }
+
+  const ROTULO = { pendente:"Em análise", aprovado:"Aprovada", recusado:"Não aprovada", cancelado:"Cancelada" };
+  const CLASSE = { pendente:"pend", aprovado:"ok", recusado:"erro", cancelado:"erro" };
+
+  box.innerHTML = `
+    <h2 style="margin-top:22px;">Indicar outra pessoa</h2>
+    <div class="cartao">
+      <p class="sub" style="margin-bottom:14px;">
+        Conhece alguém que deveria participar? Indique aqui — a organização avalia
+        antes de qualquer contato.
+      </p>
+      <div class="barra">
+        <div><label>Nome</label><input type="text" id="ind-nome"></div>
+        <div><label>E-mail</label><input type="email" id="ind-email"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>Telefone</label><input type="text" id="ind-telefone"></div>
+        <div><label>Empresa</label><input type="text" id="ind-empresa"></div>
+        <div><label>Cargo</label><input type="text" id="ind-cargo"></div>
+      </div>
+      <div id="ind-aviso" style="margin-top:10px;"></div>
+      <button class="btn" id="ind-enviar" style="margin-top:6px;">Indicar</button>
+      ${minhas.length ? `
+        <div style="margin-top:16px;">
+          <p class="meta" style="margin-bottom:6px;">Suas indicações</p>
+          ${minhas.map(m => `<div style="margin-bottom:6px;">
+            ${esc(m.nome)} — <span class="selo ${CLASSE[m.status]||"pend"}">${ROTULO[m.status]||esc(m.status)}</span>
+          </div>`).join("")}
+        </div>` : ""}
+    </div>`;
+
+  $("#ind-enviar").addEventListener("click", async () => {
+    const b = $("#ind-enviar");
+    b.disabled = true; b.textContent = "Enviando…";
+    try{
+      await rpc("part_indicar_pessoa", {
+        p_evento_slug: EVENTO,
+        p_nome: $("#ind-nome").value.trim(),
+        p_email: $("#ind-email").value.trim(),
+        p_telefone: $("#ind-telefone").value.trim() || null,
+        p_empresa: $("#ind-empresa").value.trim() || null,
+        p_cargo: $("#ind-cargo").value.trim() || null,
+      });
+      aviso("#ind-aviso", "Indicação enviada. A organização vai avaliar.", "ok");
+      carregarIndicar();
+    }catch(e){
+      aviso("#ind-aviso", explicar(e));
+    }finally{ b.disabled = false; b.textContent = "Indicar"; }
+  });
 }
 
 // Catálogo de fornecedores e revistas — links externos cadastrados
