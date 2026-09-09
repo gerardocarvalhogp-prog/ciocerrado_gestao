@@ -410,6 +410,11 @@ def criar_evento(page, jantar, producao, debug):
                                    f"rpa_sympla_{jantar['id']}_preenchido.png")
         page.screenshot(path=print_path)
         log.info("Print salvo em %s — confira antes de prosseguir.", print_path)
+        # pausa pra dar tempo de olhar/mexer na tela na mao (ex.:
+        # "Assunto", campo obrigatorio que o robo ainda nao preenche)
+        # antes do navegador fechar sozinho no fim do main()
+        input("\nFormulário preenchido — dá tempo de conferir/ajustar na tela. "
+              "Pressione Enter aqui para continuar (e fechar o navegador): ")
 
     if logo_tmp:
         os.unlink(logo_tmp)
