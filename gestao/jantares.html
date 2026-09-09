@@ -19,6 +19,16 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- xlsx (SheetJS) na versao community nao grava imagem em celula nem fundo colorido por celula com controle fino — so exceljs faz isso, so pro mailing com a logo -->
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script>
+// Places Autocomplete no campo "Local" (Dados do jantar) — mesma ideia
+// da busca de endereço que o Sympla usa na criação do evento: digita
+// o nome do lugar ou endereço, escolhe da lista, CEP preenche sozinho.
+// Promise em vez de polling: resolve quando o callback do Maps disparar.
+let _googleMapsPronto;
+window.GOOGLE_MAPS_PRONTO = new Promise(r => { _googleMapsPronto = r; });
+window.chamarQuandoGoogleMapsCarregar = () => _googleMapsPronto();
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAlSRsR-i9_BgxtPMnPQVdA833AcfdBGUM&libraries=places&loading=async&callback=chamarQuandoGoogleMapsCarregar" async defer></script>
 <style>
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -729,6 +739,7 @@ async function desenharJantar(){
   $("#jd-patro").addEventListener("input", () => DS.limparInvalido($("#jd-patro")));
   $("#jd-salvar").addEventListener("click", salvarDadosJantar);
   $("#jd-remover").addEventListener("click", removerJantar);
+  iniciarAutocompleteLocal();
   $("#jl-arquivo").addEventListener("change", enviarLogoJantar);
   carregarLogoJantar();
   $("#js-arquivo").addEventListener("change", lerPlanilhaSympla);
@@ -758,6 +769,30 @@ async function desenharJantar(){
   sincHib();
 
   carregarConvidados();
+}
+
+// Places Autocomplete no campo Local — digita o nome do lugar ou
+// endereço, escolhe da lista, CEP preenche sozinho a partir do
+// endereço escolhido. Só CEP: o campo Local continua sendo o texto
+// que a pessoa digitou/escolheu, sem forçar outro formato.
+async function iniciarAutocompleteLocal(){
+  const campo = $("#jd-local");
+  if(!campo || !window.GOOGLE_MAPS_PRONTO) return;
+  await window.GOOGLE_MAPS_PRONTO;
+  // a tela pode ter trocado de jantar (ou saído) enquanto esperava o
+  // Maps carregar — o campo de antes já não existe mais nesse caso
+  if(!document.body.contains(campo)) return;
+
+  const autocomplete = new google.maps.places.Autocomplete(campo, {
+    componentRestrictions: { country: "br" },
+    fields: ["address_components"],
+  });
+  autocomplete.addListener("place_changed", () => {
+    const place = autocomplete.getPlace();
+    const comp = place.address_components || [];
+    const cep = (comp.find(c => c.types.includes("postal_code"))?.long_name || "").replace(/\D/g, "");
+    if(cep) $("#jd-cep").value = cep;
+  });
 }
 
 async function salvarDadosJantar(){
