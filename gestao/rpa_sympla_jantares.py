@@ -330,12 +330,17 @@ def criar_evento(page, jantar, producao, debug):
         # data-minute="30">, dentro de uma lista ROLAVEL. Bater pelos
         # atributos data-hour/data-minute e' preciso (nao depende do
         # texto renderizado nem de posicao); scroll_into_view_if_needed
-        # e' o que faltava antes — o Playwright recusa clicar em algo
-        # que existe no HTML mas esta fora da area visivel da rolagem
-        # ("element is not visible"), que foi exatamente o erro visto
-        # na validacao real.
+        # e' o que faltava antes.
+        #
+        # Achado real: o picker de inicio e o de fim deixam os proprios
+        # elementos no HTML mesmo depois de "fechados" (so' ficam
+        # escondidos, nao removidos) — entao escolher a mesma hora nos
+        # dois (ex.: 19:30 aparecer tanto no de inicio quanto, por
+        # coincidencia, no de fim) bate em DOIS elementos identicos e
+        # o Playwright recusa ("strict mode violation"). :visible
+        # filtra so' o que esta aberto de verdade nesse momento.
         h, m = texto.split(":")
-        item = page.locator(f'.xdsoft_time[data-hour="{int(h)}"][data-minute="{int(m)}"]')
+        item = page.locator(f'.xdsoft_time[data-hour="{int(h)}"][data-minute="{int(m)}"]:visible')
         item.scroll_into_view_if_needed(timeout=4000)
         item.click(timeout=4000)
 
