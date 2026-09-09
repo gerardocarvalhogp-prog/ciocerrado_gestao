@@ -423,6 +423,13 @@ def criar_evento(page, jantar, producao, debug):
     except Exception:
         pass
 
+    # "Nome do Local" e' obrigatorio e continua vazio mesmo depois do
+    # autocomplete preencher CEP/Av.Rua sozinho (esses vem cinza,
+    # auto-derivados; Nome do Local fica branco, pra preencher na mao)
+    page.locator("label", has_text="Nome do Local").locator(
+        "xpath=following::input[1]"
+    ).fill(jantar.get("local") or titulo)
+
     fechar_popup_se_houver(page)
     page.get_by_text("Ingresso gratuito").click()
     page.get_by_role("textbox", name="Ex. 100").fill(str(jantar.get("capacidade") or 8))
