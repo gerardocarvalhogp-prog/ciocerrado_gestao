@@ -109,6 +109,11 @@ tr.linha-clique.marcada:hover{background:rgba(56,120,40,.14);}
 .login h1{font-size:20px;}
 .voltar{background:none;border:none;color:var(--verde);text-decoration:underline;
   font-size:13px;padding:0;margin-bottom:14px;}
+.link-nome{background:none;border:none;color:var(--verde);text-decoration:underline;
+  font:inherit;font-weight:600;padding:0;cursor:pointer;text-align:left;}
+.detalhe-convidado{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:10px;padding:10px 4px;}
+.detalhe-convidado .meta{font-size:11px;}
 
 /* Navegacao entre as telas da equipe. Cada tela e um .html isolado —
    sem isto, trocar de tela exigia saber a URL de cor. */
@@ -705,7 +710,7 @@ async function desenharJantar(){
   $("#av-salvar").addEventListener("click", salvarAvulso);
   $("#cv-exportar").addEventListener("click", exportarMailing);
   $("#cv-etiquetas").addEventListener("click", exportarEtiquetasJantar);
-  $("#cv-crachas-qr").addEventListener("click", imprimirCrachasJantar);
+  $("#cv-crachas-qr").addEventListener("click", () => imprimirCrachasJantar());
 
   let bsDebounce;
   $("#bs-busca").addEventListener("input", () => {
@@ -1231,7 +1236,7 @@ async function salvarAvulso(){
   finally{ b.disabled = false; b.textContent = "Adicionar"; }
 }
 
-const ROTULO_ST = { sugerido:"Sugerido", convidado:"Convidado",
+const ROTULO_ST = { sugerido:"Sugerido", convidado:"Convidado", em_analise:"Em análise",
   confirmado:"Confirmado", recusado:"Recusou", compareceu:"Compareceu" };
 
 async function carregarConvidados(){
@@ -1240,23 +1245,29 @@ async function carregarConvidados(){
   try{
     const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
     CONVIDADOS_ATUAL = l;
+    // ja vem ordenado por nome do banco (jantar_convidados_listar)
     box.innerHTML = l.length === 0
       ? `<div class="vazio">Nenhum convidado ainda.</div>`
       : `<div class="rolagem"><table>
           <tr><th>Nome</th><th>Empresa</th><th>Identificação</th><th>Status</th><th></th></tr>
           ${l.map(c => `<tr data-id="${esc(c.id)}">
-            <td>${esc(c.nome)}<br><span class="meta">${esc(c.email||"")}</span></td>
+            <td><button type="button" class="link-nome ver-detalhe">${esc(c.nome)}</button>
+                ${c.tem_cracha ? `<span class="selo ok" title="Já é participante do evento grande — tem crachá de lá">Já tem crachá</span>` : ""}
+                <br><span class="meta">${esc(c.email||"")}</span></td>
             <td>${esc(c.empresa||"—")}</td>
             <td>${c.rotulo ? `<span class="selo alerta">${esc(c.rotulo)}</span>` :
                  c.score!=null ? `<span class="selo ${c.score>=70?"ok":"pend"}">${c.score}%</span>` : "—"}</td>
             <td><span class="selo ${c.status==="compareceu"||c.status==="confirmado"?"ok":c.status==="recusado"?"erro":"pend"}">
                   ${esc(ROTULO_ST[c.status]||c.status)}</span></td>
             <td style="white-space:nowrap;">
+              ${c.status !== "em_analise" ? `<button class="btn sec mini st" data-st="em_analise">Em análise</button>` : ""}
               ${c.status !== "confirmado" ? `<button class="btn sec mini st" data-st="confirmado">Confirmar</button>` : ""}
               ${c.status !== "compareceu" ? `<button class="btn ok mini st" data-st="compareceu">Compareceu</button>` : ""}
               ${c.status !== "recusado" ? `<button class="btn sec mini st" data-st="recusado">Recusou</button>` : ""}
+              ${c.tem_cracha ? `<button class="btn sec mini avulsa">Etiqueta avulsa</button>` : ""}
               <button class="btn perigo mini remover">Remover</button>
-            </td></tr>`).join("")}
+            </td></tr>
+            <tr class="linha-detalhe oculto" data-detalhe="${esc(c.id)}"><td colspan="5"></td></tr>`).join("")}
         </table></div>`;
 
     $$(".st", box).forEach(b => b.addEventListener("click", async () => {
@@ -1269,7 +1280,7 @@ async function carregarConvidados(){
     }));
     $$(".remover", box).forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
-      const nome = tr.querySelector("td")?.textContent.trim() || "este convidado";
+      const nome = tr.querySelector(".link-nome")?.textContent.trim() || "este convidado";
       if(!(await DS.confirmar(`${nome} sai da lista deste jantar.`,
           {titulo:"Remover convidado?", tom:"perigo", textoConfirmar:"Remover"}))) return;
       try{
@@ -1279,7 +1290,39 @@ async function carregarConvidados(){
       }
       catch(e){ tr.style.opacity = ""; aviso("#aviso-global", explicar(e)); }
     }));
+    $$(".avulsa", box).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const c = CONVIDADOS_ATUAL.find(x => x.id === tr.dataset.id);
+      if(c) imprimirCrachasJantar([c]);
+    }));
+    $$(".ver-detalhe", box).forEach(b => b.addEventListener("click", () => {
+      const tr = b.closest("tr");
+      const linha = box.querySelector(`.linha-detalhe[data-detalhe="${tr.dataset.id}"]`);
+      const aberta = !linha.classList.contains("oculto");
+      $$(".linha-detalhe", box).forEach(l => l.classList.add("oculto"));
+      if(aberta) return;
+      const c = CONVIDADOS_ATUAL.find(x => x.id === tr.dataset.id);
+      linha.querySelector("td").innerHTML = detalheConvidadoHtml(c);
+      linha.classList.remove("oculto");
+    }));
   }catch(e){ aviso(box, explicar(e)); }
+}
+
+function detalheConvidadoHtml(c){
+  if(!c) return "";
+  const campo = (rotulo, valor) => valor ? `<div><span class="meta">${rotulo}</span><br>${esc(valor)}</div>` : "";
+  return `<div class="detalhe-convidado">
+    ${campo("Cargo", c.cargo)}
+    ${campo("Telefone", c.telefone)}
+    ${campo("Segmento", c.segmento)}
+    ${campo("Cidade/UF", [c.cidade, c.estado].filter(Boolean).join(" / "))}
+    ${campo("Natureza", c.natureza)}
+    ${campo("Origem", c.origem)}
+    ${c.linkedin ? `<div><span class="meta">LinkedIn</span><br><a href="${esc(c.linkedin)}" target="_blank" rel="noopener">${esc(c.linkedin)}</a></div>` : ""}
+    ${campo("Aderência", c.score!=null ? `${c.score}%` : "")}
+    ${campo("Justificativa", c.justificativa)}
+    ${campo("Observação", c.observacao)}
+  </div>`;
 }
 
 // O mailing sai de quem FEZ CHECK-IN, nao de quem foi convidado. É a
@@ -1303,7 +1346,8 @@ async function carregarConvidados(){
 async function exportarEtiquetasJantar(){
   try{
     const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
-    const vao = l.filter(c => c.status !== "recusado");
+    // quem ja tem cracha do evento grande nao entra na emissao em massa
+    const vao = l.filter(c => c.status !== "recusado" && !c.tem_cracha);
     if(vao.length === 0){
       aviso("#aviso-global", "Nenhum convidado ativo neste jantar — as etiquetas sairiam vazias.");
       return;
@@ -1320,17 +1364,26 @@ async function exportarEtiquetasJantar(){
 // carrega "jantar_convidado:<id>" — mesma chave que jantar_checkin_por_qr
 // espera, e como o id ja e unico em jantar_convidados nao precisa levar
 // o jantar_id junto.
-async function imprimirCrachasJantar(){
+//
+// p_lista opcional: quando vem preenchida (etiqueta avulsa, um so
+// convidado que ja tem cracha do evento grande) pula o filtro de
+// tem_cracha — a emissao em massa exclui quem ja tem, mas o botao
+// avulso por linha continua disponivel pra imprimir na mesma hora.
+async function imprimirCrachasJantar(p_lista){
   if(typeof window.QRCode !== "function"){
     aviso("#aviso-global", "Gerador de QR não carregou. Recarregue a página.");
     return;
   }
   let lista;
-  try{
-    const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
-    lista = l.filter(c => c.status !== "recusado")
-             .sort((a,b) => (a.nome||"").localeCompare(b.nome||"", "pt-BR"));
-  }catch(e){ aviso("#aviso-global", explicar(e)); return; }
+  if(Array.isArray(p_lista)){
+    lista = p_lista;
+  }else{
+    try{
+      const l = await rpc("jantar_convidados_listar", { p_jantar_id: J.id });
+      lista = l.filter(c => c.status !== "recusado" && !c.tem_cracha)
+               .sort((a,b) => (a.nome||"").localeCompare(b.nome||"", "pt-BR"));
+    }catch(e){ aviso("#aviso-global", explicar(e)); return; }
+  }
 
   if(lista.length === 0){
     aviso("#aviso-global", "Nenhum convidado ativo neste jantar — os crachás sairiam vazios.");
