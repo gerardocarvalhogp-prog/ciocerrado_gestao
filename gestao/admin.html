@@ -1097,10 +1097,12 @@ ABAS.aprovacoes = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
   try{
-    const [pend, indic] = await Promise.all([
+    const [pend, indic, pre] = await Promise.all([
       rpc("admin_listar_pendentes",  { p_evento_slug: EVENTO }),
-      rpc("admin_listar_indicacoes", { p_evento_slug: EVENTO, p_status: "nova" })
+      rpc("admin_listar_indicacoes", { p_evento_slug: EVENTO, p_status: "nova" }),
+      rpc("admin_listar_pre_cadastros", { p_evento_slug: EVENTO })
     ]);
+    const preAbertos = pre.filter(p => p.status === "aberto" || p.status === "enviado");
 
     c.innerHTML = `
       <h1>Aprovações</h1>
@@ -1112,7 +1114,17 @@ ABAS.aprovacoes = async function(){
 
       <h2 style="margin-top:22px;">Indicações de patrocinadores</h2>
       <div class="cartao" id="box-indic">${indic.length ? "" :
-        `<div class="vazio">Nenhuma indicação nova.</div>`}</div>`;
+        `<div class="vazio">Nenhuma indicação nova.</div>`}</div>
+
+      <h2 style="margin-top:22px;">Pré-cadastro de patrocinador por link</h2>
+      <p class="sub">Gere um link e envie a um prospect específico — ele preenche os próprios dados,
+        você aprova ou reprova (com motivo) antes de virar cadastro de verdade.</p>
+      <div class="cartao">
+        <button class="btn" id="pc-gerar">Gerar novo link</button>
+        <div id="pc-link-aviso" style="margin-top:8px;"></div>
+      </div>
+      <div class="cartao" id="box-pre" style="margin-top:12px;">${preAbertos.length ? "" :
+        `<div class="vazio">Nenhum link em aberto.</div>`}</div>`;
 
     if(pend.length) $("#box-pend").innerHTML = `<table>
       <tr><th>Nome</th><th>Empresa</th><th>Contato</th><th>Origem</th><th></th></tr>
@@ -1152,6 +1164,72 @@ ABAS.aprovacoes = async function(){
         b.disabled = false; b.textContent = "Criar inscrição";
       }
     }));
+
+    if(preAbertos.length) $("#box-pre").innerHTML = `<table>
+      <tr><th>Empresa</th><th>Contato</th><th>Status</th><th></th></tr>
+      ${preAbertos.map(p => `<tr data-id="${esc(p.id)}" data-token="${esc(p.token)}" data-empresa="${esc(p.empresa||"")}">
+        <td><strong>${esc(p.empresa || "(ainda não preenchido)")}</strong>
+            ${p.cnpj ? `<br><span class="meta">${esc(p.cnpj)}</span>` : ""}</td>
+        <td class="meta">${esc(p.nome_contato||"—")}<br>${esc(p.email_contato||"")}</td>
+        <td><span class="selo ${p.status==="enviado"?"alerta":"pend"}">
+              ${p.status==="enviado"?"Aguardando decisão":"Aberto — sem resposta ainda"}</span></td>
+        <td style="white-space:nowrap;">
+          <button class="btn sec mini pc-copiar">Copiar link</button>
+          ${p.status==="enviado" ? `<button class="btn ok mini pc-aprovar">Aprovar</button>
+            <button class="btn perigo mini pc-reprovar">Reprovar</button>` :
+            `<button class="btn perigo mini pc-remover">Remover</button>`}
+        </td></tr>`).join("")}</table>`;
+
+    const linkDoToken = token => new URL("precadastro.html", location.href).href + "?token=" + token;
+
+    $$("#box-pre .pc-copiar").forEach(b => b.addEventListener("click", async () => {
+      const link = linkDoToken(b.closest("tr").dataset.token);
+      try{ await navigator.clipboard.writeText(link); aviso("#aviso-global", "Link copiado.", "ok"); }
+      catch{ prompt("Copie o link:", link); }
+    }));
+
+    $$("#box-pre .pc-remover").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!(await DS.confirmar("O link deixa de funcionar.",
+          {titulo:`Remover convite de "${tr.dataset.empresa || "prospect"}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+      b.disabled = true;
+      try{ await rpc("admin_remover_convite_pre_cadastro", { p_id: tr.dataset.id }); ABAS.aprovacoes(); }
+      catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+
+    $$("#box-pre .pc-aprovar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true; b.textContent = "Aprovando…";
+      try{
+        await rpc("admin_aprovar_pre_cadastro", { p_id: tr.dataset.id });
+        aviso("#aviso-global", `${tr.dataset.empresa} aprovado — vira patrocinador do evento.`, "ok");
+        ABAS.aprovacoes();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; b.textContent = "Aprovar"; }
+    }));
+
+    $$("#box-pre .pc-reprovar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const motivo = prompt(`Por que está reprovando o cadastro de "${tr.dataset.empresa}"? Vai aparecer pra quem preencheu.`);
+      if(!motivo) return;
+      b.disabled = true;
+      try{
+        await rpc("admin_reprovar_pre_cadastro", { p_id: tr.dataset.id, p_motivo: motivo });
+        ABAS.aprovacoes();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+
+    $("#pc-gerar").addEventListener("click", async () => {
+      const b = $("#pc-gerar");
+      b.disabled = true; b.textContent = "Gerando…";
+      try{
+        const r = await rpc("admin_criar_convite_pre_cadastro", { p_evento_slug: EVENTO });
+        const link = linkDoToken(r.token);
+        try{ await navigator.clipboard.writeText(link); }catch{}
+        aviso("#pc-link-aviso", `Link gerado e copiado: ${link}`, "ok");
+        ABAS.aprovacoes();
+      }catch(e){ aviso("#pc-link-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Gerar novo link"; }
+    });
   }catch(e){ aviso(c, explicar(e)); }
 };
 

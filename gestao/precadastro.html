@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Pré-cadastro de patrocinador · CIO Cerrado</title>
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="icon" href="assets/icons/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/icons/favicon-16x16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="assets/icons/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/design-system.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/design-system.js"></script>
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--papel);color:var(--texto);
+  font-family:'Public Sans',system-ui,sans-serif;font-size:15px;line-height:1.5;
+}
+button{font-family:inherit;cursor:pointer;}
+:focus-visible{outline:2px solid var(--ouro);outline-offset:2px;}
+
+.topo{
+  background:var(--verde);color:#fff;padding:14px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:16px;letter-spacing:-.01em;}
+.marca span{
+  display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;opacity:.7;
+}
+.wrap{max-width:680px;margin:0 auto;padding:26px 20px 80px;}
+h1{font-family:'Archivo',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
+h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
+.sub{color:var(--suave);font-size:13.5px;margin:0 0 22px;}
+.linha{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.linha > div{flex:1;min-width:170px;}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--suave);margin-bottom:4px;}
+input[type=text],input[type=email],input[type=tel],select{
+  width:100%;padding:10px 12px;border:1px solid var(--linha);
+  border-radius:var(--raio);font:inherit;background:#fff;
+}
+.vazio{color:var(--suave);padding:24px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="topo">
+  <div class="marca">CIO Cerrado<span>Pré-cadastro de patrocinador</span></div>
+</div>
+<div class="wrap">
+  <div id="conteudo"><p class="sub">Carregando…</p></div>
+</div>
+
+<script>
+const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
+
+const TOKEN = new URLSearchParams(location.search).get("token") || "";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { db: { schema: "gestao" } });
+
+const $  = (s,r=document) => r.querySelector(s);
+const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function aviso(alvo, texto, tipo="erro"){
+  const el = typeof alvo === "string" ? $(alvo) : alvo;
+  if(!el) return;
+  el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
+}
+function explicar(e){ return e?.message || String(e); }
+
+async function rpc(nome, params){
+  const { data, error } = await sb.rpc(nome, params);
+  if(error) throw error;
+  return data;
+}
+
+const c = $("#conteudo");
+
+async function iniciar(){
+  if(!TOKEN){
+    c.innerHTML = `<div class="cartao"><div class="vazio">
+      Link inválido — falta o token. Peça o link correto à organização do CIO Cerrado.
+    </div></div>`;
+    return;
+  }
+
+  let d;
+  try{ d = await rpc("pre_cadastro_obter", { p_token: TOKEN }); }
+  catch(e){ c.innerHTML = `<div class="cartao"><div class="vazio">${esc(explicar(e))}</div></div>`; return; }
+
+  if(!d.ok){
+    c.innerHTML = `<div class="cartao"><div class="vazio">
+      Link não encontrado. Confira se copiou o link inteiro, ou peça um novo à organização.
+    </div></div>`;
+    return;
+  }
+
+  if(d.status === "aprovado"){
+    c.innerHTML = `<div class="cartao">
+      <h1>Cadastro aprovado</h1>
+      <p class="sub">O cadastro de ${esc(d.empresa)} já foi aprovado pela organização.
+      Em breve alguém da equipe entra em contato com os próximos passos.</p>
+    </div>`;
+    return;
+  }
+
+  desenharFormulario(d);
+}
+
+function desenharFormulario(d){
+  const reprovado = d.status === "reprovado";
+  c.innerHTML = `
+    <div class="cartao">
+      <h1>Pré-cadastro de patrocinador</h1>
+      <p class="sub">
+        ${d.evento_nome ? `Evento: <strong>${esc(d.evento_nome)}</strong>. ` : ""}
+        Preencha os dados da sua empresa. A organização revisa e confirma por e-mail.
+      </p>
+      ${reprovado ? `<div class="aviso erro" style="display:block;">
+        Este pré-cadastro foi devolvido pela organização.
+        ${d.motivo_reprovacao ? `Motivo: ${esc(d.motivo_reprovacao)}` : ""}
+        Corrija e envie novamente.</div>` : ""}
+
+      <h2 style="margin-top:18px;">Empresa</h2>
+      <div class="linha">
+        <div><label>Nome da empresa *</label><input type="text" id="pc-empresa" value="${esc(d.empresa||"")}"></div>
+        <div><label>CNPJ</label><input type="text" id="pc-cnpj" value="${esc(d.cnpj||"")}"></div>
+      </div>
+      <div class="linha">
+        <div><label>Site</label><input type="text" id="pc-site" placeholder="empresa.com.br" value="${esc(d.site||"")}"></div>
+        <div><label>Segmento</label><input type="text" id="pc-segmento" value="${esc(d.segmento||"")}"></div>
+        <div style="max-width:160px;"><label>Natureza</label>
+          <select id="pc-natureza">
+            <option value="">—</option>
+            <option value="privada" ${d.natureza==="privada"?"selected":""}>Privada</option>
+            <option value="hibrida" ${d.natureza==="hibrida"?"selected":""}>Híbrida</option>
+            <option value="publica" ${d.natureza==="publica"?"selected":""}>Pública</option>
+          </select></div>
+      </div>
+      <div class="linha">
+        <div><label>Cidade</label><input type="text" id="pc-cidade" value="${esc(d.cidade||"")}"></div>
+        <div style="max-width:100px;"><label>UF</label><input type="text" id="pc-estado" value="${esc(d.estado||"")}"></div>
+      </div>
+      <div class="linha">
+        <div><label>O que a empresa vende</label>
+          <input type="text" id="pc-vende" placeholder="Cloud, AWS, migração e FinOps" value="${esc(d.o_que_vende||"")}"></div>
+      </div>
+      <div class="linha">
+        <div><label>Resumo das atividades</label>
+          <input type="text" id="pc-resumo" placeholder="O que a empresa faz, em uma linha" value="${esc(d.resumo||"")}"></div>
+      </div>
+
+      <h2 style="margin-top:18px;">Contato</h2>
+      <p class="sub">Quem está preenchendo — a organização usa isso para confirmar o cadastro.</p>
+      <div class="linha">
+        <div><label>Nome *</label><input type="text" id="pc-nome-contato" value="${esc(d.nome_contato||"")}"></div>
+        <div><label>E-mail *</label><input type="email" id="pc-email-contato" value="${esc(d.email_contato||"")}"></div>
+        <div style="max-width:180px;"><label>Telefone</label><input type="tel" id="pc-telefone-contato" value="${esc(d.telefone_contato||"")}"></div>
+      </div>
+
+      <div id="pc-aviso"></div>
+      <button class="btn" id="pc-enviar" style="margin-top:8px;">Enviar</button>
+    </div>`;
+
+  $("#pc-enviar").addEventListener("click", enviar);
+}
+
+async function enviar(){
+  const empresa = $("#pc-empresa").value.trim();
+  const nomeContato = $("#pc-nome-contato").value.trim();
+  const emailContato = $("#pc-email-contato").value.trim();
+
+  if(!empresa){ aviso("#pc-aviso", "Informe o nome da empresa."); return; }
+  if(!nomeContato || !emailContato){ aviso("#pc-aviso", "Informe nome e e-mail de contato."); return; }
+
+  const btn = $("#pc-enviar");
+  btn.disabled = true; btn.textContent = "Enviando…";
+  try{
+    await rpc("pre_cadastro_enviar", {
+      p_token: TOKEN, p_empresa: empresa,
+      p_cnpj: $("#pc-cnpj").value.trim() || null,
+      p_segmento: $("#pc-segmento").value.trim() || null,
+      p_o_que_vende: $("#pc-vende").value.trim() || null,
+      p_site: $("#pc-site").value.trim() || null,
+      p_resumo: $("#pc-resumo").value.trim() || null,
+      p_cidade: $("#pc-cidade").value.trim() || null,
+      p_estado: $("#pc-estado").value.trim().toUpperCase() || null,
+      p_natureza: $("#pc-natureza").value || null,
+      p_nome_contato: nomeContato,
+      p_email_contato: emailContato,
+      p_telefone_contato: $("#pc-telefone-contato").value.trim() || null
+    });
+    c.innerHTML = `<div class="cartao">
+      <h1>Recebemos seu cadastro</h1>
+      <p class="sub">A organização do CIO Cerrado vai revisar os dados de ${esc(empresa)}
+      e confirma por e-mail em breve. Obrigado!</p>
+    </div>`;
+  }catch(e){
+    aviso("#pc-aviso", explicar(e));
+    btn.disabled = false; btn.textContent = "Enviar";
+  }
+}
+
+iniciar();
+</script>
+</body>
+</html>
