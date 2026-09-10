@@ -10,6 +10,10 @@
 sympla_sessao.json
 rpa_sympla_login_erro.png
 rpa_sympla_erro_*.png
+# qualquer outro screenshot de debug do RPA de jantares (preenchido,
+# preview de convite etc.) — podem conter e-mail/CNPJ/endereco de
+# convidado, alem da sessao logada acima
+rpa_sympla_*.png
 
 # Sistema
 Thumbs.db
