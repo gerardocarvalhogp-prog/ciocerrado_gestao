@@ -12,6 +12,15 @@
     return t.content.firstElementChild;
   }
 
+  // mensagem/titulo às vezes vêm de dado do banco (nome de empresa,
+  // patrocinador, convidado) — sem isso, dava pra injetar HTML na sessão
+  // autenticada de quem clica (normalmente um admin).
+  function escHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
   function garantirToasts() {
     let host = document.querySelector(".ds-toasts");
     if (!host) {
@@ -25,7 +34,7 @@
     opcoes = opcoes || {};
     const tom = opcoes.tom || "info";
     const host = garantirToasts();
-    const el = elemento(`<div class="ds-toast tom-${tom}" role="status">${mensagem}</div>`);
+    const el = elemento(`<div class="ds-toast tom-${tom}" role="status">${escHtml(mensagem)}</div>`);
     host.appendChild(el);
     requestAnimationFrame(() => el.classList.add("aberto"));
     const duracao = opcoes.duracao || 4200;
@@ -52,8 +61,8 @@
       const backdrop = elemento(`
         <div class="ds-backdrop">
           <div class="ds-modal tom-${tom}" role="alertdialog" aria-modal="true" aria-labelledby="ds-modal-titulo">
-            <h2 id="ds-modal-titulo">${titulo}</h2>
-            <p>${mensagem}</p>
+            <h2 id="ds-modal-titulo">${escHtml(titulo)}</h2>
+            <p>${escHtml(mensagem)}</p>
             <div class="ds-modal-acoes">
               <button type="button" class="btn sec" data-acao="cancelar">${textoCancelar}</button>
               <button type="button" class="btn${tom === "perigo" ? " perigo" : ""}" data-acao="confirmar">${textoConfirmar}</button>
