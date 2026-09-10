@@ -494,10 +494,160 @@ function desenhar(){
     <p class="sub">${esc(STATUS.empresa || "")}</p>
     <div class="trilha">${trilha()}</div>
     <div id="aviso-global"></div>
-    <div id="area"></div>`;
+    <div id="area"></div>
+    <div id="materiais"></div>
+    <div id="meusdados"></div>
+    <div id="indicar"></div>`;
 
   if(STATUS.rooming_liberado) areaRooming();
   else areaBloqueada();
+  carregarMateriais();
+  carregarMeusDados();
+  carregarIndicar();
+}
+
+// Corrigir os proprios dados de cadastro (telefone, cargo, empresa,
+// segmento, cidade/estado, linkedin) — nao depende de rooming liberado.
+// Email nao entra: e' a chave de identidade do login.
+async function carregarMeusDados(){
+  const box = $("#meusdados");
+  let d;
+  try{
+    const linhas = await rpc("part_meus_dados", { p_evento_slug: EVENTO });
+    d = linhas?.[0];
+    if(!d){ box.innerHTML = ""; return; }
+  }catch(e){ box.innerHTML = ""; return; }
+
+  box.innerHTML = `
+    <h2 style="margin-top:22px;">Meus dados</h2>
+    <div class="cartao">
+      <p class="sub" style="margin-bottom:14px;">
+        Encontrou algo errado no seu cadastro? Corrija aqui.
+      </p>
+      <div class="barra">
+        <div><label>Nome</label><input type="text" id="md-nome" value="${esc(d.nome||"")}"></div>
+        <div><label>Telefone</label><input type="text" id="md-telefone" value="${esc(d.telefone||"")}"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>Cargo</label><input type="text" id="md-cargo" value="${esc(d.cargo||"")}"></div>
+        <div><label>Empresa</label><input type="text" id="md-empresa" value="${esc(d.empresa||"")}"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>Segmento</label><input type="text" id="md-segmento" value="${esc(d.segmento||"")}"></div>
+        <div><label>Cidade</label><input type="text" id="md-cidade" value="${esc(d.cidade||"")}"></div>
+        <div style="max-width:90px;"><label>UF</label><input type="text" id="md-estado" maxlength="2" value="${esc(d.estado||"")}"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>LinkedIn</label><input type="text" id="md-linkedin" placeholder="https://linkedin.com/in/…" value="${esc(d.linkedin||"")}"></div>
+      </div>
+      <div id="md-aviso" style="margin-top:10px;"></div>
+      <button class="btn" id="md-salvar" style="margin-top:6px;">Salvar</button>
+    </div>`;
+
+  $("#md-salvar").addEventListener("click", async () => {
+    const b = $("#md-salvar");
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      await rpc("part_salvar_meus_dados", {
+        p_evento_slug: EVENTO,
+        p_nome: $("#md-nome").value.trim(),
+        p_telefone: $("#md-telefone").value.trim() || null,
+        p_cargo: $("#md-cargo").value.trim() || null,
+        p_empresa: $("#md-empresa").value.trim() || null,
+        p_segmento: $("#md-segmento").value.trim() || null,
+        p_cidade: $("#md-cidade").value.trim() || null,
+        p_estado: $("#md-estado").value.trim() || null,
+        p_linkedin: $("#md-linkedin").value.trim() || null,
+      });
+      aviso("#md-aviso", "Dados atualizados.", "ok");
+      carregar();
+    }catch(e){
+      aviso("#md-aviso", explicar(e));
+    }finally{ b.disabled = false; b.textContent = "Salvar"; }
+  });
+}
+
+// Indicar outra pessoa para o evento: cria uma inscricao pendente, que
+// cai na mesma fila de aprovacao de qualquer outra origem — a
+// organizacao decide, ninguem recebe e-mail sem essa aprovacao.
+async function carregarIndicar(){
+  const box = $("#indicar");
+  let minhas = [];
+  try{ minhas = await rpc("part_minhas_indicacoes", { p_evento_slug: EVENTO }); }
+  catch(e){ box.innerHTML = ""; return; }
+
+  const ROTULO = { pendente:"Em análise", aprovado:"Aprovada", recusado:"Não aprovada", cancelado:"Cancelada" };
+  const CLASSE = { pendente:"pend", aprovado:"ok", recusado:"erro", cancelado:"erro" };
+
+  box.innerHTML = `
+    <h2 style="margin-top:22px;">Indicar outra pessoa</h2>
+    <div class="cartao">
+      <p class="sub" style="margin-bottom:14px;">
+        Conhece alguém que deveria participar? Indique aqui — a organização avalia
+        antes de qualquer contato.
+      </p>
+      <div class="barra">
+        <div><label>Nome</label><input type="text" id="ind-nome"></div>
+        <div><label>E-mail</label><input type="email" id="ind-email"></div>
+      </div>
+      <div class="barra" style="margin-top:10px;">
+        <div><label>Telefone</label><input type="text" id="ind-telefone"></div>
+        <div><label>Empresa</label><input type="text" id="ind-empresa"></div>
+        <div><label>Cargo</label><input type="text" id="ind-cargo"></div>
+      </div>
+      <div id="ind-aviso" style="margin-top:10px;"></div>
+      <button class="btn" id="ind-enviar" style="margin-top:6px;">Indicar</button>
+      ${minhas.length ? `
+        <div style="margin-top:16px;">
+          <p class="meta" style="margin-bottom:6px;">Suas indicações</p>
+          ${minhas.map(m => `<div style="margin-bottom:6px;">
+            ${esc(m.nome)} — <span class="selo ${CLASSE[m.status]||"pend"}">${ROTULO[m.status]||esc(m.status)}</span>
+          </div>`).join("")}
+        </div>` : ""}
+    </div>`;
+
+  $("#ind-enviar").addEventListener("click", async () => {
+    const b = $("#ind-enviar");
+    b.disabled = true; b.textContent = "Enviando…";
+    try{
+      await rpc("part_indicar_pessoa", {
+        p_evento_slug: EVENTO,
+        p_nome: $("#ind-nome").value.trim(),
+        p_email: $("#ind-email").value.trim(),
+        p_telefone: $("#ind-telefone").value.trim() || null,
+        p_empresa: $("#ind-empresa").value.trim() || null,
+        p_cargo: $("#ind-cargo").value.trim() || null,
+      });
+      aviso("#ind-aviso", "Indicação enviada. A organização vai avaliar.", "ok");
+      carregarIndicar();
+    }catch(e){
+      aviso("#ind-aviso", explicar(e));
+    }finally{ b.disabled = false; b.textContent = "Indicar"; }
+  });
+}
+
+// Catálogo de fornecedores e revistas — links externos cadastrados
+// pela organização (admin.html, aba Equipe). Não depende de rooming
+// liberado nem contrato assinado: quem está inscrito já pode ver.
+async function carregarMateriais(){
+  const box = $("#materiais");
+  try{
+    const l = await rpc("part_listar_materiais_cio", { p_evento_slug: EVENTO });
+    if(l.length === 0){ box.innerHTML = ""; return; }
+
+    const grupos = { catalogo: [], revista: [] };
+    l.forEach(m => (grupos[m.tipo] || []).push(m));
+
+    const bloco = (titulo, itens) => itens.length ? `
+      <h2 style="margin-top:22px;">${titulo}</h2>
+      <div class="cartao">
+        ${itens.map(m => `<div style="margin-bottom:8px;">
+          <a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.titulo)}</a>
+        </div>`).join("")}
+      </div>` : "";
+
+    box.innerHTML = bloco("Catálogo de fornecedores", grupos.catalogo) + bloco("Revistas", grupos.revista);
+  }catch(e){ box.innerHTML = ""; }
 }
 
 // A trilha diz exatamente onde a pessoa está e o que falta.
@@ -644,11 +794,7 @@ async function areaRooming(){
       <div class="fatura" id="fatura"></div>
       <div id="aviso-rooming"></div>
       <button class="btn" id="salvar-rooming">Confirmar dados</button>
-    </div>
-
-    <div class="cartao" id="cartao-quarto-extra"></div>`;
-
-  carregarQuartoExtra();
+    </div>`;
 
   $("#add-pessoa").addEventListener("click", () => {
     ACOMPANHANTES.push({ nome:"", cpf:"", data_nascimento:"", tipo:"adulto",
@@ -666,82 +812,6 @@ async function areaRooming(){
   });
 
   desenharPessoas();
-}
-
-// O quarto principal comporta ate 4 (a mensagem de "acima disso e
-// quarto adicional" ja existia, so nunca oferecia a opcao). Reusa
-// patro_disponibilidade — apesar do nome, e so leitura agregada por
-// tipo (quantos livres, preco), sem dado de patrocinador nenhum.
-async function carregarQuartoExtra(){
-  const box = $("#cartao-quarto-extra");
-  box.innerHTML = `<p class="carregando">Carregando…</p>`;
-
-  let disponibilidade, meusQuartos;
-  try{
-    [disponibilidade, meusQuartos] = await Promise.all([
-      rpc("patro_disponibilidade", { p_evento_slug: EVENTO }),
-      rpc("part_listar_meus_quartos", { p_evento_slug: EVENTO })
-    ]);
-  }catch(e){ aviso(box, explicar(e)); return; }
-
-  const extras = meusQuartos.filter(q => q.origem === "extra");
-  const ROTULO_TIPO = { single:"Single", duplo:"Duplo", triplo:"Triplo" };
-
-  box.innerHTML = `
-    <h2>Quarto adicional</h2>
-    <p class="sub" style="margin-bottom:12px;">
-      Seu quarto comporta até 4 pessoas. Precisa de mais espaço — família grande,
-      quer um quarto separado — compre um adicional aqui. Entra na sua fatura.
-    </p>
-
-    ${extras.length ? `
-      <div style="margin-bottom:12px;">
-        ${extras.map(q => `
-          <div class="linha" style="align-items:center;">
-            <div><strong>${esc(q.rotulo)}</strong> · ${ROTULO_TIPO[q.tipo]||esc(q.tipo)}
-              ${q.quarto_numero ? ` · nº ${esc(q.quarto_numero)}` : ` · <span class="fila-nota">ainda sem número</span>`}</div>
-            <div style="min-width:auto;"><button class="btn perigo mini qe-cancelar" data-id="${esc(q.reserva_id)}">Cancelar</button></div>
-          </div>`).join("")}
-      </div>` : ""}
-
-    <div class="linha">
-      ${disponibilidade.map(d => `
-        <div>
-          <button class="btn sec mini qe-comprar" data-tipo="${esc(d.tipo)}" ${Number(d.livres) ? "" : "disabled"}>
-            Comprar ${ROTULO_TIPO[d.tipo]||esc(d.tipo)}
-          </button>
-          <p class="fila-nota" style="margin:4px 0 0;">
-            ${Number(d.livres) ? `${d.livres} livre(s) · ${moeda(d.valor)}` : "Esgotado"}
-          </p>
-        </div>`).join("")}
-    </div>
-    <div id="qe-aviso"></div>`;
-
-  $$(".qe-comprar", box).forEach(b => b.addEventListener("click", async () => {
-    b.disabled = true;
-    try{
-      const r = await rpc("part_comprar_quarto", { p_evento_slug: EVENTO, p_tipo: b.dataset.tipo });
-      if(!r.ok){
-        aviso("#qe-aviso", "Esse tipo acabou de esgotar — tente outro.", "erro");
-        carregarQuartoExtra();
-        return;
-      }
-      aviso("#qe-aviso", "Quarto adicional comprado — já entra na sua fatura.", "ok");
-      carregarQuartoExtra();
-      atualizarFatura();
-    }catch(e){ aviso("#qe-aviso", explicar(e)); b.disabled = false; }
-  }));
-
-  $$(".qe-cancelar", box).forEach(b => b.addEventListener("click", async () => {
-    if(!(await DS.confirmar("O quarto volta a ficar disponível pra outra pessoa.",
-        {titulo:"Cancelar este quarto adicional?", tom:"perigo", textoConfirmar:"Cancelar"}))) return;
-    b.disabled = true;
-    try{
-      await rpc("part_cancelar_quarto_extra", { p_reserva_id: b.dataset.id });
-      carregarQuartoExtra();
-      atualizarFatura();
-    }catch(e){ aviso("#qe-aviso", explicar(e)); b.disabled = false; }
-  }));
 }
 
 function desenharPessoas(){

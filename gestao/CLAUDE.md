@@ -136,7 +136,7 @@ Conferido no banco local (`supabase db reset` + `supabase/tests/`):
   Ouro não aparece para a Esmeralda
 
 Conferido no hospedado, por consulta ao catálogo e por requisição real
-com a chave anon (ver README §7):
+com a chave anon (ver README §8):
 
 - as 97 RPCs que as telas chamam existem, com os nomes de parâmetro
   batendo

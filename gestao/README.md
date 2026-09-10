@@ -143,7 +143,39 @@ Sem essa etapa, o painel funciona normalmente — só os botões
 
 ---
 
-## 5. Integrações
+## 5. Edge Function de e-mail
+
+`admin.html` já mantém a fila de notificação (aba Equipe → "Fila de e-mail") e chama
+esta função para despachá-la — mas ela nunca manda nada de verdade sem os dois passos
+abaixo, de propósito:
+
+```bash
+supabase functions deploy enviar-notificacoes
+supabase secrets set RESEND_API_KEY=re_...       # a conta é a do gerardocarvalhogp@gmail.com
+supabase secrets set AMBIENTE=producao            # sem isso, so' monta e mostra — nao envia
+```
+
+**`AMBIENTE=producao` é o interruptor real.** Sem essa variável (ou com qualquer outro
+valor), a função monta cada e-mail da fila, devolve no JSON de resposta para conferência
+e **não** chama o Resend nem marca nada como enviado — a fila fica intacta. É o modo de
+teste, e é o padrão: mesma lógica do `--producao` do `integracao.py`, produção é sempre
+flag explícita, nunca comportamento default. Só depois de setar as três coisas acima o
+botão "Enviar toda a fila" do admin dispara e-mail de verdade.
+
+Sem `RESEND_API_KEY` configurada (com `AMBIENTE=producao` setado), a função recusa
+rodar — melhor falhar visível do que fingir que enviou. Confira também que
+`ciocerrado.com.br` está com SPF/DKIM verificados no painel do Resend: sem isso o
+Resend aceita a chamada e devolve 200, mas o e-mail não chega em ninguém.
+
+Tipos de notificação já disparados pelo sistema hoje: `inscricao_aprovada`,
+`autocadastro_recebido`, `convite_evento`, `rooming_ok`, `cobranca_<etapa>`. O botão
+"Enviar teste para mim" (aba Equipe) manda só uma mensagem para o próprio e-mail de
+quem clicou, sem tocar no resto da fila — use para conferir a configuração antes de
+soltar a fila inteira em cima de gente real.
+
+---
+
+## 6. Integrações
 
 `integracao.py` roda fora do banco, no Agendador de Tarefas — mesmo
 lugar do `rotina_cerrado.py`.
@@ -189,9 +221,94 @@ em nada — vale conferir a lista antes do primeiro disparo real.
 O Sympla nunca aprova ninguém sozinho: inscrição nova entra como
 `pendente` e espera decisão humana no painel.
 
+### Criar o evento do jantar no Sympla — `rpa_sympla_jantares.py`
+
+A API pública do Sympla **só lê** (eventos, participantes, checkin) — não existe
+endpoint para criar evento, subir logo/banner ou lançar convite/cortesia. Confirmado
+antes de escrever este script: a biblioteca cliente de referência da API só expõe
+métodos de leitura, e a própria Sympla descreve a API pública como "obter informações
+dos eventos criados por você". Criar e configurar evento continua sendo ação só do
+painel — então `rpa_sympla_jantares.py` automatiza o **navegador** (Playwright) em vez
+de chamar API, clicando no painel de produtor como um humano clicaria.
+
+Onde a logo e a mensagem do jantar ficam: `jantares.html`, dentro de cada jantar
+("Dados do jantar" e "Logo para a página do evento") — preenche aqui, o robô lê dali.
+
+**Calibrado a partir de uma gravação real** (`playwright codegen`, criando um evento e
+mandando convite de verdade no painel) — os seletores não são mais placeholder. Ainda
+assim, teste com `--debug` antes de confiar em `--producao`: o Sympla pode mudar a tela
+a qualquer momento, sem aviso, e um seletor que sumiu quebra o robô sem meio-termo. Uns
+poucos pontos ficaram marcados `# TODO CALIBRAR` no código — passos que a gravação não
+deixou claros o suficiente (CEP padrão do local, se a busca de endereço exige escolher
+uma opção da lista, o link direto pra tela de convite de um evento já criado).
+
+```bash
+pip install playwright
+playwright install chromium
+```
+
+O login do Sympla pede senha **e** dois códigos de confirmação (e-mail e WhatsApp) — não
+dá pra automatizar sozinho, então é um passo à parte, rodado uma vez (ou quando a sessão
+expirar):
+
+```bash
+python rpa_sympla_jantares.py --login               # interativo, pede os dois códigos
+python rpa_sympla_jantares.py --criar                # modo seguro, só mostra
+python rpa_sympla_jantares.py --criar --producao     # cria e publica de verdade
+python rpa_sympla_jantares.py --convites --producao
+python rpa_sympla_jantares.py --debug --criar        # navegador visível, p/ recalibrar
+```
+
+`--login` salva a sessão autenticada em `sympla_sessao.json`, ao lado do script —
+`--criar`/`--convites` reaproveitam esse arquivo depois, sem repetir OTP a cada execução
+(mesmo princípio do "Mantenha-me conectado" marcado no login). **Esse arquivo é tão
+sensível quanto uma senha** (é uma sessão logada de verdade) — já está no `.gitignore`,
+nunca commitar.
+
+O robô publica o evento (clica "Publicar Evento" + "Entendi") mas para aí: a gravação
+mostrou que todo evento novo entra "Em análise" no Sympla antes de ficar visível de
+verdade, e só sai dali com um segundo clique manual em "Meus eventos" — isso vira o
+checkpoint humano antes do evento ir ao ar, sem precisar de nenhuma lógica extra no robô.
+
+Variáveis de ambiente extras (mesmo `.env` do `integracao.py`):
+
+```
+SYMPLA_EMAIL=...     # login do painel de produtor do Sympla — NÃO é o SYMPLA_TOKEN da API
+SYMPLA_SENHA=...
+```
+
+Mais sensível que o `SYMPLA_TOKEN` (abre o painel inteiro, não só leitura) — nunca vai
+pro `.html` nem é commitada, só no `.env` local ou no Agendador de Tarefas. Se essa senha
+já apareceu em algum lugar fora do `.env` (chat, print, etc.), troque ela no painel do
+Sympla — mais barato trocar do que confiar que ninguém mais viu.
+
+**Achado ao validar isto, e já corrigido:** `is_admin()`/`is_staff()` só reconheciam
+e-mail cadastrado em `admins` — e o token `service_role`, que `integracao.py` já usa pra
+tudo, não carrega e-mail nenhum no JWT. Testado localmente: `is_admin()` dava falso para
+uma chamada autenticada só como `service_role`, então qualquer RPC gateada por
+`_exige_admin()`/`_exige_staff()` (a maioria do schema) recusava a `service_role` — a
+chave mais privilegiada era, ironicamente, a única que não conseguia chamar essas
+funções. Isso incluía `jantar_importar_convidados_sympla`, que `integracao.py --jantares`
+já chama hoje do mesmo jeito: pode ter estado falhando silenciosamente em produção — vale
+conferir o log do Agendador de Tarefas depois de aplicar esta migration. Corrigido na
+raiz (migration `20260909210000`): `is_admin()`/`is_staff()` agora aceitam
+`auth.jwt() ->> 'role' = 'service_role'` também, não só o e-mail — não é uma brecha
+nova, a `service_role` já bypassa RLS por completo em qualquer chamada direta a tabela,
+então só alinha o mesmo nível de confiança pra chamada de RPC. (Tentativa inicial usou
+`current_user = 'service_role'` — quebrou na validação local: dentro de função
+`SECURITY DEFINER`, `current_user` vira o dono da função, não o papel de quem chamou, e
+não sobrevive a duas camadas empilhadas — `auth.jwt()->>'role'` lê uma claim do JWT,
+imune a isso.) Por isso este script (e qualquer RPC nova) usa só a `service_role` de
+sempre, sem precisar de uma segunda credencial de staff.
+
+Por padrão o evento é salvo como **rascunho**, nunca publicado sozinho (confirme no
+código, `# TODO CALIBRAR`, se o Sympla separa "salvar rascunho" de "publicar" no fluxo
+de vocês) — publicar de verdade e mandar convite continua sendo decisão sua, olhando o
+rascunho antes.
+
 ---
 
-## 6. Decisões que valem saber
+## 7. Decisões que valem saber
 
 **Portão do contrato.** O rooming só abre com inscrição aprovada *e*
 contrato assinado. As duas condições são checadas no banco, não só na tela.
@@ -291,7 +408,7 @@ exemplo. A geração das reservas respeita a composição.
 
 ---
 
-## 7. Segurança
+## 8. Segurança
 
 A chave `anon` está publicada dentro dos cinco `.html` — é assim que o
 Supabase funciona. Por isso a pergunta que importa não é "quem tem a
@@ -371,7 +488,7 @@ por senha, mas é um clique.
 supabase db advisors --linked --type security
 ```
 
-## 8. O que ainda não existe
+## 9. O que ainda não existe
 
 - Pagamento da fatura (hoje o valor é calculado e comunicado, não cobrado)
 - Webhook do Autentique — o status é lido por polling, não em tempo real

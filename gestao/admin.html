@@ -1097,10 +1097,12 @@ ABAS.aprovacoes = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
   try{
-    const [pend, indic] = await Promise.all([
+    const [pend, indic, pre] = await Promise.all([
       rpc("admin_listar_pendentes",  { p_evento_slug: EVENTO }),
-      rpc("admin_listar_indicacoes", { p_evento_slug: EVENTO, p_status: "nova" })
+      rpc("admin_listar_indicacoes", { p_evento_slug: EVENTO, p_status: "nova" }),
+      rpc("admin_listar_pre_cadastros", { p_evento_slug: EVENTO })
     ]);
+    const preAbertos = pre.filter(p => p.status === "aberto" || p.status === "enviado");
 
     c.innerHTML = `
       <h1>Aprovações</h1>
@@ -1112,7 +1114,17 @@ ABAS.aprovacoes = async function(){
 
       <h2 style="margin-top:22px;">Indicações de patrocinadores</h2>
       <div class="cartao" id="box-indic">${indic.length ? "" :
-        `<div class="vazio">Nenhuma indicação nova.</div>`}</div>`;
+        `<div class="vazio">Nenhuma indicação nova.</div>`}</div>
+
+      <h2 style="margin-top:22px;">Pré-cadastro de patrocinador por link</h2>
+      <p class="sub">Gere um link e envie a um prospect específico — ele preenche os próprios dados,
+        você aprova ou reprova (com motivo) antes de virar cadastro de verdade.</p>
+      <div class="cartao">
+        <button class="btn" id="pc-gerar">Gerar novo link</button>
+        <div id="pc-link-aviso" style="margin-top:8px;"></div>
+      </div>
+      <div class="cartao" id="box-pre" style="margin-top:12px;">${preAbertos.length ? "" :
+        `<div class="vazio">Nenhum link em aberto.</div>`}</div>`;
 
     if(pend.length) $("#box-pend").innerHTML = `<table>
       <tr><th>Nome</th><th>Empresa</th><th>Contato</th><th>Origem</th><th></th></tr>
@@ -1152,6 +1164,72 @@ ABAS.aprovacoes = async function(){
         b.disabled = false; b.textContent = "Criar inscrição";
       }
     }));
+
+    if(preAbertos.length) $("#box-pre").innerHTML = `<table>
+      <tr><th>Empresa</th><th>Contato</th><th>Status</th><th></th></tr>
+      ${preAbertos.map(p => `<tr data-id="${esc(p.id)}" data-token="${esc(p.token)}" data-empresa="${esc(p.empresa||"")}">
+        <td><strong>${esc(p.empresa || "(ainda não preenchido)")}</strong>
+            ${p.cnpj ? `<br><span class="meta">${esc(p.cnpj)}</span>` : ""}</td>
+        <td class="meta">${esc(p.nome_contato||"—")}<br>${esc(p.email_contato||"")}</td>
+        <td><span class="selo ${p.status==="enviado"?"alerta":"pend"}">
+              ${p.status==="enviado"?"Aguardando decisão":"Aberto — sem resposta ainda"}</span></td>
+        <td style="white-space:nowrap;">
+          <button class="btn sec mini pc-copiar">Copiar link</button>
+          ${p.status==="enviado" ? `<button class="btn ok mini pc-aprovar">Aprovar</button>
+            <button class="btn perigo mini pc-reprovar">Reprovar</button>` :
+            `<button class="btn perigo mini pc-remover">Remover</button>`}
+        </td></tr>`).join("")}</table>`;
+
+    const linkDoToken = token => new URL("precadastro.html", location.href).href + "?token=" + token;
+
+    $$("#box-pre .pc-copiar").forEach(b => b.addEventListener("click", async () => {
+      const link = linkDoToken(b.closest("tr").dataset.token);
+      try{ await navigator.clipboard.writeText(link); aviso("#aviso-global", "Link copiado.", "ok"); }
+      catch{ prompt("Copie o link:", link); }
+    }));
+
+    $$("#box-pre .pc-remover").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!(await DS.confirmar("O link deixa de funcionar.",
+          {titulo:`Remover convite de "${tr.dataset.empresa || "prospect"}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+      b.disabled = true;
+      try{ await rpc("admin_remover_convite_pre_cadastro", { p_id: tr.dataset.id }); ABAS.aprovacoes(); }
+      catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+
+    $$("#box-pre .pc-aprovar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      b.disabled = true; b.textContent = "Aprovando…";
+      try{
+        await rpc("admin_aprovar_pre_cadastro", { p_id: tr.dataset.id });
+        aviso("#aviso-global", `${tr.dataset.empresa} aprovado — vira patrocinador do evento.`, "ok");
+        ABAS.aprovacoes();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; b.textContent = "Aprovar"; }
+    }));
+
+    $$("#box-pre .pc-reprovar").forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const motivo = prompt(`Por que está reprovando o cadastro de "${tr.dataset.empresa}"? Vai aparecer pra quem preencheu.`);
+      if(!motivo) return;
+      b.disabled = true;
+      try{
+        await rpc("admin_reprovar_pre_cadastro", { p_id: tr.dataset.id, p_motivo: motivo });
+        ABAS.aprovacoes();
+      }catch(e){ aviso("#aviso-global", explicar(e)); b.disabled = false; }
+    }));
+
+    $("#pc-gerar").addEventListener("click", async () => {
+      const b = $("#pc-gerar");
+      b.disabled = true; b.textContent = "Gerando…";
+      try{
+        const r = await rpc("admin_criar_convite_pre_cadastro", { p_evento_slug: EVENTO });
+        const link = linkDoToken(r.token);
+        try{ await navigator.clipboard.writeText(link); }catch{}
+        aviso("#pc-link-aviso", `Link gerado e copiado: ${link}`, "ok");
+        ABAS.aprovacoes();
+      }catch(e){ aviso("#pc-link-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Gerar novo link"; }
+    });
   }catch(e){ aviso(c, explicar(e)); }
 };
 
@@ -1919,7 +1997,7 @@ ABAS.quartos = async function(){
       if(!reservas.has(p.reserva_id))
         reservas.set(p.reserva_id, {
           reserva_id:p.reserva_id, empresa:p.empresa, quarto_tipo:p.quarto_tipo,
-          quarto_id:p.quarto_id, quarto_numero:p.quarto_numero, publico:p.publico, gente:[] });
+          quarto_id:p.quarto_id, quarto_numero:p.quarto_numero, gente:[] });
       reservas.get(p.reserva_id).gente.push(p.nome);
     });
     const lista = [...reservas.values()];
@@ -1952,11 +2030,7 @@ ABAS.quartos = async function(){
       await blocoEquipe();
     }
 
-    // quarto bloqueado pra outro publico nem aparece como opcao — a
-    // recusa no banco (admin_alocar_quarto) e so o cinto de seguranca,
-    // aqui evita a viagem e a tela nao oferece o que ja sabe que vai falhar
     const opcoes = r => livres
-      .filter(l => !l.publico_alvo || l.publico_alvo === r.publico)
       .map(l => `<option value="${esc(l.id)}">${esc(l.numero||"s/n")} · ${esc(l.tipo)} (${l.capacidade})</option>`)
       .join("");
 
@@ -2004,9 +2078,7 @@ async function alocar(el, liberar=false){
       // o banco recusou por um motivo que a tela precisa explicar
       aviso("#aviso-global", r.motivo === "quarto_ocupado"
         ? "Esse quarto acabou de ser ocupado por outra reserva."
-        : r.motivo === "publico_incompativel"
-          ? `Esse quarto está bloqueado para ${r.publico_quarto} — essa reserva é de ${r.publico_reserva}.`
-          : `Não cabe: a reserva tem ${r.ocupantes} pessoa(s) e o quarto comporta ${r.capacidade}.`);
+        : `Não cabe: a reserva tem ${r.ocupantes} pessoa(s) e o quarto comporta ${r.capacidade}.`);
     }
     ABAS.quartos();
   }catch(e){
@@ -2671,22 +2743,32 @@ ABAS.arquivos = async function(){
         p_evento_slug: EVENTO, p_status: $("#ar-status").value || null
       });
 
+      const extensao = nome => { const m = /\.([a-z0-9]+)$/i.exec(nome||""); return m ? m[1].toUpperCase() : ""; };
+      const porTipoEmpresa = {};
+      lista.forEach(u => (porTipoEmpresa[u.patrocinador_id + "|" + u.tipo] =
+        porTipoEmpresa[u.patrocinador_id + "|" + u.tipo] || []).push(u));
+
       $("#ar-tabela").innerHTML = lista.length ? `
         <tr><th>Empresa</th><th>Tipo</th><th>Arquivo</th><th>Enviado</th><th>Situação</th><th></th></tr>
-        ${lista.map(u => `<tr data-id="${esc(u.id)}" data-path="${esc(u.storage_path)}">
+        ${lista.map(u => {
+          const grupo = porTipoEmpresa[u.patrocinador_id + "|" + u.tipo];
+          const rotuloTipo = ROTULO_TIPO_UPLOAD[u.tipo] || u.tipo;
+          return `<tr data-id="${esc(u.id)}" data-path="${esc(u.storage_path)}">
           <td><strong>${esc(u.empresa)}</strong></td>
-          <td>${esc(ROTULO_TIPO_UPLOAD[u.tipo] || u.tipo)}</td>
+          <td>${esc(grupo.length > 1 ? `${rotuloTipo} ${u.ordem}` : rotuloTipo)}</td>
           <td>${esc(u.nome_arquivo||"—")}
-              ${u.tamanho_bytes ? `<br><span class="meta">${(u.tamanho_bytes/1024/1024).toFixed(1)} MB</span>` : ""}</td>
+              ${extensao(u.nome_arquivo) ? `<br><span class="meta">${extensao(u.nome_arquivo)}` +
+                (u.tamanho_bytes ? ` · ${(u.tamanho_bytes/1024/1024).toFixed(1)} MB` : "") +
+                (u.largura && u.altura ? ` · ${u.largura}×${u.altura}px` : "") + `</span>` : ""}</td>
           <td class="meta">${dataBR((u.enviado_em||"").slice(0,10))}</td>
           <td><span class="selo ${u.status==='aprovado'?'ok':u.status==='rejeitado'?'pend':''}">${ROTULO_STATUS_UPLOAD_ADMIN[u.status]||u.status}</span>
               ${u.observacao_admin ? `<br><span class="meta">${esc(u.observacao_admin)}</span>` : ""}</td>
           <td style="white-space:nowrap;">
-            <button class="btn sec mini ar-baixar">Baixar</button>
+            <button class="btn sec mini ar-baixar">Visualizar</button>
             ${SOU_ADMIN ? `<button class="btn mini ar-aprovar">Aprovar</button>
               <button class="btn perigo mini ar-rejeitar">Rejeitar</button>` : ""}
           </td>
-        </tr>`).join("")}`
+        </tr>`;}).join("")}`
         : `<tr><td style="color:var(--suave)">Nenhum arquivo enviado ainda.</td></tr>`;
 
       $$(".ar-baixar", c).forEach(b => b.addEventListener("click", async () => {
@@ -3183,10 +3265,20 @@ ABAS.relatorios = function(){
       <button class="btn sec" id="r-pesquisa">Carregar</button>
       <div id="box-pesquisa"></div>
     </div>
+
+    <div class="cartao">
+      <h2>Relatório do Lounge</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Patrocinadores com número de lounge, uma linha por contato — mesmo formato do mailing list.
+      </p>
+      <button class="btn sec" id="r-lounge">Carregar</button>
+      <div id="box-lounge"></div>
+    </div>
 `;
 
   $("#r-mailing").addEventListener("click",  () => relMailing());
   $("#r-pesquisa").addEventListener("click", () => relPesquisa());
+  $("#r-lounge").addEventListener("click",   () => relLounge());
 };
 
 // Puxa todas as paginas: o Data API corta em 1000 linhas por resposta.
@@ -3248,6 +3340,27 @@ async function relPesquisa(){
   }catch(e){ aviso(box, explicar(e)); }
 }
 
+async function relLounge(){
+  const box = $("#box-lounge");
+  box.innerHTML = DS.skeletonCartoes(3);
+  try{
+    const l = await rpc("admin_rel_lounge", { p_evento_slug: EVENTO });
+    box.innerHTML = `
+      <p class="meta" style="margin:10px 0;">${l.length} registro(s).</p>
+      <button class="btn sec mini" id="x-lounge">Exportar Excel</button>
+      <div class="rolagem" style="max-height:280px;margin-top:10px;">
+        <table><tr><th>Lounge</th><th>Empresa</th><th>Cota</th><th>Contato</th><th>E-mail</th></tr>
+        ${l.slice(0,100).map(r => `<tr><td>${esc(r.lounge)}</td><td>${esc(r.empresa)}</td>
+          <td class="meta">${esc(r.cota||"—")}</td><td class="meta">${esc(r.contato_nome||"sem contato cadastrado")}</td>
+          <td class="meta">${esc(r.contato_email||"—")}</td></tr>`).join("")}</table>
+      </div>`;
+    $("#x-lounge").addEventListener("click", () => exportar(l, [
+      ["lounge","LOUNGE"],["empresa","EMPRESA"],["cota","COTA"],["segmento","SEGMENTO"],
+      ["site","SITE"],["contato_nome","CONTATO"],["contato_email","E-MAIL"],["contato_telefone","TELEFONE"]
+    ], "relatorio-lounge-cio-cerrado.xlsx", "Lounge"));
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
 // =====================================================================
 // ABA: FINANCEIRO
 //
@@ -3262,19 +3375,53 @@ const ROTULO_FAT = {
 const SELO_FAT = {
   estimada:"pend", emitida:"alerta", paga:"ok", cancelada:"erro"
 };
+const ROTULO_PAG = { aberto:"Em aberto", parcial:"Parcial", pago:"Pago" };
 
 ABAS.financeiro = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
 
   try{
-    const r = await rpc("admin_financeiro_resumo", { p_evento_slug: EVENTO });
+    const [r, rc, cotasFin] = await Promise.all([
+      rpc("admin_financeiro_resumo", { p_evento_slug: EVENTO }),
+      rpc("admin_financeiro_cotas_resumo", { p_evento_slug: EVENTO }),
+      rpc("admin_listar_financeiro_cotas", { p_evento_slug: EVENTO })
+    ]);
 
     c.innerHTML = `
       <h1>Financeiro</h1>
+
+      <h2>Cota (contrato)</h2>
+      <p class="sub">Valor contratado por empresa e status de pagamento — separado dos adicionais abaixo.</p>
+      <div class="cartao">
+        <p class="meta" style="margin:0;">
+          <strong style="font-size:15px;color:var(--verde);">${moeda(rc.contratado)}</strong>
+          contratado ·
+          ${moeda(rc.pago)} pago ·
+          ${moeda(rc.em_aberto)} em aberto
+          ${Number(rc.qtd_vencidas) ? ` · <span class="selo erro">${rc.qtd_vencidas} vencida(s), ${moeda(rc.vencido)}</span>` : ""}
+        </p>
+      </div>
+      <div class="cartao"><div class="rolagem"><table>
+        <tr><th>Empresa</th><th>Cota</th><th>Valor</th><th>Status</th><th>Vencimento</th><th></th></tr>
+        ${cotasFin.length ? cotasFin.map(f => `<tr data-id="${esc(f.id)}" data-empresa="${esc(f.empresa)}"
+                              data-valor="${f.valor_contratado ?? ""}" data-status="${esc(f.status_pagamento)}"
+                              data-vencimento="${esc(f.data_vencimento||"")}" data-pagamento="${esc(f.data_pagamento||"")}"
+                              data-obs="${esc(f.observacao_pagamento||"")}">
+          <td><strong>${esc(f.empresa)}</strong></td>
+          <td class="meta">${esc(f.cota||"sem cota")}</td>
+          <td>${f.valor_contratado != null ? moeda(f.valor_contratado) : "—"}</td>
+          <td><span class="selo ${f.status_pagamento==="pago"?"ok":f.vencido?"erro":"pend"}">
+                ${f.vencido ? "Vencido" : ROTULO_PAG[f.status_pagamento]||f.status_pagamento}</span></td>
+          <td class="meta">${f.data_vencimento ? dataBR(f.data_vencimento) : "—"}</td>
+          <td><button class="btn sec mini fc-marcar">Alterar</button></td>
+        </tr>`).join("") : `<tr><td colspan="6" style="color:var(--suave)">Nenhum patrocinador ativo neste evento.</td></tr>`}
+      </table></div></div>
+      <div id="fc-detalhe"></div>
+
+      <h2 style="margin-top:26px;">Adicionais</h2>
       <p class="sub">
         Valores adicionais de familiar, criança, transfer e quarto extra.
-        A cota do patrocinador não entra aqui — ela é do contrato.
       </p>
 
       <div class="cartao">
@@ -3307,6 +3454,9 @@ ABAS.financeiro = async function(){
       <div id="fi-aviso"></div>
       <div class="cartao"><div class="rolagem"><table id="fi-tabela"></table></div></div>
       <div id="fi-detalhe"></div>`;
+
+    $$(".fc-marcar").forEach(b =>
+      b.addEventListener("click", () => abrirMarcarCota(b.closest("tr"))));
 
     let FAT = [];
 
@@ -3487,6 +3637,58 @@ function abrirMarcar(tr){
   });
 }
 
+function abrirMarcarCota(tr){
+  const box = $("#fc-detalhe");
+  box.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+  box.innerHTML = `
+    <h2 style="margin-top:16px;">Cota · ${esc(tr.dataset.empresa)}</h2>
+    <div class="cartao">
+      <div class="barra">
+        <div style="max-width:170px;"><label>Valor contratado</label>
+          <input type="text" id="fc-valor" placeholder="Ex.: 50000" value="${esc(tr.dataset.valor||"")}"></div>
+        <div style="max-width:170px;"><label>Status</label>
+          <select id="fc-status">
+            ${["aberto","parcial","pago"].map(s =>
+              `<option value="${s}" ${s===tr.dataset.status?"selected":""}>${ROTULO_PAG[s]}</option>`).join("")}
+          </select></div>
+        <div style="max-width:180px;"><label>Vencimento</label>
+          <input type="date" id="fc-venc" value="${esc(tr.dataset.vencimento||"")}"></div>
+        <div style="max-width:180px;"><label>Data do pagamento</label>
+          <input type="date" id="fc-pgto" value="${esc(tr.dataset.pagamento||"")}"></div>
+      </div>
+      <div class="barra">
+        <div><label>Observação</label><input type="text" id="fc-obs" value="${esc(tr.dataset.obs||"")}"></div>
+      </div>
+      <div id="fc-aviso"></div>
+      <button class="btn" id="fc-salvar">Salvar</button>
+      <button class="btn sec" id="fc-cancelar" style="margin-left:6px;">Fechar</button>
+    </div>`;
+
+  $("#fc-cancelar").addEventListener("click", () => box.innerHTML = "");
+
+  $("#fc-salvar").addEventListener("click", async () => {
+    const b = $("#fc-salvar");
+    b.disabled = true; b.textContent = "Salvando…";
+    try{
+      await rpc("admin_definir_pagamento_patrocinador", {
+        p_id: tr.dataset.id,
+        p_valor_contratado: parseFloat($("#fc-valor").value.replace(",",".")) || null,
+        p_status_pagamento: $("#fc-status").value,
+        p_data_vencimento: $("#fc-venc").value || null,
+        p_data_pagamento: $("#fc-pgto").value || null,
+        p_observacao: $("#fc-obs").value.trim() || null
+      });
+      aviso("#aviso-global", `${tr.dataset.empresa}: cota atualizada.`, "ok");
+      box.innerHTML = "";
+      ABAS.financeiro();
+    }catch(e){
+      aviso("#fc-aviso", explicar(e));
+      b.disabled = false; b.textContent = "Salvar";
+    }
+  });
+}
+
 // =====================================================================
 // ABA: ESTRUTURA  (evento · cotas · quartos)
 // =====================================================================
@@ -3652,16 +3854,22 @@ async function blocoCotas(){
             <input type="text" id="co-limite-ind" placeholder="sem limite"></div>
           <div style="max-width:150px;"><label>Escolhe convidados</label>
             <select id="co-escolhe"><option value="1">Sim</option><option value="0">Não (sorteio)</option></select></div>
+          <div style="max-width:150px;"><label>Valor sugerido</label>
+            <input type="text" id="co-valor" placeholder="Ex.: 50000"></div>
           <div style="min-width:auto;"><button class="btn" id="co-salvar">Salvar cota</button>
             <button class="btn sec" id="co-cancelar" style="margin-left:6px;display:none;">Cancelar edição</button></div>
         </div>
+        <p class="meta" style="margin:0 0 8px;">
+          Valor sugerido é referência para o cadastro do patrocinador — o valor de fato
+          contratado por empresa fica na aba Financeiro, porque pode divergir da tabela.
+        </p>
         <p class="meta" style="margin:0 0 8px;">
           A cota pode misturar tipos — 2 duplos e 2 singles, por exemplo. Deixe zero no que não usar.
           "Escolhe convidados" em Não tira a cota da fila de escolha — as vagas dela são preenchidas
           por sorteio em Mesas e jantares, não pelo próprio patrocinador.
         </p>
         <div class="barra" style="align-items:flex-end;">
-          <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-logo"> Logo</label></div>
+          <div style="max-width:110px;"><label>Logos (qtd.)</label><input type="text" id="co-up-logo" placeholder="0"></div>
           <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-banner"> Banner</label></div>
           <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-revista"> Arte de revista</label></div>
           <div style="min-width:auto;"><label class="check"><input type="checkbox" id="co-up-apresentacao"> Apresentação</label></div>
@@ -3684,17 +3892,19 @@ async function blocoCotas(){
                             data-mesa="${c.vagas_mesa_redonda}"
                             data-limite-ind="${c.limite_indicacoes ?? ""}"
                             data-escolhe="${c.escolhe_convidados === false ? 0 : 1}"
-                            data-up-logo="${c.upload_logo?1:0}" data-up-banner="${c.upload_banner?1:0}"
+                            data-up-logo="${c.upload_logo_qtd||0}" data-up-banner="${c.upload_banner?1:0}"
                             data-up-revista="${c.upload_arte_revista?1:0}" data-up-apresentacao="${c.upload_apresentacao?1:0}"
                             data-up-video="${c.upload_video?1:0}" data-up-prazo="${esc(c.prazo_upload || "")}"
-                            data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}">
+                            data-reuniao="${c.tem_reuniao_exclusiva?1:0}" data-jantar="${c.tem_jantar?1:0}"
+                            data-valor="${c.valor_sugerido ?? ""}">
             ${COTA_UNICA ? "" : `<td class="meta">${c.ordem_prioridade}</td>
               <td class="meta">${c.janela_horas ? c.janela_horas + "h" : "sem limite"}
                 ${c.prazo_indicacao
                    ? `<br>teto ${dataBR(c.prazo_indicacao)}` + (c.prazo_indicacao < HOJE_ISO
                        ? ` <span class="selo pend">vencido</span>` : "")
                    : ""}</td>`}
-            <td><strong>${esc(c.nome)}</strong></td>
+            <td><strong>${esc(c.nome)}</strong>
+                ${c.valor_sugerido ? `<br><span class="meta">${moeda(c.valor_sugerido)}</span>` : ""}</td>
             <td>${esc(comp(c.quartos))}<br><span class="meta">${c.total_quartos} no total</span></td>
             <td>${c.vagas_mesa_redonda || "—"}</td>
             <td>${c.tem_reuniao_exclusiva ? "Sim" : "—"}</td>
@@ -3702,7 +3912,7 @@ async function blocoCotas(){
             <td class="meta">${c.limite_indicacoes ?? "sem limite"}</td>
             <td>${c.escolhe_convidados === false ? `<span class="selo alerta">Sorteio</span>` : "Sim"}</td>
             <td class="meta">${[
-                c.upload_logo && "Logo", c.upload_banner && "Banner",
+                c.upload_logo_qtd > 0 && `Logo (${c.upload_logo_qtd})`, c.upload_banner && "Banner",
                 c.upload_arte_revista && "Arte", c.upload_apresentacao && "Apresentação",
                 c.upload_video && "Vídeo"
               ].filter(Boolean).join(", ") || "—"}</td>
@@ -3736,20 +3946,21 @@ async function blocoCotas(){
       $("#co-jantar").value = t.jantar;
       $("#co-limite-ind").value = t.limiteInd || "";
       $("#co-escolhe").value = t.escolhe;
-      $("#co-up-logo").checked = t.upLogo === "1";
+      $("#co-up-logo").value = t.upLogo || "";
       $("#co-up-banner").checked = t.upBanner === "1";
       $("#co-up-revista").checked = t.upRevista === "1";
       $("#co-up-apresentacao").checked = t.upApresentacao === "1";
       $("#co-up-video").checked = t.upVideo === "1";
       $("#co-up-prazo").value = t.upPrazo || "";
+      $("#co-valor").value = t.valor || "";
       $("#co-cancelar").style.display = "";
       $("#co-nome").focus();
     }));
 
     $("#co-cancelar").addEventListener("click", () => {
-      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo"]
+      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
         .forEach(s => $(s).value = "");
-      ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
+      ["#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
         .forEach(s => $(s).checked = false);
       if($("#co-ordem"))  $("#co-ordem").value  = "";
       if($("#co-prazo"))  $("#co-prazo").value  = "";
@@ -3873,16 +4084,17 @@ async function salvarCota(){
       p_janela_horas: parseInt($("#co-janela")?.value, 10) || null,
       p_limite_indicacoes: parseInt($("#co-limite-ind").value, 10) || null,
       p_escolhe_convidados: $("#co-escolhe").value === "1",
-      p_upload_logo: $("#co-up-logo").checked,
+      p_upload_logo_qtd: parseInt($("#co-up-logo").value,10) || 0,
       p_upload_banner: $("#co-up-banner").checked,
       p_upload_arte_revista: $("#co-up-revista").checked,
       p_upload_apresentacao: $("#co-up-apresentacao").checked,
       p_upload_video: $("#co-up-video").checked,
-      p_prazo_upload: $("#co-up-prazo").value || null
+      p_prazo_upload: $("#co-up-prazo").value || null,
+      p_valor_sugerido: parseFloat($("#co-valor").value.replace(",",".")) || null
     });
-    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo"]
+    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
       .forEach(s => $(s).value = "");
-    ["#co-up-logo","#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
+    ["#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
       .forEach(s => $(s).checked = false);
     if($("#co-ordem"))  $("#co-ordem").value  = "";
     if($("#co-prazo"))  $("#co-prazo").value  = "";
@@ -3938,28 +4150,6 @@ async function blocoQuartos(){
               </button></div>
           </div>
           <div id="qta-aviso"></div>
-        </div>
-        <div style="border-top:1px solid var(--linha);margin-top:12px;padding-top:12px;">
-          <p class="meta" style="margin:0 0 8px;">
-            Reserve uma faixa pra um público antes mesmo de vendas/inscrições — CIO, Organização
-            ou Cotas param de disputar esses números com os outros. "Liberar" volta ao pool geral.
-          </p>
-          <div class="barra">
-            <div style="max-width:100px;"><label>De</label><input type="text" id="qtb-de" placeholder="200"></div>
-            <div style="max-width:100px;"><label>Até</label><input type="text" id="qtb-ate" placeholder="279"></div>
-            <div style="max-width:150px;"><label>Público</label>
-              <select id="qtb-publico">
-                <option value="">Liberar (pool geral)</option>
-                <option value="cio">CIO</option>
-                <option value="organizacao">Organização</option>
-                <option value="cotas">Cotas</option>
-              </select></div>
-            <div style="min-width:auto;">
-              <button class="btn sec" id="qt-publico" title="Bloqueia ou libera a faixa pro publico escolhido">
-                Aplicar
-              </button></div>
-          </div>
-          <div id="qtb-aviso"></div>
         </div>
         <div style="border-top:1px solid var(--linha);margin-top:12px;padding-top:12px;">
           <p class="sub" style="margin-bottom:8px;">
@@ -4047,24 +4237,6 @@ async function blocoQuartos(){
       finally{ b.disabled = false; b.textContent = "Alterar tipo da faixa"; }
     });
 
-    $("#qt-publico").addEventListener("click", async () => {
-      const de = $("#qtb-de").value.trim(), ate = $("#qtb-ate").value.trim();
-      const publico = $("#qtb-publico").value || null;
-      if(!de || !ate){ aviso("#qtb-aviso","Informe a faixa."); return; }
-
-      const b = $("#qt-publico");
-      b.disabled = true; b.textContent = "Aplicando…";
-      try{
-        const res = await rpc("admin_definir_publico_faixa", {
-          p_evento_slug: EVENTO, p_de: de, p_ate: ate, p_publico_alvo: publico });
-        aviso("#qtb-aviso", res.alterados
-          ? `${res.alterados} quarto(s) ${publico ? "bloqueado(s) para " + publico : "liberado(s) pro pool geral"}.`
-          : `Nenhum quarto nessa faixa precisava mudar.`, "ok");
-        blocoQuartos();
-      }catch(e){ aviso("#qtb-aviso", explicar(e)); }
-      finally{ b.disabled = false; b.textContent = "Aplicar"; }
-    });
-
     $("#mp-arquivo").addEventListener("change", e => {
       const f = e.target.files[0];
       if(f) importarMapaResort(f);
@@ -4083,38 +4255,46 @@ async function carregarQuartosIndividual(){
       p_evento_slug: EVENTO, p_busca: $("#qi-busca").value.trim() || null
     });
     tbl.innerHTML = `
-      <tr><th>Número</th><th>Tipo</th><th>Público</th><th>Bloco</th><th>Status</th><th>Ocupado por</th><th></th></tr>
-      ${lista.map(q => `<tr data-id="${esc(q.id)}">
+      <tr><th>Número</th><th>Tipo</th><th>Bloco</th><th>Status</th><th>Ocupado por</th><th></th></tr>
+      ${lista.map(q => `<tr data-id="${esc(q.id)}" data-reserva="${esc(q.reserva_id||"")}">
         <td>${esc(q.numero||"—")}</td>
         <td><select class="qi-tipo">
           <option value="single" ${q.tipo==="single"?"selected":""}>Single</option>
           <option value="duplo"  ${q.tipo==="duplo" ?"selected":""}>Duplo</option>
           <option value="triplo" ${q.tipo==="triplo"?"selected":""}>Triplo</option>
         </select></td>
-        <td><select class="qi-publico">
-          <option value="" ${!q.publico_alvo?"selected":""}>Pool geral</option>
-          <option value="cio" ${q.publico_alvo==="cio"?"selected":""}>CIO</option>
-          <option value="organizacao" ${q.publico_alvo==="organizacao"?"selected":""}>Organização</option>
-          <option value="cotas" ${q.publico_alvo==="cotas"?"selected":""}>Cotas</option>
-        </select></td>
         <td class="meta">${esc(q.bloco||"—")}</td>
         <td class="meta">${esc(q.status)}</td>
-        <td class="meta">${esc(q.ocupado_por||"—")}</td>
-        <td><button class="btn sec mini qi-salvar">Salvar</button></td>
-      </tr>`).join("") || `<tr><td colspan="7" style="color:var(--suave)">Nada com essa busca.</td></tr>`}`;
+        <td>${q.reserva_id
+          ? `<input type="text" class="qi-ocupado" value="${esc(q.ocupado_por||"")}" placeholder="Nome — Empresa">`
+          : `<span class="meta">${esc(q.ocupado_por||"—")}</span>`}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn sec mini qi-salvar">Salvar tipo</button>
+          ${q.reserva_id ? `<button class="btn sec mini qi-salvar-ocupado">Salvar ocupante</button>` : ""}
+        </td>
+      </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nada com essa busca.</td></tr>`}`;
 
     $$(".qi-salvar", tbl).forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
       const tipo = tr.querySelector(".qi-tipo").value;
-      const publico = tr.querySelector(".qi-publico").value || null;
       b.disabled = true; b.textContent = "Salvando…";
       try{
-        const res = await rpc("admin_editar_tipo_quarto",
-          { p_id: tr.dataset.id, p_tipo: tipo, p_publico_alvo: publico });
-        aviso("#qi-aviso", `Quarto ${res.numero || "—"} agora é ${tipo}${publico ? " · bloqueado para " + publico : ""}.`, "ok");
-        b.disabled = false; b.textContent = "Salvar";
+        const res = await rpc("admin_editar_tipo_quarto", { p_id: tr.dataset.id, p_tipo: tipo });
+        aviso("#qi-aviso", `Quarto ${res.numero || "—"} agora é ${tipo}.`, "ok");
+        b.disabled = false; b.textContent = "Salvar tipo";
         blocoQuartos();
-      }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar"; }
+      }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar tipo"; }
+    }));
+
+    $$(".qi-salvar-ocupado", tbl).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const texto = tr.querySelector(".qi-ocupado").value;
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        await rpc("admin_definir_ocupado_por", { p_reserva_id: tr.dataset.reserva, p_texto: texto });
+        aviso("#qi-aviso", "Ocupante atualizado.", "ok");
+      }catch(e){ aviso("#qi-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Salvar ocupante"; }
     }));
   }catch(e){ aviso("#qi-tabela", explicar(e)); }
 }
@@ -4368,7 +4548,8 @@ ABAS.patrocinadores = async function(){
         ${lista.length ? `<table>
           <tr><th><input type="checkbox" id="pt-marcar-todos"></th>
               <th>Empresa</th><th>Cota</th><th>O que vende</th><th>Quartos</th><th>Usuários</th><th></th></tr>
-          ${lista.map(p => `<tr data-id="${esc(p.id)}" data-empresa="${esc(p.empresa)}"
+          ${lista.map(p => `<tr data-id="${esc(p.id)}" data-empresa-id="${esc(p.empresa_id)}"
+                                data-empresa="${esc(p.empresa)}"
                                 data-cota="${esc(p.cota||"")}" data-cnpj="${esc(p.cnpj||"")}"
                                 data-seg="${esc(p.segmento||"")}" data-vende="${esc(p.o_que_vende||"")}"
                                 data-site="${esc(p.site||"")}" data-resumo="${esc(p.resumo||"")}"
@@ -4527,7 +4708,7 @@ ABAS.patrocinadores = async function(){
 
     $$(".pt-usuarios").forEach(b => b.addEventListener("click", () => {
       const tr = b.closest("tr");
-      abrirUsuarios(tr.dataset.id, tr.dataset.empresa);
+      abrirUsuarios(tr.dataset.empresaId, tr.dataset.empresa);
     }));
   }catch(e){ aviso(c, explicar(e)); }
 };
@@ -4640,18 +4821,19 @@ async function enriquecerUmGestor(id, nome, empresa){
     .filter(k => String(d[k] || "").trim()).length;
 }
 
-async function abrirUsuarios(id, empresa){
+async function abrirUsuarios(empresaId, empresa){
   const box = $("#pt-detalhe");
   box.innerHTML = DS.skeletonCartoes(3);
   box.scrollIntoView({ behavior:"smooth", block:"nearest" });
 
   try{
-    const l = await rpc("admin_listar_usuarios_patro", { p_patrocinador_id: id });
+    const l = await rpc("admin_listar_usuarios_patro", { p_empresa_id: empresaId });
     box.innerHTML = `
       <div class="cartao">
         <h2>Usuários · ${esc(empresa)}</h2>
         <p class="sub" style="margin-bottom:12px;">
-          Todos veem os mesmos quartos. O login é por link no e-mail — o endereço precisa estar exato.
+          Cadastro único da empresa — vale para todo evento em que ela participar, não só o atual.
+          O login é por link no e-mail — o endereço precisa estar exato.
         </p>
         <div class="barra">
           <div><label>E-mail</label><input type="email" id="up-email"></div>
@@ -4682,11 +4864,11 @@ async function abrirUsuarios(id, empresa){
       b.disabled = true; b.textContent = "Salvando…";
       try{
         await rpc("admin_salvar_usuario_patro", {
-          p_patrocinador_id: id, p_email: email,
+          p_empresa_id: empresaId, p_email: email,
           p_nome: $("#up-nome").value.trim() || null,
           p_telefone: $("#up-tel").value.trim() || null
         });
-        abrirUsuarios(id, empresa);
+        abrirUsuarios(empresaId, empresa);
       }catch(e){ aviso("#up-aviso", explicar(e)); }
       finally{ b.disabled = false; b.textContent = "Adicionar"; }
     });
@@ -4695,7 +4877,7 @@ async function abrirUsuarios(id, empresa){
       b.disabled = true;
       try{
         await rpc("admin_remover_usuario_patro", { p_id: b.closest("tr").dataset.id });
-        abrirUsuarios(id, empresa);
+        abrirUsuarios(empresaId, empresa);
       }catch(e){ aviso("#up-aviso", explicar(e)); b.disabled = false; }
     }));
   }catch(e){ aviso(box, explicar(e)); }
@@ -5666,11 +5848,34 @@ ABAS.equipe = async function(){
         O teste manda uma mensagem só para o seu e-mail e não toca no resto da fila —
         use para conferir a configuração antes de disparar avisos para outras pessoas.
       </p>
+    </div>
+
+    <div class="cartao">
+      <h2>Materiais do CIO</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Catálogo de fornecedores e revistas — links externos que aparecem na área do CIO
+        (rooming.html). Valem para todo evento, não só o selecionado aqui em cima.
+      </p>
+      <div class="barra">
+        <div style="max-width:150px;"><label>Tipo</label>
+          <select id="mc-tipo">
+            <option value="catalogo">Catálogo</option>
+            <option value="revista">Revista</option>
+          </select></div>
+        <div><label>Título</label><input type="text" id="mc-titulo" placeholder="Ex.: Edição de setembro"></div>
+        <div><label>URL</label><input type="text" id="mc-url" placeholder="https://…"></div>
+        <div style="max-width:90px;"><label>Ordem</label><input type="text" id="mc-ordem" placeholder="0"></div>
+        <div style="min-width:auto;"><button class="btn" id="mc-salvar">Salvar</button></div>
+      </div>
+      <div id="mc-aviso"></div>
+      <div id="mc-lista" style="margin-top:10px;">${DS.skeletonLinhas(2)}</div>
     </div>`;
 
   $("#eq-salvar").addEventListener("click", salvarMembro);
   listarEquipe();
   carregarFilaEmail();
+  $("#mc-salvar").addEventListener("click", salvarMaterialCio);
+  listarMateriaisCio();
 
   // Teste isolado: enfileira uma mensagem para o proprio usuario e
   // dispara SO ela. Sem isso, a unica forma de testar seria mandar a
@@ -5684,10 +5889,16 @@ ABAS.equipe = async function(){
         { body: { id: t.id } });
       if(error) throw error;
       if(data?.erro) throw new Error(data.erro);
-      aviso("#nt-aviso", data.enviadas
-        ? `Teste enviado para ${t.destinatario}. Se não chegar em alguns minutos, confira se o domínio está verificado no Resend.`
-        : `Não saiu: ${data.com_erro} com erro. Veja o detalhe na fila.`,
-        data.enviadas ? "ok" : "erro");
+      if(data.modo === "teste"){
+        const p = data.previa?.[0];
+        aviso("#nt-aviso", `Modo de teste (nenhum e-mail sai daqui): assunto "${esc(p?.assunto||"")}" ` +
+          `para ${esc(p?.destinatario||"")}. Para enviar de verdade, configure AMBIENTE=producao na function.`, "ok");
+      } else {
+        aviso("#nt-aviso", data.enviadas
+          ? `Teste enviado para ${t.destinatario}. Se não chegar em alguns minutos, confira se o domínio está verificado no Resend.`
+          : `Não saiu: ${data.com_erro} com erro. Veja o detalhe na fila.`,
+          data.enviadas ? "ok" : "erro");
+      }
       carregarFilaEmail();
     }catch(e){
       const m = explicar(e);
@@ -5713,10 +5924,16 @@ ABAS.equipe = async function(){
       const { data, error } = await sb.functions.invoke("enviar-notificacoes", { body: {} });
       if(error) throw error;
       if(data?.erro) throw new Error(data.erro);
-      aviso("#nt-aviso",
-        `${data.enviadas} enviado(s)` +
-        (data.com_erro ? ` · ${data.com_erro} com erro` : "") + ".",
-        data.com_erro ? "erro" : "ok");
+      if(data.modo === "teste"){
+        aviso("#nt-aviso", `Modo de teste (nenhum e-mail sai daqui): ${data.previa?.length||0} montado(s) — ` +
+          `${(data.previa||[]).map(p=>esc(p.destinatario)).join(", ")}. ` +
+          `Para enviar de verdade, configure AMBIENTE=producao na function.`, "ok");
+      } else {
+        aviso("#nt-aviso",
+          `${data.enviadas} enviado(s)` +
+          (data.com_erro ? ` · ${data.com_erro} com erro` : "") + ".",
+          data.com_erro ? "erro" : "ok");
+      }
       carregarFilaEmail();
     }catch(e){
       // erro mais provável aqui é a chave do Resend não estar configurada —
@@ -5757,6 +5974,71 @@ async function carregarFilaEmail(){
       $("#nt-erros").innerHTML = "";
     }
   }catch(e){ aviso("#nt-resumo", explicar(e)); }
+}
+
+const ROTULO_MATERIAL_CIO = { catalogo: "Catálogo", revista: "Revista" };
+
+async function listarMateriaisCio(){
+  try{
+    const l = await rpc("admin_listar_materiais_cio", {});
+    $("#mc-lista").innerHTML = l.length ? `<table>
+      <tr><th>Tipo</th><th>Título</th><th>URL</th><th>Ativo</th><th></th></tr>
+      ${l.map(m => `<tr data-id="${esc(m.id)}" data-tipo="${esc(m.tipo)}"
+                        data-titulo="${esc(m.titulo)}" data-url="${esc(m.url)}"
+                        data-ordem="${m.ordem}" data-ativo="${m.ativo?1:0}">
+        <td class="meta">${esc(ROTULO_MATERIAL_CIO[m.tipo]||m.tipo)}</td>
+        <td>${esc(m.titulo)}</td>
+        <td class="meta"><a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.url)}</a></td>
+        <td>${m.ativo ? "Sim" : `<span class="selo pend">Não</span>`}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn sec mini mc-editar">Editar</button>
+          <button class="btn perigo mini mc-apagar">Remover</button>
+        </td></tr>`).join("")}</table>`
+      : `<div class="vazio">Nenhum material cadastrado.</div>`;
+
+    $$(".mc-editar", $("#mc-lista")).forEach(b => b.addEventListener("click", () => {
+      const t = b.closest("tr").dataset;
+      $("#mc-tipo").value = t.tipo;
+      $("#mc-titulo").value = t.titulo;
+      $("#mc-url").value = t.url;
+      $("#mc-ordem").value = t.ordem;
+      $("#mc-salvar").dataset.editando = b.closest("tr").dataset.id;
+      $("#mc-titulo").focus();
+    }));
+
+    $$(".mc-apagar", $("#mc-lista")).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      if(!(await DS.confirmar("Some da área do CIO imediatamente.",
+          {titulo:`Remover "${tr.dataset.titulo}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
+      b.disabled = true;
+      try{ await rpc("admin_remover_material_cio", { p_id: tr.dataset.id }); listarMateriaisCio(); }
+      catch(e){ aviso("#mc-aviso", explicar(e)); b.disabled = false; }
+    }));
+  }catch(e){ aviso("#mc-lista", explicar(e)); }
+}
+
+async function salvarMaterialCio(){
+  const titulo = $("#mc-titulo").value.trim();
+  const url = $("#mc-url").value.trim();
+  if(!titulo || !url){
+    aviso("#mc-aviso", "Informe título e URL.");
+    return;
+  }
+
+  const b = $("#mc-salvar");
+  const editando = b.dataset.editando || null;
+  b.disabled = true; b.textContent = "Salvando…";
+  try{
+    await rpc("admin_salvar_material_cio", {
+      p_id: editando, p_tipo: $("#mc-tipo").value,
+      p_titulo: titulo, p_url: url,
+      p_ordem: parseInt($("#mc-ordem").value,10) || 0, p_ativo: true
+    });
+    $("#mc-titulo").value = ""; $("#mc-url").value = ""; $("#mc-ordem").value = "";
+    delete b.dataset.editando;
+    listarMateriaisCio();
+  }catch(e){ aviso("#mc-aviso", explicar(e)); }
+  finally{ b.disabled = false; b.textContent = "Salvar"; }
 }
 
 async function listarEquipe(){
