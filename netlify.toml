@@ -37,7 +37,7 @@
   # O site e estatico: os .html carregam supabase-js e SheetJS por CDN.
   # O preparar-site.js nao compila nada, so escolhe o que pode ir ao
   # ar; por isso fica fora do build do Netlify e roda na mao.
-  command = ""
+  command = "node preparar-site.js"
 
 # Sem cache no HTML: as telas carregam a chave anon e o slug do evento
 # em constantes no proprio arquivo. Com cache longo, uma correcao
