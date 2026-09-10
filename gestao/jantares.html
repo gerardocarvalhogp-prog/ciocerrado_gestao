@@ -584,7 +584,8 @@ async function desenharJantar(){
         <div style="max-width:100px;"><label>Horário</label><input type="text" id="jd-hora" value="${esc(J.horario||"")}"></div>
       </div>
       <div class="barra">
-        <div><label>Local</label><input type="text" id="jd-local" value="${esc(J.local||"")}"></div>
+        <div><label>Local</label><input type="text" id="jd-local" value="${esc(J.local||"")}">
+          <div id="jd-local-busca" class="meta" style="margin-top:4px;"></div></div>
         <div style="max-width:130px;"><label>CEP do local</label>
           <input type="text" id="jd-cep" placeholder="00000-000" value="${esc(J.cep||"")}"></div>
         <div style="max-width:110px;"><label>Capacidade</label><input type="text" id="jd-cap" value="${J.capacidade}"></div>
@@ -771,27 +772,38 @@ async function desenharJantar(){
   carregarConvidados();
 }
 
-// Places Autocomplete no campo Local — digita o nome do lugar ou
-// endereço, escolhe da lista, CEP preenche sozinho a partir do
-// endereço escolhido. Só CEP: o campo Local continua sendo o texto
-// que a pessoa digitou/escolheu, sem forçar outro formato.
+// Busca de endereço pra preencher o CEP do local — widget separado do
+// campo Local, não anexado nele. A API antiga (google.maps.places.Autocomplete)
+// se anexava a um <input> existente e deixava a pessoa digitar livremente
+// ali mesmo; a API nova (PlaceAutocompleteElement, obrigatória pra projeto
+// Google Cloud criado depois de 1º/mar/2025 — a antiga não fica disponível
+// pra projeto novo) é um componente próprio, não um plugin de input alheio.
+// Por isso o campo Local continua um <input> comum e livre, e este widget
+// só existe pra escolher um endereço e derivar o CEP dele.
 async function iniciarAutocompleteLocal(){
-  const campo = $("#jd-local");
-  if(!campo || !window.GOOGLE_MAPS_PRONTO) return;
+  const hospedeiro = $("#jd-local-busca");
+  if(!hospedeiro || !window.GOOGLE_MAPS_PRONTO) return;
   await window.GOOGLE_MAPS_PRONTO;
   // a tela pode ter trocado de jantar (ou saído) enquanto esperava o
   // Maps carregar — o campo de antes já não existe mais nesse caso
-  if(!document.body.contains(campo)) return;
+  if(!document.body.contains(hospedeiro)) return;
 
-  const autocomplete = new google.maps.places.Autocomplete(campo, {
-    componentRestrictions: { country: "br" },
-    fields: ["address_components"],
-  });
-  autocomplete.addListener("place_changed", () => {
-    const place = autocomplete.getPlace();
-    const comp = place.address_components || [];
-    const cep = (comp.find(c => c.types.includes("postal_code"))?.long_name || "").replace(/\D/g, "");
+  const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
+  const busca = new PlaceAutocompleteElement({ includedRegionCodes: ["br"] });
+  busca.placeholder = "Buscar endereço para preencher o CEP…";
+  hospedeiro.appendChild(busca);
+
+  busca.addEventListener("gmp-select", async ({ placePrediction }) => {
+    const place = placePrediction.toPlace();
+    await place.fetchFields({ fields: ["addressComponents", "formattedAddress"] });
+    const comp = place.addressComponents || [];
+    const cep = (comp.find(c => c.types.includes("postal_code"))?.longText || "").replace(/\D/g, "");
     if(cep) $("#jd-cep").value = cep;
+    // só sugere o endereço formatado se o campo Local ainda estiver vazio —
+    // nunca sobrescreve o que a pessoa já digitou
+    if(!$("#jd-local").value.trim() && place.formattedAddress){
+      $("#jd-local").value = place.formattedAddress;
+    }
   });
 }
 
