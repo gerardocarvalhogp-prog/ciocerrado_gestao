@@ -63,10 +63,18 @@ const versionados = execFileSync("git", ["ls-files", "-z"], {
 // respondeu 200. E ferramenta, nao pagina.
 const FERRAMENTAS = new Set([path.basename(__filename)]);
 
+// Pastas inteiras que sao ferramenta/processo server-side, nunca pagina
+// — mesmo motivo do FERRAMENTAS acima, so que pra diretorio. Sem isso,
+// gestao/whatsapp_operacional/*.js (o daemon do numero operacional,
+// roda fora do Supabase, nunca no navegador) ia publicar junto so por
+// ser .js versionado.
+const PASTAS_FORA = ["gestao/whatsapp_operacional/"];
+
 const publicaveis = versionados.filter(
   (rel) =>
     EXTENSOES_WEB.has(path.extname(rel).toLowerCase()) &&
-    !FERRAMENTAS.has(path.basename(rel))
+    !FERRAMENTAS.has(path.basename(rel)) &&
+    !PASTAS_FORA.some((pasta) => rel.startsWith(pasta))
 );
 
 // Recomeca do zero: arquivo removido do repositorio tem que sumir do
