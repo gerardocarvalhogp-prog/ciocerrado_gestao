@@ -1,0 +1,22 @@
+{
+  "name": "cio-cerrado-whatsapp-operacional",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Numero operacional do CIO Cerrado — so cria grupo de jantar, vira admin, gera link. Nunca manda mensagem (isso e' o numero 1, Cloud API oficial, ja coberto pela Edge Function enviar-whatsapp).",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "conectar": "node conectar.js",
+    "obter-token": "node obter_refresh_token.js"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "googleapis": "^180.0.0",
+    "pino": "^9.5.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
