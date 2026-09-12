@@ -594,6 +594,8 @@ let PROSP = [];
 // Guardado aqui pra reaproveitar em removerJantar() sem bater no banco de
 // novo só pra montar o texto da confirmação.
 let CONVIDADOS_ATUAL = [];
+let WG_POLL = null;
+let WG_CONFIRMADOS = 0;
 
 async function abrirJantar(id){
   const c = $("#conteudo");
@@ -627,6 +629,7 @@ const achaSympla = (linha, ...alternativas) => {
 };
 
 async function desenharJantar(){
+  clearInterval(WG_POLL);   // reabrindo outro jantar (ou o mesmo) sem passar pelo botão Voltar
   const c = $("#conteudo");
   c.innerHTML = `
     <button class="voltar" id="voltar">← Voltar para a agenda</button>
@@ -800,9 +803,18 @@ async function desenharJantar(){
         </div>
       </div>
       <div id="cv-lista">${DS.skeletonLinhas(4, 30)}</div>
+    </div>
+
+    <div class="cartao">
+      <h2>Grupo de WhatsApp</h2>
+      <p class="sub" style="margin-bottom:10px;">
+        Cria o grupo (número operacional, sem enviar nada) e manda o link pelo canal
+        oficial — ninguém entra no grupo por automação, só por esse link.
+      </p>
+      <div id="wg-conteudo">${DS.skeletonLinhas(2, 24)}</div>
     </div>`;
 
-  $("#voltar").addEventListener("click", ABAS.agenda);
+  $("#voltar").addEventListener("click", () => { clearInterval(WG_POLL); ABAS.agenda(); });
   $("#jd-patro").addEventListener("input", () => DS.limparInvalido($("#jd-patro")));
   $("#jd-salvar").addEventListener("click", salvarDadosJantar);
   $("#jd-remover").addEventListener("click", removerJantar);
@@ -836,6 +848,7 @@ async function desenharJantar(){
   sincHib();
 
   carregarConvidados();
+  carregarGrupoWhatsapp();
 }
 
 // Busca de endereço pra preencher o CEP do local — widget separado do
@@ -1522,6 +1535,92 @@ function detalheConvidadoHtml(c){
     ${campo("Justificativa", c.justificativa)}
     ${campo("Observação", c.observacao)}
   </div>`;
+}
+
+// Pipeline de grupo de WhatsApp: sincroniza contato no Google, cria o
+// grupo (numero operacional, so isso — nunca manda mensagem), enfileira
+// o link pro numero 1 (Cloud API) entregar. Ver
+// supabase/migrations/20260912090000_grupos_whatsapp_jantares.sql e
+// gestao/whatsapp_operacional/ pro resto do pipeline (daemon Node).
+async function carregarGrupoWhatsapp(){
+  const box = $("#wg-conteudo");
+  try{
+    const [g] = await rpc("jantar_grupo_obter", { p_jantar_id: J.id });
+    await renderizarGrupoWhatsapp(g);
+    clearInterval(WG_POLL);
+    if(g && (g.status === "sincronizando_contatos" || g.status === "criando_grupo")){
+      WG_POLL = setInterval(carregarGrupoWhatsapp, 4000);
+    }
+  }catch(e){ aviso(box, explicar(e)); }
+}
+
+async function renderizarGrupoWhatsapp(g){
+  const box = $("#wg-conteudo");
+  WG_CONFIRMADOS = g?.confirmados ?? 0;
+
+  if(!g || !g.status){
+    if(WG_CONFIRMADOS === 0){
+      box.innerHTML = `<p class="meta">Nenhum convidado confirmado ainda — o botão aparece a partir do primeiro.</p>`;
+      return;
+    }
+    // lista de quem recebe o link, visivel ANTES do clique — pedido
+    // explicito do desenho, nao so a confirmacao do modal
+    let confs = [];
+    try{ confs = (await rpc("jantar_convidados_listar", { p_jantar_id: J.id })).filter(c => c.status === "confirmado"); }
+    catch{ /* lista e so preview — segue sem ela se a chamada falhar */ }
+
+    box.innerHTML = `
+      <p class="meta" style="margin-bottom:6px;">Vão receber o link (pelo canal oficial), assim que o grupo for criado:</p>
+      <ul style="margin:0 0 12px 18px;padding:0;">
+        ${confs.map(c => `<li>${esc(c.nome)}${c.telefone ? "" : ` <span class="meta">(sem telefone cadastrado)</span>`}</li>`).join("")}
+      </ul>
+      <button class="btn" id="wg-criar">Criar grupo do WhatsApp (${WG_CONFIRMADOS} confirmado${WG_CONFIRMADOS>1?"s":""})</button>`;
+    $("#wg-criar").addEventListener("click", solicitarGrupoWhatsapp);
+    return;
+  }
+
+  if(g.status === "sincronizando_contatos" || g.status === "criando_grupo"){
+    const ETAPA = { sincronizando_contatos: "Sincronizando contatos no Google…", criando_grupo: "Criando o grupo…" };
+    box.innerHTML = `<span class="selo alerta">${ETAPA[g.status]}</span>`;
+    return;
+  }
+
+  if(g.status === "criado"){
+    const quando = g.criado_em ? new Date(g.criado_em).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }) : "";
+    box.innerHTML = `
+      <span class="selo ok">Criado</span><span class="meta"> em ${quando}</span>
+      <div class="barra" style="margin-top:8px;">
+        <div style="min-width:280px;"><label>Link de convite</label>
+          <input type="text" id="wg-link" readonly value="${esc(g.invite_link||"")}"></div>
+        <div style="min-width:auto;"><button class="btn sec mini" id="wg-copiar">Copiar link</button></div>
+      </div>`;
+    $("#wg-copiar").addEventListener("click", async () => {
+      try{ await navigator.clipboard.writeText(g.invite_link || ""); DS.avisar("Link copiado.", {tom:"ok"}); }
+      catch{ $("#wg-link").select(); DS.avisar("Não consegui copiar sozinho — selecionei o texto, copie com Ctrl+C.", {tom:"alerta"}); }
+    });
+    return;
+  }
+
+  if(g.status === "erro"){
+    box.innerHTML = `
+      <span class="selo erro">Erro</span>
+      <p class="meta" style="margin-top:4px;">${esc(g.erro || "Falha não detalhada.")}</p>
+      <button class="btn sec mini" id="wg-tentar">Tentar de novo</button>`;
+    $("#wg-tentar").addEventListener("click", solicitarGrupoWhatsapp);
+    return;
+  }
+}
+
+async function solicitarGrupoWhatsapp(){
+  const ok = await DS.confirmar(
+    `Vai criar o grupo e enfileirar o envio do link (pelo canal oficial) pra ${WG_CONFIRMADOS} pessoa(s) confirmada(s). Essa ação não tem como desfazer por aqui.`,
+    { titulo: "Criar grupo do WhatsApp?", textoConfirmar: "Criar grupo" });
+  if(!ok) return;
+
+  try{
+    await rpc("jantar_grupo_solicitar", { p_jantar_id: J.id });
+    carregarGrupoWhatsapp();
+  }catch(e){ aviso($("#wg-conteudo"), explicar(e)); }
 }
 
 // O mailing sai de quem FEZ CHECK-IN, nao de quem foi convidado. É a
