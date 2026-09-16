@@ -43,8 +43,9 @@
 #     PRINT de cada etapa e PARA antes de publicar/enviar de verdade —
 #     mesmo modo seguro do integracao.py (--producao explicito pra
 #     valer).
-#   - O robo publica o evento (clica "Publicar Evento" + "Entendi") mas
-#     PARA AI — a gravacao mostrou que todo evento novo entra "Em
+#   - O robo publica o evento (clica "Publicar Evento" — sem modal de
+#     confirmacao, a publicacao e' instantanea) mas PARA AI — a
+#     gravacao mostrou que todo evento novo entra "Em
 #     analise" no Sympla antes de ficar visivel de verdade, e so' sai
 #     dali com um segundo clique manual em "Meus eventos". Isso vira o
 #     checkpoint humano antes do evento ficar publico: o organizador
@@ -259,6 +260,45 @@ def abrir_pagina_logada(p, debug):
 
 
 # ---------------------------------------------------------------------
+# aceita uma sugestao do autocomplete de endereco (Google Places) —
+# NUNCA segue em frente sem aceitar uma. Achado no mapeamento manual de
+# 16/09/2026 (Secao 3, Caso A): se nenhuma sugestao e' aceita, o Sympla
+# mantem um campo oculto "Nome do Local" invalido, e "Salvar
+# rascunho"/"Publicar Evento" simplesmente NAO FAZEM NADA depois disso
+# — sem borda vermelha, sem toast, sem chamada de rede, nada. E' um bug
+# do formulario do Sympla, nao do robo, mas o robo precisa se proteger
+# dele: o dropdown de sugestoes do Google as vezes nao aparece na
+# primeira digitada (intermitencia confirmada), entao a saida e'
+# insistir — apagar o ultimo caractere e redigitar forca o autocomplete
+# a tentar de novo — e, se depois de varias tentativas ainda assim nao
+# aparecer nenhuma sugestao, FALHAR ALTO (raise) em vez de seguir com
+# o formulario num estado que vai travar silenciosamente mais adiante.
+# ---------------------------------------------------------------------
+def aceitar_sugestao_endereco(page, campo, texto, tentativas=4):
+    for tentativa in range(1, tentativas + 1):
+        campo.fill(texto)
+        try:
+            page.get_by_role("option").first.wait_for(timeout=2500)
+            page.get_by_role("option").first.click()
+            return
+        except Exception:
+            log.warning("    sugestão de endereço não apareceu (tentativa %d/%d) — redigitando…",
+                        tentativa, tentativas)
+            # apaga o ultimo caractere e redigita o endereco inteiro —
+            # muda o valor duas vezes (dispara 'input' duas vezes),
+            # forcando o autocomplete a reavaliar do zero
+            campo.fill(texto[:-1])
+            page.wait_for_timeout(300)
+
+    raise RuntimeError(
+        f"Nenhuma sugestão de endereço apareceu para '{texto}' depois de {tentativas} "
+        f"tentativas. Sem aceitar uma sugestão, o Sympla trava 'Salvar rascunho'/"
+        f"'Publicar Evento' sem nenhum erro visível (bug do formulário, ver mapeamento "
+        f"de 16/09/2026, Seção 3, Caso A) — melhor parar aqui com um erro claro do que "
+        f"prosseguir e travar mais adiante sem explicação.")
+
+
+# ---------------------------------------------------------------------
 # cria o evento pro jantar.
 #
 # A gravacao original (playwright codegen) mostrou um "modal rapido"
@@ -320,7 +360,9 @@ def criar_evento(page, jantar, producao, debug):
     page.locator("label", has_text="Assunto").first.locator(
         "xpath=following::span[contains(@class,'select2-selection')][1]"
     ).click()
-    page.get_by_role("treeitem", name="Empreendedorismo").click()
+    # rotulo exato confirmado no mapeamento de 16/09/2026 — "Empreendedorismo"
+    # sozinho nao existe na lista, so' derrubava o select silenciosamente
+    page.get_by_role("treeitem", name="Empreendedorismo, negócios e inovação").click()
 
     # jantares nao guarda horario de termino — 3h de duracao e' a
     # mesma janela usada na gravacao que calibrou este script (19h as
@@ -415,13 +457,7 @@ def criar_evento(page, jantar, producao, debug):
     # (nao e' um <label for> de verdade) — o placeholder "Endereço" e'
     # o que da pra bater com certeza
     campo_endereco = page.get_by_placeholder("Endereço", exact=True)
-    campo_endereco.fill(endereco_texto)
-    # autocomplete de endereco (provavelmente Google Places) — escolhe
-    # a primeira sugestao se aparecer; segue com o texto livre se nao
-    try:
-        page.get_by_role("option").first.click(timeout=3000)
-    except Exception:
-        pass
+    aceitar_sugestao_endereco(page, campo_endereco, endereco_texto)
 
     # "Nome do Local" e' obrigatorio e continua vazio mesmo depois do
     # autocomplete preencher CEP/Av.Rua sozinho (esses vem cinza,
@@ -457,7 +493,13 @@ def criar_evento(page, jantar, producao, debug):
     fechar_popup_se_houver(page)
     page.get_by_role("checkbox", name="Ao publicar este evento,").check()
     page.get_by_role("button", name="Publicar Evento").click()
-    page.get_by_role("button", name="Entendi").click()
+    # NAO existe modal "Entendi" — confirmado no mapeamento de
+    # 16/09/2026 (Seção 4): a publicação é instantânea, só um toast.
+    # Esperar por um botão que não existe travava o robô até timeout.
+    # A verificação real de sucesso é a que já vinha logo abaixo:
+    # achar o evento pelo título em "Meus eventos" — se o publish não
+    # deu certo, abrir_evento_na_lista falha aí, de forma explícita.
+    page.wait_for_timeout(1500)
 
     # O evento entra "Em análise" no Sympla — publicar de verdade (o
     # segundo clique, em "Meus eventos") fica por conta do organizador,
