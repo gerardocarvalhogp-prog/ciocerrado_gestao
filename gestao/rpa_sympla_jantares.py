@@ -310,34 +310,45 @@ def aceitar_sugestao_endereco(page, campo, texto, tentativas=4):
 # em algum outro caminho — o que importa e' que essa pagina unica e'
 # o que a conta real mostra hoje, entao e' isso que o robo segue.
 # ---------------------------------------------------------------------
-def criar_evento(page, jantar, producao, debug):
-    titulo = f"Jantar CIO Cerrado — {jantar['patrocinador_nome']}"
-    log.info("Criando evento: %s", titulo)
+def _escolher_horario(page, texto):
+    # o seletor de hora e' o plugin xdsoft_datetimepicker — cada opcao
+    # e' um <div class="xdsoft_time" data-hour="19" data-minute="30">,
+    # dentro de uma lista ROLAVEL. Bater pelos atributos data-hour/
+    # data-minute e' preciso (nao depende do texto renderizado nem de
+    # posicao); scroll_into_view_if_needed e' o que faltava antes.
+    #
+    # Achado real: o picker de inicio e o de fim deixam os proprios
+    # elementos no HTML mesmo depois de "fechados" (so' ficam
+    # escondidos, nao removidos) — entao escolher a mesma hora nos dois
+    # (ex.: 19:30 aparecer tanto no de inicio quanto, por coincidencia,
+    # no de fim) bate em DOIS elementos identicos e o Playwright recusa
+    # ("strict mode violation"). :visible filtra so' o que esta aberto
+    # de verdade nesse momento.
+    # Achado real (2ª rodada): "Element is not attached to the DOM" no
+    # scroll — a lista parece re-renderizar os itens conforme rola (só
+    # existe no HTML o que está perto da posição atual), então o
+    # elemento pode sumir entre localizar e clicar. Reconsulta o
+    # locator a cada tentativa (não reusa referência antiga) e tenta de
+    # novo se isso acontecer.
+    h, m = texto.split(":")
+    selector = f'.xdsoft_time[data-hour="{int(h)}"][data-minute="{int(m)}"]:visible'
+    ultimo_erro = None
+    for _ in range(6):
+        try:
+            item = page.locator(selector)
+            item.scroll_into_view_if_needed(timeout=4000)
+            item.click(timeout=4000)
+            return
+        except Exception as e:
+            ultimo_erro = e
+            page.wait_for_timeout(300)
+    raise ultimo_erro
 
-    data_str = jantar["data"]  # AAAA-MM-DD, vindo do banco
-    ano, mes, dia = data_str.split("-")
-    data_br = f"{dia}/{mes}/{ano}"
-    hora = (jantar.get("horario") or "20:00:00")[:5]  # "HH:MM"
 
-    cep = jantar.get("cep") or ""
-    if not cep:
-        raise RuntimeError(
-            f"jantar '{jantar['patrocinador_nome']}' sem CEP cadastrado — "
-            f"preencha em jantares.html antes de rodar o robô.")
-
-    page.goto("https://organizador.sympla.com.br/meus-eventos")
-    page.get_by_role("button", name="Criar evento presencial").click()
-
-    # popup de novidade ("Seu evento, ainda mais organizado") que a
-    # Sympla mostra por cima do formulário — acontece mais de uma vez
-    # na mesma sessão (voltou a aparecer mais adiante, bloqueando o
-    # upload da logo), não só na abertura da tela. Esc sozinho não
-    # fechou (testado); o X real é <span class="icon icon-icon-close">,
-    # achado inspecionando a tela de verdade. fechar_popup_se_houver()
-    # e' chamado de novo antes de cada clique que ja esbarrou nele.
-    page.wait_for_timeout(800)
-    fechar_popup_se_houver(page)
-
+# Secao 1 do formulario ("Informacoes basicas"): nome, imagem
+# (opcional) e assunto. Devolve o caminho do arquivo temporario da logo
+# (ou None), pra criar_evento apagar depois de usar.
+def _preencher_informacoes_basicas(page, titulo, jantar):
     page.get_by_role("textbox", name="Nome do evento").fill(titulo)
 
     logo_tmp = None
@@ -364,67 +375,36 @@ def criar_evento(page, jantar, producao, debug):
     # sozinho nao existe na lista, so' derrubava o select silenciosamente
     page.get_by_role("treeitem", name="Empreendedorismo, negócios e inovação").click()
 
-    # jantares nao guarda horario de termino — 3h de duracao e' a
-    # mesma janela usada na gravacao que calibrou este script (19h as
-    # 22h). Se passar da meia-noite (jantar comecando depois das 21h),
-    # cai no fim do dia em vez de virar o dia — mais seguro que
-    # arriscar mandar uma data errada pro Sympla.
+    return logo_tmp
+
+
+# Secao 2 ("Data e horario"). jantares nao guarda horario de termino —
+# 3h de duracao e' a mesma janela usada na gravacao que calibrou este
+# script (19h as 22h). Se passar da meia-noite (jantar comecando depois
+# das 21h), cai no fim do dia em vez de virar o dia — mais seguro que
+# arriscar mandar uma data errada pro Sympla.
+def _preencher_data_horario(page, dia, hora):
     try:
         hi = datetime.strptime(hora, "%H:%M")
         hora_fim = min(hi + timedelta(hours=3), hi.replace(hour=23, minute=59)).strftime("%H:%M")
     except ValueError:
         hora, hora_fim = "20:00", "23:00"
 
-    def escolher_horario(texto):
-        # o seletor de hora e' o plugin xdsoft_datetimepicker — cada
-        # opcao e' um <div class="xdsoft_time" data-hour="19"
-        # data-minute="30">, dentro de uma lista ROLAVEL. Bater pelos
-        # atributos data-hour/data-minute e' preciso (nao depende do
-        # texto renderizado nem de posicao); scroll_into_view_if_needed
-        # e' o que faltava antes.
-        #
-        # Achado real: o picker de inicio e o de fim deixam os proprios
-        # elementos no HTML mesmo depois de "fechados" (so' ficam
-        # escondidos, nao removidos) — entao escolher a mesma hora nos
-        # dois (ex.: 19:30 aparecer tanto no de inicio quanto, por
-        # coincidencia, no de fim) bate em DOIS elementos identicos e
-        # o Playwright recusa ("strict mode violation"). :visible
-        # filtra so' o que esta aberto de verdade nesse momento.
-        # Achado real (2ª rodada): "Element is not attached to the DOM"
-        # no scroll — a lista parece re-renderizar os itens conforme
-        # rola (só existe no HTML o que está perto da posição atual),
-        # então o elemento pode sumir entre localizar e clicar.
-        # Reconsulta o locator a cada tentativa (não reusa referência
-        # antiga) e tenta de novo se isso acontecer.
-        h, m = texto.split(":")
-        selector = f'.xdsoft_time[data-hour="{int(h)}"][data-minute="{int(m)}"]:visible'
-        ultimo_erro = None
-        for _ in range(6):
-            try:
-                item = page.locator(selector)
-                item.scroll_into_view_if_needed(timeout=4000)
-                item.click(timeout=4000)
-                return
-            except Exception as e:
-                ultimo_erro = e
-                page.wait_for_timeout(300)
-        raise ultimo_erro
-
     page.locator("#date-from-create-event-time").click()
     page.get_by_role("cell", name=str(int(dia))).click()
     page.locator("#time-from-create-event-time").click()
-    escolher_horario(hora)
+    _escolher_horario(page, hora)
     page.locator("#date-until-create-event-time").click()
     page.get_by_role("cell", name=str(int(dia))).click()
     page.locator("#time-until-create-event-time").click()
-    escolher_horario(hora_fim)
+    _escolher_horario(page, hora_fim)
 
-    if jantar.get("mensagem"):
-        page.locator(".note-editable").first.fill(jantar["mensagem"])
 
-    # "4. Onde o seu evento vai acontecer" — a pagina parece montar
-    # secoes conforme rola (formulario longo), entao o campo "Local"
-    # pode nao existir ainda no DOM se o robo nao rolar ate la antes.
+# Secao 4 ("Onde o seu evento vai acontecer").
+def _preencher_endereco(page, jantar, cep, titulo):
+    # a pagina parece montar secoes conforme rola (formulario longo),
+    # entao o campo "Local" pode nao existir ainda no DOM se o robo nao
+    # rolar ate la antes.
     page.get_by_text("Onde o seu evento vai acontecer").scroll_into_view_if_needed(timeout=5000)
 
     # o dropdown "Local" vem com um endereco salvo de evento anterior
@@ -466,11 +446,82 @@ def criar_evento(page, jantar, producao, debug):
         "xpath=following::input[1]"
     ).fill(jantar.get("local") or titulo)
 
+
+# Secao 5 ("Ingressos").
+def _criar_ingresso(page, jantar):
     fechar_popup_se_houver(page)
     page.get_by_text("Ingresso gratuito").click()
     page.get_by_role("textbox", name="Ex. 100").fill(str(jantar.get("capacidade") or 8))
     page.get_by_role("textbox", name="Ingresso único, Meia-Entrada").fill("Convidado")
     page.get_by_role("button", name="Criar Ingresso").click()
+
+
+# Secao 8 ("Responsabilidades") + publicacao.
+def _publicar_evento(page, titulo):
+    fechar_popup_se_houver(page)
+    page.get_by_role("checkbox", name="Ao publicar este evento,").check()
+    page.get_by_role("button", name="Publicar Evento").click()
+    # NAO existe modal "Entendi" — confirmado no mapeamento de
+    # 16/09/2026 (Seção 4): a publicação é instantânea, só um toast.
+    # Esperar por um botão que não existe travava o robô até timeout.
+    # A verificação real de sucesso e' abrir_evento_na_lista logo
+    # abaixo: se o publish não deu certo, ela falha aí, de forma
+    # explícita.
+    page.wait_for_timeout(1500)
+
+    # O evento entra "Em análise" no Sympla — publicar de verdade (o
+    # segundo clique, em "Meus eventos") fica por conta do organizador,
+    # de propósito: é o checkpoint humano antes do evento ir ao ar.
+    page.wait_for_load_state("networkidle")
+    return abrir_evento_na_lista(page, titulo)
+
+
+def criar_evento(page, jantar, producao, debug):
+    titulo = f"Jantar CIO Cerrado — {jantar['patrocinador_nome']}"
+    log.info("Criando evento: %s", titulo)
+
+    data_str = jantar["data"]  # AAAA-MM-DD, vindo do banco
+    ano, mes, dia = data_str.split("-")
+    hora = (jantar.get("horario") or "20:00:00")[:5]  # "HH:MM"
+
+    cep = jantar.get("cep") or ""
+    if not cep:
+        raise RuntimeError(
+            f"jantar '{jantar['patrocinador_nome']}' sem CEP cadastrado — "
+            f"preencha em jantares.html antes de rodar o robô.")
+
+    # Confere se um evento com este titulo JA EXISTE antes de criar outro.
+    # Protege contra evento duplicado quando um run anterior criou o
+    # evento de verdade mas falhou depois disso (rede caiu antes do
+    # jantar_marcar_sympla, por exemplo) — o jantar ficaria 'pendente'
+    # no banco pra sempre, e cada run subsequente criaria outro evento
+    # igual (achado na revisao de arquitetura de 10/09/2026). O titulo
+    # e' deterministico (mesmo texto sempre), entao serve de chave.
+    url_existente = encontrar_evento_na_lista(page, titulo)
+    if url_existente:
+        log.warning("  Evento '%s' já existe no Sympla — não vou criar outro. Só sincronizando o link.", titulo)
+        return url_existente
+
+    page.get_by_role("button", name="Criar evento presencial").click()
+
+    # popup de novidade ("Seu evento, ainda mais organizado") que a
+    # Sympla mostra por cima do formulário — acontece mais de uma vez
+    # na mesma sessão (voltou a aparecer mais adiante, bloqueando o
+    # upload da logo), não só na abertura da tela. Esc sozinho não
+    # fechou (testado); o X real é <span class="icon icon-icon-close">,
+    # achado inspecionando a tela de verdade. fechar_popup_se_houver()
+    # e' chamado de novo antes de cada clique que ja esbarrou nele.
+    page.wait_for_timeout(800)
+    fechar_popup_se_houver(page)
+
+    logo_tmp = _preencher_informacoes_basicas(page, titulo, jantar)
+    _preencher_data_horario(page, dia, hora)
+
+    if jantar.get("mensagem"):
+        page.locator(".note-editable").first.fill(jantar["mensagem"])
+
+    _preencher_endereco(page, jantar, cep, titulo)
+    _criar_ingresso(page, jantar)
 
     if debug:
         print_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -490,38 +541,41 @@ def criar_evento(page, jantar, producao, debug):
         log.warning("MODO SEGURO: formulário preenchido, nada publicado. Use --producao para valer.")
         return None
 
-    fechar_popup_se_houver(page)
-    page.get_by_role("checkbox", name="Ao publicar este evento,").check()
-    page.get_by_role("button", name="Publicar Evento").click()
-    # NAO existe modal "Entendi" — confirmado no mapeamento de
-    # 16/09/2026 (Seção 4): a publicação é instantânea, só um toast.
-    # Esperar por um botão que não existe travava o robô até timeout.
-    # A verificação real de sucesso é a que já vinha logo abaixo:
-    # achar o evento pelo título em "Meus eventos" — se o publish não
-    # deu certo, abrir_evento_na_lista falha aí, de forma explícita.
-    page.wait_for_timeout(1500)
+    return _publicar_evento(page, titulo)
 
-    # O evento entra "Em análise" no Sympla — publicar de verdade (o
-    # segundo clique, em "Meus eventos") fica por conta do organizador,
-    # de propósito: é o checkpoint humano antes do evento ir ao ar.
+
+# ---------------------------------------------------------------------
+# acha o evento pelo TITULO na lista "Meus eventos" — em vez de um
+# índice de posição (que dependia de quantos outros eventos/links a
+# lista tivesse), usa o título, que é determinístico (mesmo texto que
+# criar_evento gerou). name= faz combinação parcial por padrão, então
+# bate mesmo com o prefixo de status ("Em análise ...", "Publicado ...")
+# que aparece junto na gravação.
+#
+# Versão que NÃO levanta exceção — devolve None se não achar. Existe
+# separada de abrir_evento_na_lista porque criar_evento usa isso pra
+# checar SE UM EVENTO COM ESSE TÍTULO JÁ EXISTE antes de criar outro
+# (ver criar_evento) — "não achei" é uma resposta válida ali, não um
+# erro.
+# ---------------------------------------------------------------------
+def encontrar_evento_na_lista(page, titulo, timeout=4000):
+    page.goto("https://organizador.sympla.com.br/meus-eventos")
     page.wait_for_load_state("networkidle")
-    abrir_evento_na_lista(page, titulo)
+    linha = page.get_by_role("row", name=titulo)
+    try:
+        linha.wait_for(timeout=timeout)
+    except Exception:
+        return None
+    linha.get_by_role("link").click()
+    page.wait_for_load_state("networkidle")
     return page.url
 
 
-# ---------------------------------------------------------------------
-# acha o evento pelo TITULO na lista "Meus eventos" e abre a página de
-# gerenciamento dele — em vez de um índice de posição (que dependia de
-# quantos outros eventos/links a lista tivesse), usa o título, que é
-# determinístico (mesmo texto que criar_evento gerou). name= faz
-# combinação parcial por padrão, então bate mesmo com o prefixo de
-# status ("Em análise ...", "Publicado ...") que aparece junto na
-# gravação.
-# ---------------------------------------------------------------------
 def abrir_evento_na_lista(page, titulo):
-    page.goto("https://organizador.sympla.com.br/meus-eventos")
-    page.get_by_role("row", name=titulo).get_by_role("link").click()
-    page.wait_for_load_state("networkidle")
+    url = encontrar_evento_na_lista(page, titulo)
+    if url is None:
+        raise RuntimeError(f"Evento '{titulo}' não encontrado em 'Meus eventos'.")
+    return url
 
 
 # ---------------------------------------------------------------------
@@ -546,15 +600,27 @@ def mandar_convites(page, jantar, confirmados, producao, debug):
         page.locator(".note-editable").fill(jantar["mensagem"])
 
     page.get_by_text("Lista específica").click()
-    emails = "\n".join(c["email"] for c in confirmados if c.get("email"))
-    page.get_by_role("textbox", name="Cole ou digite os e-mails dos").fill(emails)
+    lista_emails = [c["email"] for c in confirmados if c.get("email")]
+    page.get_by_role("textbox", name="Cole ou digite os e-mails dos").fill("\n".join(lista_emails))
     page.get_by_role("button", name="Adicionar").click()
 
-    if debug:
-        print_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   f"rpa_sympla_{jantar['id']}_convite_preview.png")
-        page.screenshot(path=print_path)
-        log.info("Print salvo em %s", print_path)
+    # Nao ha (ainda) como confirmar programaticamente que os
+    # len(lista_emails) e-mails foram TODOS aceitos pelo painel — essa
+    # tela nao fez parte do mapeamento manual de 16/09/2026 (so' a
+    # criacao de evento foi inspecionada a fundo), entao nao ha
+    # seletor de contagem confirmado contra o DOM real pra bater aqui.
+    # Achado na revisao de arquitetura de 10/09/2026: se o painel
+    # rejeitar um e-mail malformado silenciosamente, isso nao seria
+    # percebido antes do envio (irreversivel). Ate ter esse seletor
+    # calibrado, o print ANTES DO ENVIO fica sempre salvo (nao so' em
+    # --debug) — e' a rede de seguranca possivel por enquanto: confira
+    # esse print manualmente pra ver se todos os destinatarios entraram.
+    print_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               f"rpa_sympla_{jantar['id']}_convite_preview.png")
+    page.screenshot(path=print_path)
+    log.warning("  %s: %d e-mail(s) preparado(s), contagem não confirmada contra a tela "
+                "(seletor não calibrado ainda) — confira %s antes de repetir com --producao.",
+                jantar["patrocinador_nome"], len(lista_emails), print_path)
 
     if not producao:
         log.warning("MODO SEGURO: convites não enviados. Use --producao para valer.")
