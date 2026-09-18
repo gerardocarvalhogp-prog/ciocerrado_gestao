@@ -171,6 +171,38 @@ def _sympla_event_id_do_link(url):
     return m.group(1) if m else None
 
 
+SYMPLA_API_BASE = "https://api.sympla.com.br/public/v3"
+
+
+# Pagina o endpoint /events/{id}/participants da API publica do Sympla
+# ate esgotar. Vivia duplicado entre sincronizar_sympla e
+# sincronizar_jantares_sympla ate a revisao de arquitetura de
+# 10/09/2026 — e ja tinha divergido nesse meio tempo (so' um dos dois
+# tratava 404). ignorar_404=True devolve o que ja tiver lido ate ali
+# com um aviso, em vez de estourar — usado por sincronizar_jantares_
+# sympla pra um jantar com link quebrado nao derrubar os outros.
+def _listar_participantes_sympla(sympla_id, ignorar_404=False):
+    participantes, pagina = [], 1
+    while True:
+        r = requests.get(
+            f"{SYMPLA_API_BASE}/events/{sympla_id}/participants",
+            headers={"s_token": SYMPLA_TOKEN},
+            params={"page": pagina, "page_size": 200}, timeout=30)
+        if ignorar_404 and r.status_code == 404:
+            log.warning("    evento %s nao encontrado no Sympla — confira o link", sympla_id)
+            return participantes
+        r.raise_for_status()
+        corpo = r.json()
+        lote = corpo.get("data", [])
+        participantes.extend(lote)
+
+        pg = corpo.get("pagination", {})
+        if not pg.get("has_next") or not lote:
+            break
+        pagina += 1
+    return participantes
+
+
 def sincronizar_sympla(supa, evento, producao):
     if not SYMPLA_TOKEN:
         log.warning("SYMPLA_TOKEN ausente: pulando sincronizacao.")
@@ -183,21 +215,7 @@ def sincronizar_sympla(supa, evento, producao):
 
     log.info("Lendo participantes do Sympla (evento %s)...", sympla_id)
 
-    participantes, pagina = [], 1
-    while True:
-        r = requests.get(
-            f"https://api.sympla.com.br/public/v3/events/{sympla_id}/participants",
-            headers={"s_token": SYMPLA_TOKEN},
-            params={"page": pagina, "page_size": 200}, timeout=30)
-        r.raise_for_status()
-        corpo = r.json()
-        lote = corpo.get("data", [])
-        participantes.extend(lote)
-
-        pg = corpo.get("pagination", {})
-        if not pg.get("has_next") or not lote:
-            break
-        pagina += 1
+    participantes = _listar_participantes_sympla(sympla_id)
 
     log.info("%d inscricao(oes) no Sympla.", len(participantes))
 
@@ -317,23 +335,7 @@ def sincronizar_jantares_sympla(supa, evento, producao):
     for jantar, sympla_id in alvo:
         log.info("  %s (Sympla #%s)...", jantar["patrocinador_nome"], sympla_id)
 
-        participantes, pagina = [], 1
-        while True:
-            r = requests.get(
-                f"https://api.sympla.com.br/public/v3/events/{sympla_id}/participants",
-                headers={"s_token": SYMPLA_TOKEN},
-                params={"page": pagina, "page_size": 200}, timeout=30)
-            if r.status_code == 404:
-                log.warning("    evento %s nao encontrado no Sympla — confira o link", sympla_id)
-                break
-            r.raise_for_status()
-            corpo = r.json()
-            lote = corpo.get("data", [])
-            participantes.extend(lote)
-            pg = corpo.get("pagination", {})
-            if not pg.get("has_next") or not lote:
-                break
-            pagina += 1
+        participantes = _listar_participantes_sympla(sympla_id, ignorar_404=True)
 
         if not participantes:
             log.info("    0 inscricao(oes).")
@@ -530,10 +532,15 @@ def enviar_contratos(supa, evento, producao):
         log.warning("CONTRATO_TEMPLATE_PATH ausente: pulando envio.")
         return
 
-    # aprovados que ainda nao receberam contrato
+    # aprovados que ainda nao receberam contrato. autentique_id entra na
+    # selecao pra sustentar a idempotencia abaixo: uma linha pode ter
+    # ficado com o documento ja criado no Autentique mas o patch de
+    # status seguinte falhou por rede — sem checar isso, o proximo run
+    # criava um SEGUNDO documento pra mesma pessoa (achado na revisao
+    # de arquitetura de 10/09/2026).
     pend = supa.get(
         "contratos",
-        select="id,participante_id,status,participantes!inner(evento_id,status,gestores!inner(nome,email,cpf))",
+        select="id,participante_id,status,autentique_id,participantes!inner(evento_id,status,gestores!inner(nome,email,cpf))",
         status="eq.nao_enviado")
 
     alvo = [c for c in pend
@@ -550,13 +557,29 @@ def enviar_contratos(supa, evento, producao):
 
         pdf = None
         try:
-            pdf = gerar_contrato_pdf(g["nome"], g.get("cpf") or "")
-            doc = criar_documento_autentique(
-                f"Contrato · {g['nome']}", pdf, g["email"], sandbox=not producao)
+            if c.get("autentique_id"):
+                # ja foi criado no Autentique num run anterior — so o
+                # patch de status seguinte que falhou. Nao cria de novo,
+                # so completa o que faltou.
+                log.warning("  %s: documento Autentique %s já existia (run anterior incompleto) — completando.",
+                            g["email"], c["autentique_id"])
+                autentique_id = c["autentique_id"]
+            else:
+                pdf = gerar_contrato_pdf(g["nome"], g.get("cpf") or "")
+                doc = criar_documento_autentique(
+                    f"Contrato · {g['nome']}", pdf, g["email"], sandbox=not producao)
+                autentique_id = doc["id"]
+
+                # patch separado, o mais cedo possivel: se o patch de
+                # status abaixo falhar por rede, a checagem acima (na
+                # proxima execucao) ve o autentique_id ja gravado e nao
+                # cria um segundo documento pra mesma pessoa
+                supa.patch("contratos", {"id": f"eq.{c['id']}"}, {
+                    "autentique_id": autentique_id,
+                    "autentique_url": f"https://app.autentique.com.br/documentos/{autentique_id}",
+                })
 
             supa.patch("contratos", {"id": f"eq.{c['id']}"}, {
-                "autentique_id": doc["id"],
-                "autentique_url": f"https://app.autentique.com.br/documentos/{doc['id']}",
                 "status": "enviado",
                 "enviado_em": agora(),
             })
