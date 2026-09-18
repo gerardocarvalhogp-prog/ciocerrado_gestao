@@ -237,33 +237,15 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   db: { schema: "gestao" }
 });
 
-const $  = (s,r=document) => r.querySelector(s);
-const $$ = (s,r=document) => [...r.querySelectorAll(s)];
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// $, $$, esc, rpc e explicar vêm de assets/design-system.js — eram
+// cópias idênticas nas 5 telas (revisão de arquitetura de 10/09/2026).
 
 function aviso(texto, tipo="erro"){
   $("#aviso").innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
   if(texto && tipo === "ok") setTimeout(() => $("#aviso").innerHTML = "", 2500);
 }
 
-function explicar(e){
-  const m = e?.message || String(e);
-  if(m.includes("Email not confirmed"))
-    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
-  if(m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
-  if(m.includes("Acesso restrito")) return "Seu e-mail não está cadastrado na equipe.";
-  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
-  return m;
-}
-
 const hora = d => d ? new Date(d).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "";
-
-async function rpc(nome, params){
-  const { data, error } = await sb.rpc(nome, params);
-  if(error) throw error;
-  return data;
-}
 
 // =====================================================================
 // LOGIN

@@ -236,31 +236,13 @@ const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { db: { schema: "gestao" } });
 
-const $  = (s,r=document) => r.querySelector(s);
-const $$ = (s,r=document) => [...r.querySelectorAll(s)];
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// $, $$, esc, rpc e explicar vêm de assets/design-system.js — eram
+// cópias idênticas nas 5 telas (revisão de arquitetura de 10/09/2026).
 
 function aviso(alvo, texto, tipo="erro"){
   const el = typeof alvo === "string" ? $(alvo) : alvo;
   if(!el) return;
   el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
-}
-function explicar(e){
-  const m = e?.message || String(e);
-  if(m.includes("Email not confirmed"))
-    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
-  if(m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
-  if(m.includes("Acesso restrito a administradores"))
-    return "Esta ação exige perfil de administrador.";
-  if(m.includes("Acesso restrito")) return "Seu e-mail não está cadastrado na equipe.";
-  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
-  return m;
-}
-async function rpc(nome, params){
-  const { data, error } = await sb.rpc(nome, params);
-  if(error) throw error;
-  return data;
 }
 async function ia(prompt, { buscarWeb=false, json=false, maxTokens=2000 } = {}){
   const { data, error } = await sb.functions.invoke("ia", {

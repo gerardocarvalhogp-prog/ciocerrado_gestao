@@ -226,11 +226,8 @@ let STATUS = null;
 // =====================================================================
 // UTILITARIOS
 // =====================================================================
-const $  = (s,r=document) => r.querySelector(s);
-const $$ = (s,r=document) => [...r.querySelectorAll(s)];
-
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// $, $$, esc e rpc vêm de assets/design-system.js — eram cópias
+// idênticas nas 5 telas (revisão de arquitetura de 10/09/2026).
 
 function aviso(alvo, texto, tipo="erro"){
   const el = typeof alvo === "string" ? $(alvo) : alvo;
@@ -238,29 +235,26 @@ function aviso(alvo, texto, tipo="erro"){
   el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
 }
 
+// explicar() daqui tem regras proprias (rooming/data de nascimento),
+// alem das comuns (login/sessao/acesso) — usa a base do design-system
+// com as regras extras desta tela na frente. DS.explicarBase, nao
+// window.explicar: esta funcao ESTÁ redefinindo o global `explicar`
+// (call sites do arquivo inteiro continuam chamando so' `explicar(e)`),
+// e window.explicar ia virar ela mesma — DS.explicarBase e' o mesmo
+// codigo, acessivel por um nome que essa redeclaracao nao alcanca.
+const EXPLICAR_EXTRAS_ROOMING = [
+  ["Rooming liberado", "O rooming abre depois que seu contrato for assinado."],
+  ["Prazo de rooming", (m) => m + " Fale com a organização para ajustar."],
+  ["data de nascimento das criancas", "Informe a data de nascimento das crianças — ela define a cobrança e o crachá."],
+  ["depois do início do evento", "Confira a data de nascimento: é depois do início do evento."],
+  ["familiar precisa de nome", "Todo familiar precisa de nome."],
+];
 function explicar(e){
-  const m = e?.message || String(e);
-  if(m.includes("Email not confirmed"))
-    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
-  if(m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
-  if(m.includes("Rooming liberado"))  return "O rooming abre depois que seu contrato for assinado.";
-  if(m.includes("Prazo de rooming"))  return m + " Fale com a organização para ajustar.";
-  if(m.includes("data de nascimento das criancas"))
-    return "Informe a data de nascimento das crianças — ela define a cobrança e o crachá.";
-  if(m.includes("depois do início do evento")) return "Confira a data de nascimento: é depois do início do evento.";
-  if(m.includes("familiar precisa de nome")) return "Todo familiar precisa de nome.";
-  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
-  return m;
+  return DS.explicarBase(e, EXPLICAR_EXTRAS_ROOMING);
 }
 
 const moeda = v => Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const dataBR = d => d ? String(d).split("-").reverse().join("/") : "—";
-
-async function rpc(nome, params){
-  const { data, error } = await sb.rpc(nome, params);
-  if(error) throw error;
-  return data;
-}
 
 // =====================================================================
 // LOGIN E AUTO-CADASTRO

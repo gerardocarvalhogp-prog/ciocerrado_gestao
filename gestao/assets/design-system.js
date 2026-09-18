@@ -5,20 +5,66 @@
 // Uso:
 //   if (!(await DS.confirmar("Remover a cota?", {tom:"perigo"}))) return;
 //   DS.avisar("Não foi possível salvar.", {tom:"erro"});
+// esc/$/$$/rpc/explicar viviam copiados em cada uma das 5 telas
+// (admin/portal/jantares/rooming/checkin) — idênticos, exceto por
+// diferenças de formatação e pelas regras extras que cada tela
+// acrescenta em explicar(). Centralizados aqui (revisão de arquitetura
+// de 10/09/2026) pra não duplicar, e porque foi exatamente essa
+// duplicação que abriu a divergência de escaping que causou o achado
+// de XSS corrigido antes em avisar()/confirmar() — um esc() só, usado
+// por tudo, fecha a causa na raiz.
+//
+// Ficam como globais soltos (não DS.esc etc.) de propósito: nenhuma
+// tela usa <script type="module">, então toda variável de topo já é
+// implicitamente global — manter o mesmo padrão evita reescrever
+// centenas de call sites (esc(x), $(sel), rpc(nome,params)) por uma
+// mudança que é só de onde o código mora, não de como se chama.
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+window.esc = esc;
+
+window.$ = (s, r = document) => r.querySelector(s);
+window.$$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+// depende de `sb` (cliente Supabase) já existir no escopo global — cada
+// tela cria o próprio `sb` antes de qualquer clique disparar uma
+// chamada, então funciona mesmo definido aqui, num <script> carregado
+// antes do que declara `sb`.
+async function rpc(nome, params) {
+  const { data, error } = await sb.rpc(nome, params);
+  if (error) throw error;
+  return data;
+}
+window.rpc = rpc;
+
+// extras: array de [trecho, resposta] (ou [trecho, fn(m)]), checado
+// ANTES das regras base — é como cada tela acrescenta as próprias
+// regras (ex.: rooming.html e a data de nascimento das crianças) sem
+// duplicar as regras comuns de login/sessão/acesso. Quem não passa
+// extras (a maioria dos call sites) só usa a base, sem mudar nada.
+function explicar(e, extras) {
+  const m = e?.message || String(e);
+  for (const [trecho, resposta] of extras || []) {
+    if (m.includes(trecho)) return typeof resposta === "function" ? resposta(m) : resposta;
+  }
+  if (m.includes("Email not confirmed"))
+    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
+  if (m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
+  if (m.includes("Acesso restrito a administradores")) return "Esta ação exige perfil de administrador.";
+  if (m.includes("Acesso restrito")) return "Seu e-mail não está cadastrado na equipe.";
+  if (m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
+  return m;
+}
+window.explicar = explicar;
+
 (function () {
   function elemento(html) {
     const t = document.createElement("template");
     t.innerHTML = html.trim();
     return t.content.firstElementChild;
-  }
-
-  // mensagem/titulo às vezes vêm de dado do banco (nome de empresa,
-  // patrocinador, convidado) — sem isso, dava pra injetar HTML na sessão
-  // autenticada de quem clica (normalmente um admin).
-  function escHtml(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
   }
 
   function garantirToasts() {
@@ -34,7 +80,7 @@
     opcoes = opcoes || {};
     const tom = opcoes.tom || "info";
     const host = garantirToasts();
-    const el = elemento(`<div class="ds-toast tom-${tom}" role="status">${escHtml(mensagem)}</div>`);
+    const el = elemento(`<div class="ds-toast tom-${tom}" role="status">${esc(mensagem)}</div>`);
     host.appendChild(el);
     requestAnimationFrame(() => el.classList.add("aberto"));
     const duracao = opcoes.duracao || 4200;
@@ -61,8 +107,8 @@
       const backdrop = elemento(`
         <div class="ds-backdrop">
           <div class="ds-modal tom-${tom}" role="alertdialog" aria-modal="true" aria-labelledby="ds-modal-titulo">
-            <h2 id="ds-modal-titulo">${escHtml(titulo)}</h2>
-            <p>${escHtml(mensagem)}</p>
+            <h2 id="ds-modal-titulo">${esc(titulo)}</h2>
+            <p>${esc(mensagem)}</p>
             <div class="ds-modal-acoes">
               <button type="button" class="btn sec" data-acao="cancelar">${textoCancelar}</button>
               <button type="button" class="btn${tom === "perigo" ? " perigo" : ""}" data-acao="confirmar">${textoConfirmar}</button>
@@ -229,5 +275,10 @@
     limparInvalido,
     focarPrimeiroInvalido,
     lerQR,
+    // mesma funcao que window.explicar, so' que acessivel por um nome
+    // que uma tela com regras extras (rooming.html, portal.html) nao
+    // corre risco de sobrescrever ao redeclarar o `explicar` global
+    // proprio dela — DS.explicarBase nao muda, `explicar` bare muda.
+    explicarBase: explicar,
   };
 })();

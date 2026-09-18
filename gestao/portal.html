@@ -318,14 +318,8 @@ let SESSOES = [];
 // =====================================================================
 // UTILITARIOS
 // =====================================================================
-const $  = (s, r=document) => r.querySelector(s);
-const $$ = (s, r=document) => [...r.querySelectorAll(s)];
-
-function esc(v){
-  return String(v ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[c]));
-}
+// $, $$, esc e rpc vêm de assets/design-system.js — eram cópias
+// idênticas nas 5 telas (revisão de arquitetura de 10/09/2026).
 
 function aviso(alvo, texto, tipo="erro"){
   const el = typeof alvo === "string" ? $(alvo) : alvo;
@@ -335,19 +329,22 @@ function aviso(alvo, texto, tipo="erro"){
     : "";
 }
 
-// Mensagem de erro que diz o que aconteceu, nao "algo deu errado".
+// explicar() daqui tem regras proprias, alem das comuns — usa a base
+// do design-system com as regras extras desta tela na frente.
+// DS.explicarBase, nao window.explicar: esta funcao ESTÁ redefinindo o
+// global `explicar` (call sites do arquivo inteiro continuam chamando
+// so' `explicar(e)`), e window.explicar ia virar ela mesma —
+// DS.explicarBase e' o mesmo codigo, acessivel por um nome que essa
+// redeclaracao nao alcanca.
+const EXPLICAR_EXTRAS_PORTAL = [
+  ["Sem acesso", "Seu e-mail não está vinculado a esta empresa. Fale com a organização."],
+  ["nao e a sua vez", (m) => m],
+  ["não é a sua vez", (m) => m],
+  ["Cota de", (m) => m],
+  ["comporta", (m) => m],
+];
 function explicar(erro){
-  const m = erro?.message || String(erro);
-  if(m.includes("Email not confirmed"))
-    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
-  if(m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
-  if(m.includes("Sem acesso"))          return "Seu e-mail não está vinculado a esta empresa. Fale com a organização.";
-  if(m.includes("nao e a sua vez") ||
-     m.includes("não é a sua vez"))     return m;
-  if(m.includes("Cota de"))             return m;
-  if(m.includes("comporta"))            return m;
-  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
-  return m;
+  return DS.explicarBase(erro, EXPLICAR_EXTRAS_PORTAL);
 }
 
 function moeda(v){
@@ -357,12 +354,6 @@ function dataBR(d){
   if(!d) return "—";
   const [a,m,dia] = String(d).split("-");
   return `${dia}/${m}/${a}`;
-}
-
-async function rpc(nome, params){
-  const { data, error } = await sb.rpc(nome, params);
-  if(error) throw error;
-  return data;
 }
 
 // =====================================================================
