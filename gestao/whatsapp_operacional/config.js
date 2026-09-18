@@ -12,7 +12,19 @@ function obrigatoria(nome) {
   return v;
 }
 
-export const config = {
+// WHATSAPP_POLL_INTERVALO_MS mal formado (texto, vazio-apos-trim, etc)
+// vira NaN em Number(...) — e um NaN passado pro setTimeout do loop de
+// poll em index.js dispara IMEDIATAMENTE, a cada iteracao, sem nenhum
+// atraso: um martelo de requisicoes no Postgres em vez de um poll a
+// cada 15s. Falha alto e cedo em vez de degradar em silencio.
+const pollIntervaloMs = Number(process.env.WHATSAPP_POLL_INTERVALO_MS || 15000);
+if (!Number.isFinite(pollIntervaloMs) || pollIntervaloMs <= 0) {
+  throw new Error(
+    `WHATSAPP_POLL_INTERVALO_MS invalido: "${process.env.WHATSAPP_POLL_INTERVALO_MS}" — precisa ser um numero positivo de milissegundos.`
+  );
+}
+
+export const config = Object.freeze({
   // MODO=teste (padrao, de proposito — nunca cria grupo real nem grava
   // contato real por acidente) ou MODO=producao. So producao chama a
   // API de verdade do WhatsApp e do Google.
@@ -34,9 +46,9 @@ export const config = {
   perfilNome: process.env.WHATSAPP_PERFIL_NOME || "CIO Cerrado",
   perfilFotoPath: process.env.WHATSAPP_PERFIL_FOTO_PATH || "",
 
-  pollIntervaloMs: Number(process.env.WHATSAPP_POLL_INTERVALO_MS || 15000),
+  pollIntervaloMs,
 
-  google: {
+  google: Object.freeze({
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     // Obtido uma vez, na mao, por um consentimento OAuth de um usuario
@@ -45,8 +57,8 @@ export const config = {
     // CLAUDE.md): service account nao tem agenda de contatos propria.
     // Ver README.md secao "Google People API" pra como gerar.
     refreshToken: process.env.GOOGLE_REFRESH_TOKEN || "",
-  },
-};
+  }),
+});
 
 export function exigirConfigProducao() {
   obrigatoria("SUPABASE_URL");

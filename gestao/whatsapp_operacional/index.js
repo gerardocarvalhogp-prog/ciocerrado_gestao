@@ -95,9 +95,25 @@ async function processarPendentes() {
   }
 }
 
+// Sem isto, um SIGTERM/SIGINT (deploy, restart do supervisor, Ctrl+C)
+// mata o processo no meio de um await de processarPendentes() — que
+// pode estar entre criar o grupo de verdade no WhatsApp e gravar
+// p_status:"criado" no banco. O jantar fica preso em "criando_grupo"
+// pra sempre, com um grupo real ja existindo e ninguem sabendo. Aqui
+// o sinal so' marca a intencao de parar; o ciclo em andamento termina
+// e o loop sai depois dele, nunca no meio.
+let pararSolicitado = false;
+function pedirParada(sinal) {
+  console.log(`\n${sinal} recebido — terminando o ciclo atual e saindo (sem novo poll).`);
+  pararSolicitado = true;
+}
+process.on("SIGTERM", () => pedirParada("SIGTERM"));
+process.on("SIGINT", () => pedirParada("SIGINT"));
+
 console.log(`Poll a cada ${config.pollIntervaloMs}ms. Ctrl+C pra parar.`);
-// eslint-disable-next-line no-constant-condition
-while (true) {
+while (!pararSolicitado) {
   await processarPendentes().catch((e) => console.error("Erro no ciclo de poll:", e));
+  if (pararSolicitado) break;
   await new Promise((r) => setTimeout(r, config.pollIntervaloMs));
 }
+console.log("Daemon encerrado.");

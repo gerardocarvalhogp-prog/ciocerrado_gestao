@@ -49,6 +49,13 @@ await conectar({
   },
 
   aoCair(motivo) {
-    console.log(`Conexão caiu antes de terminar: ${motivo}. Rode de novo.`);
+    // Sem o exit, o script "de rodar uma vez" nao morre aqui: a mesma
+    // conectar() de baileys_grupo.js ja agendou uma reconexao com
+    // backoff por baixo dos panos (pra servir o daemon de vida longa),
+    // e este processo de linha de comando ficaria vivo, tentando de
+    // novo sozinho no fundo, contradizendo a proria mensagem "Rode de
+    // novo" — que so faz sentido se o processo de fato encerrar.
+    console.error(`Conexão caiu antes de terminar: ${motivo}. Rode \`npm run conectar\` de novo.`);
+    process.exit(1);
   },
 });

@@ -36,7 +36,13 @@ const rl = createInterface({ input: process.stdin, output: process.stdout });
 const codigo = await rl.question("Código: ");
 rl.close();
 
-const { tokens } = await oauth2.getToken(codigo.trim());
+let tokens;
+try {
+  ({ tokens } = await oauth2.getToken(codigo.trim()));
+} catch (e) {
+  console.error(`\nCódigo rejeitado pelo Google: ${e.message}\nConfira se colou o código completo e sem espaços, e tente de novo.`);
+  process.exit(1);
+}
 
 if (!tokens.refresh_token) {
   console.error(

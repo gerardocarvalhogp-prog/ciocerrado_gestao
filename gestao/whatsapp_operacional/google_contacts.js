@@ -18,6 +18,25 @@ function clienteOAuth() {
   return oauth2;
 }
 
+// Ultimos 11 digitos: cobre o numero em si (DDD + celular com 9) sem
+// depender de o contato ja estar salvo com +55 na frente ou nao. Uma
+// unica funcao pras duas pontas da comparacao (agenda existente e
+// telefone_e164 do convidado) — antes a mesma regra de corte estava
+// duplicada em dois lugares, podendo divergir com uma mudanca futura.
+function chaveTelefone(digitosOuE164) {
+  return digitosOuE164.replace(/\D/g, "").slice(-11);
+}
+
+// A agenda do CIO Cerrado usa nome completo num campo so' (nome do
+// convidado, como veio do Sympla). O People API separa given/family —
+// sem isso, o Google Contacts mostra o convidado com o sobrenome vazio
+// e o nome completo inteiro no campo de primeiro nome.
+function dividirNome(nomeCompleto) {
+  const partes = nomeCompleto.trim().split(/\s+/);
+  if (partes.length === 1) return { givenName: partes[0] };
+  return { givenName: partes[0], familyName: partes.slice(1).join(" ") };
+}
+
 // Le TODOS os contatos com telefone de uma vez (pessoas, nao paginas) —
 // mais confiavel que people.searchContacts pra achar por telefone exato:
 // o indice de busca do Google pode demorar a refletir contato recem-
@@ -36,10 +55,7 @@ async function mapaDeTelefones(people) {
     });
     for (const pessoa of data.connections || []) {
       for (const tel of pessoa.phoneNumbers || []) {
-        const digitos = (tel.value || "").replace(/\D/g, "");
-        // ultimos 10-11 digitos cobrem o numero em si, sem depender de
-        // o contato ja estar salvo com +55 na frente ou nao
-        const chave = digitos.slice(-11);
+        const chave = chaveTelefone(tel.value || "");
         if (chave) mapa.set(chave, pessoa.resourceName);
       }
     }
@@ -73,7 +89,7 @@ export async function sincronizarContatos(convidados, log) {
   const resultado = [];
 
   for (const c of convidados) {
-    const chave = c.telefone_e164.slice(-11);
+    const chave = chaveTelefone(c.telefone_e164);
     const jaExiste = existentes.get(chave);
 
     if (jaExiste) {
@@ -83,7 +99,7 @@ export async function sincronizarContatos(convidados, log) {
 
     const { data } = await people.people.createContact({
       requestBody: {
-        names: [{ givenName: c.nome }],
+        names: [dividirNome(c.nome)],
         phoneNumbers: [{ value: `+${c.telefone_e164}` }],
       },
     });

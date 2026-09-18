@@ -10,7 +10,24 @@ import { config } from "./config.js";
 
 const logger = pino({ level: process.env.WHATSAPP_LOG_LEVEL || "warn" });
 
-let socketAtual = null;
+// Backoff exponencial com teto e jitter pra reconexao — sem isso, uma
+// rejeicao instantanea do WhatsApp (numero limitado/suspenso,
+// instabilidade do lado deles) vira um laco fechado de reconexao na
+// velocidade maxima do event loop, martelando os servidores deles.
+// Isso e' exatamente o tipo de comportamento que aumenta o risco de
+// banimento do numero — o oposto do que este modulo inteiro existe
+// pra evitar (achado na auditoria de 18/09/2026).
+const RECONEXAO_BASE_MS = 2000;
+const RECONEXAO_TETO_MS = 5 * 60 * 1000;
+let tentativasReconexao = 0;
+
+function proximoAtrasoReconexao() {
+  const exponencial = RECONEXAO_BASE_MS * 2 ** tentativasReconexao;
+  const comTeto = Math.min(exponencial, RECONEXAO_TETO_MS);
+  const jitter = comTeto * (0.5 + Math.random() * 0.5); // 50%-100% do valor, pra nao sincronizar retries
+  tentativasReconexao++;
+  return Math.round(jitter);
+}
 
 /**
  * Conecta (ou reconecta) o numero operacional. Em modo teste nao chama
@@ -41,6 +58,7 @@ export async function conectar(eventos = {}) {
     }
 
     if (connection === "open") {
+      tentativasReconexao = 0; // conexao de verdade reseta o contador de backoff
       eventos.aoConectar?.(sock);
     }
 
@@ -51,19 +69,17 @@ export async function conectar(eventos = {}) {
       // Deslogado (QR revogado no aparelho, etc.) exige nova primeira
       // conexao na mao — nao adianta reconectar sozinho. Qualquer outro
       // motivo (rede, restart) reconecta automatico, reaproveitando a
-      // sessao salva, sem pedir QR de novo.
+      // sessao salva, sem pedir QR de novo — mas so' depois do atraso
+      // de backoff, nunca na hora.
       if (!deslogado) {
-        conectar(eventos).then((s) => { socketAtual = s; });
+        const atraso = proximoAtrasoReconexao();
+        logger.warn({ atraso, tentativa: tentativasReconexao }, "reconectando apos atraso de backoff");
+        setTimeout(() => { conectar(eventos); }, atraso);
       }
     }
   });
 
-  socketAtual = sock;
   return sock;
-}
-
-export function socketConectado() {
-  return socketAtual;
 }
 
 /**
@@ -86,12 +102,20 @@ export async function criarGrupoVazio(sock, nomeDoGrupo) {
   return { jid: metadata.id, inviteLink: `https://chat.whatsapp.com/${codigo}` };
 }
 
+/**
+ * Define nome e foto de perfil do numero operacional. A foto e' sempre
+ * lida do disco e enviada como buffer — a assinatura de
+ * updateProfilePicture aceita `{ url }` OU `{ buffer }`, nunca os dois
+ * ao mesmo tempo; passar ambos e' comportamento nao documentado que
+ * depende de qual chave a versao instalada do Baileys checa primeiro
+ * (achado na auditoria de 18/09/2026).
+ */
 export async function definirPerfil(sock) {
   if (config.perfilNome) {
     await sock.updateProfileName(config.perfilNome);
   }
   if (config.perfilFotoPath) {
     const { readFileSync } = await import("node:fs");
-    await sock.updateProfilePicture(sock.user.id, { url: config.perfilFotoPath, buffer: readFileSync(config.perfilFotoPath) });
+    await sock.updateProfilePicture(sock.user.id, { buffer: readFileSync(config.perfilFotoPath) });
   }
 }
