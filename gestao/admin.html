@@ -335,33 +335,13 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   db: { schema: "gestao" }
 });
 
-const $  = (s,r=document) => r.querySelector(s);
-const $$ = (s,r=document) => [...r.querySelectorAll(s)];
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// $, $$, esc, rpc e explicar vêm de assets/design-system.js — eram
+// cópias idênticas nas 5 telas (revisão de arquitetura de 10/09/2026).
 
 function aviso(alvo, texto, tipo="erro"){
   const el = typeof alvo === "string" ? $(alvo) : alvo;
   if(!el) return;
   el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
-}
-
-function explicar(e){
-  const m = e?.message || String(e);
-  if(m.includes("Email not confirmed"))
-    return "Confirme seu e-mail antes de entrar — enviamos um link de confirmação. Não achou? Confira o spam ou peça pra reenviar.";
-  if(m.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
-  if(m.includes("Acesso restrito a administradores"))
-    return "Esta ação exige perfil de administrador. Seu acesso é de staff.";
-  if(m.includes("Acesso restrito"))  return "Seu e-mail não está cadastrado na equipe.";
-  if(m.includes("JWT") || m.includes("session")) return "Sua sessão expirou. Entre novamente.";
-  return m;
-}
-
-async function rpc(nome, params){
-  const { data, error } = await sb.rpc(nome, params);
-  if(error) throw error;
-  return data;
 }
 
 const dataBR = d => d ? String(d).split("T")[0].split("-").reverse().join("/") : "—";
@@ -1647,7 +1627,11 @@ ABAS.cadastro = async function(){
     }catch(e){ aviso("#emp-tabela", explicar(e)); }
   };
 
-  $("#emp-busca").addEventListener("input", carregarEmpresas);
+  let empBuscaTimer;
+  $("#emp-busca").addEventListener("input", () => {
+    clearTimeout(empBuscaTimer);
+    empBuscaTimer = setTimeout(carregarEmpresas, 300);
+  });
   ["#emp-f-segmento","#emp-f-cidade","#emp-f-estado","#emp-f-perfil","#emp-f-comgestor"]
     .forEach(s => $(s).addEventListener("change", carregarEmpresas));
   $("#emp-f-limpar").addEventListener("click", () => {
@@ -1792,7 +1776,11 @@ ABAS.cadastro = async function(){
     }catch(e){ aviso("#g-tabela", explicar(e)); }
   };
 
-  $("#g-busca").addEventListener("input", () => { G_OFFSET = 0; carregarGestores(); });
+  let gBuscaTimer;
+  $("#g-busca").addEventListener("input", () => {
+    clearTimeout(gBuscaTimer);
+    gBuscaTimer = setTimeout(() => { G_OFFSET = 0; carregarGestores(); }, 300);
+  });
   ["#g-perfil","#g-segmento","#g-cidade","#g-estado","#g-posicao","#g-email"].forEach(s =>
     $(s).addEventListener("change", () => { G_OFFSET = 0; carregarGestores(); }));
   $("#g-limpar").addEventListener("click", () => {
@@ -5329,10 +5317,12 @@ async function rodarProspeccao(){
     let bloquear = [];
     if(marcadas.length){
       status("Levantando empresas das rodadas anteriores…");
-      for(const r of marcadas){
-        const emp = await rpc("admin_empresas_da_rodada", { p_rodada: r });
-        bloquear = bloquear.concat(emp.map(x => x.empresa));
-      }
+      // chamadas independentes entre si — paralelo em vez de uma
+      // rodada de cada vez (N+1 sequencial, achado na revisao de
+      // arquitetura de 10/09/2026)
+      const lotes = await Promise.all(
+        marcadas.map(r => rpc("admin_empresas_da_rodada", { p_rodada: r })));
+      bloquear = lotes.flat().map(x => x.empresa);
     }
 
     status("Buscando empresas na base…");
