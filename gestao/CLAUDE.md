@@ -91,6 +91,13 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 - **Sympla:** a API não é acessível de dentro do ambiente do Claude (chat). Trabalhar
   com export `.xlsx` ou script rodando na máquina do Gerardo.
+- **Criação de evento no Sympla é manual.** Já existiu um robô de navegador
+  (`rpa_sympla_jantares.py`, Playwright) pra criar evento e mandar convite — abandonado
+  em 21/09/2026, instável demais (painel muda sem aviso, login com OTP em duas etapas).
+  O organizador cria e publica o evento e manda convite direto no painel do Sympla;
+  o sistema só guarda o link (`jantares.sympla_url`, `jantares.html`) e acompanha quem
+  confirmou/recusou pela API pública de leitura (`integracao.py --jantares`, já
+  automático). Não propor de novo automação de navegador pra isso sem pedir antes.
 - **Autentique:** geração e envio de contratos. O pipeline atual roda em **sandbox por
   padrão**; produção é flag explícita. Manter esse comportamento.
 - **Google Drive:** conta de serviço `robo-fichas` só tem leitura e **não tem cota para

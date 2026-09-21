@@ -221,90 +221,25 @@ em nada — vale conferir a lista antes do primeiro disparo real.
 O Sympla nunca aprova ninguém sozinho: inscrição nova entra como
 `pendente` e espera decisão humana no painel.
 
-### Criar o evento do jantar no Sympla — `rpa_sympla_jantares.py`
+### Criar o evento do jantar no Sympla — processo manual
 
-A API pública do Sympla **só lê** (eventos, participantes, checkin) — não existe
-endpoint para criar evento, subir logo/banner ou lançar convite/cortesia. Confirmado
-antes de escrever este script: a biblioteca cliente de referência da API só expõe
-métodos de leitura, e a própria Sympla descreve a API pública como "obter informações
-dos eventos criados por você". Criar e configurar evento continua sendo ação só do
-painel — então `rpa_sympla_jantares.py` automatiza o **navegador** (Playwright) em vez
-de chamar API, clicando no painel de produtor como um humano clicaria.
+Já existiu aqui um robô de navegador (`rpa_sympla_jantares.py`, Playwright) para criar
+o evento e mandar convite direto no painel do Sympla — a API pública do Sympla só lê
+(eventos, participantes, checkin), não existe endpoint pra criar evento nem lançar
+convite. Abandonado em 21/09/2026: instável na prática (o painel muda de tela sem
+aviso e quebra seletor; o login pede dois códigos de confirmação que não dá pra
+automatizar de ponta a ponta).
 
-Onde a logo e a mensagem do jantar ficam: `jantares.html`, dentro de cada jantar
-("Dados do jantar" e "Logo para a página do evento") — preenche aqui, o robô lê dali.
+O fluxo agora é manual: crie e publique o evento direto no painel do Sympla, mande o
+convite por lá também. A logo e a mensagem de cada jantar ficam guardadas em
+`jantares.html` ("Dados do jantar" e "Logo para a página do evento") — baixe e suba no
+painel na hora de montar a página. Depois, cole o link do evento no mesmo card
+("Link do Sympla") — isso já marca o jantar como "Criado" na tela.
 
-**Calibrado a partir de uma gravação real** (`playwright codegen`, criando um evento e
-mandando convite de verdade no painel) — os seletores não são mais placeholder. Ainda
-assim, teste com `--debug` antes de confiar em `--producao`: o Sympla pode mudar a tela
-a qualquer momento, sem aviso, e um seletor que sumiu quebra o robô sem meio-termo. Uns
-poucos pontos ficaram marcados `# TODO CALIBRAR` no código — passos que a gravação não
-deixou claros o suficiente (CEP padrão do local, se a busca de endereço exige escolher
-uma opção da lista, o link direto pra tela de convite de um evento já criado).
-
-```bash
-pip install playwright
-playwright install chromium
-```
-
-O login do Sympla pede senha **e** dois códigos de confirmação (e-mail e WhatsApp) — não
-dá pra automatizar sozinho, então é um passo à parte, rodado uma vez (ou quando a sessão
-expirar):
-
-```bash
-python rpa_sympla_jantares.py --login               # interativo, pede os dois códigos
-python rpa_sympla_jantares.py --criar                # modo seguro, só mostra
-python rpa_sympla_jantares.py --criar --producao     # cria e publica de verdade
-python rpa_sympla_jantares.py --convites --producao
-python rpa_sympla_jantares.py --debug --criar        # navegador visível, p/ recalibrar
-```
-
-`--login` salva a sessão autenticada em `sympla_sessao.json`, ao lado do script —
-`--criar`/`--convites` reaproveitam esse arquivo depois, sem repetir OTP a cada execução
-(mesmo princípio do "Mantenha-me conectado" marcado no login). **Esse arquivo é tão
-sensível quanto uma senha** (é uma sessão logada de verdade) — já está no `.gitignore`,
-nunca commitar.
-
-O robô publica o evento (clica "Publicar Evento" + "Entendi") mas para aí: a gravação
-mostrou que todo evento novo entra "Em análise" no Sympla antes de ficar visível de
-verdade, e só sai dali com um segundo clique manual em "Meus eventos" — isso vira o
-checkpoint humano antes do evento ir ao ar, sem precisar de nenhuma lógica extra no robô.
-
-Variáveis de ambiente extras (mesmo `.env` do `integracao.py`):
-
-```
-SYMPLA_EMAIL=...     # login do painel de produtor do Sympla — NÃO é o SYMPLA_TOKEN da API
-SYMPLA_SENHA=...
-```
-
-Mais sensível que o `SYMPLA_TOKEN` (abre o painel inteiro, não só leitura) — nunca vai
-pro `.html` nem é commitada, só no `.env` local ou no Agendador de Tarefas. Se essa senha
-já apareceu em algum lugar fora do `.env` (chat, print, etc.), troque ela no painel do
-Sympla — mais barato trocar do que confiar que ninguém mais viu.
-
-**Achado ao validar isto, e já corrigido:** `is_admin()`/`is_staff()` só reconheciam
-e-mail cadastrado em `admins` — e o token `service_role`, que `integracao.py` já usa pra
-tudo, não carrega e-mail nenhum no JWT. Testado localmente: `is_admin()` dava falso para
-uma chamada autenticada só como `service_role`, então qualquer RPC gateada por
-`_exige_admin()`/`_exige_staff()` (a maioria do schema) recusava a `service_role` — a
-chave mais privilegiada era, ironicamente, a única que não conseguia chamar essas
-funções. Isso incluía `jantar_importar_convidados_sympla`, que `integracao.py --jantares`
-já chama hoje do mesmo jeito: pode ter estado falhando silenciosamente em produção — vale
-conferir o log do Agendador de Tarefas depois de aplicar esta migration. Corrigido na
-raiz (migration `20260909210000`): `is_admin()`/`is_staff()` agora aceitam
-`auth.jwt() ->> 'role' = 'service_role'` também, não só o e-mail — não é uma brecha
-nova, a `service_role` já bypassa RLS por completo em qualquer chamada direta a tabela,
-então só alinha o mesmo nível de confiança pra chamada de RPC. (Tentativa inicial usou
-`current_user = 'service_role'` — quebrou na validação local: dentro de função
-`SECURITY DEFINER`, `current_user` vira o dono da função, não o papel de quem chamou, e
-não sobrevive a duas camadas empilhadas — `auth.jwt()->>'role'` lê uma claim do JWT,
-imune a isso.) Por isso este script (e qualquer RPC nova) usa só a `service_role` de
-sempre, sem precisar de uma segunda credencial de staff.
-
-Por padrão o evento é salvo como **rascunho**, nunca publicado sozinho (confirme no
-código, `# TODO CALIBRAR`, se o Sympla separa "salvar rascunho" de "publicar" no fluxo
-de vocês) — publicar de verdade e mandar convite continua sendo decisão sua, olhando o
-rascunho antes.
+Confirmação e recusa de convite continuam automáticas: `integracao.py --jantares` (ver
+"Agendamento sugerido" acima) lê a lista de participantes pela API pública a cada
+execução e importa quem está aprovado/cancelado para `jantar_convidados`, sem precisar
+de robô nenhum.
 
 ---
 

@@ -657,9 +657,10 @@ async function desenharJantar(){
           </span>` : ""}
         </div>
         <div><label>Status no Sympla</label>
-          <span class="selo ${J.sympla_status==="convites_enviados"?"ok":J.sympla_status==="criado"?"alerta":"pend"}" style="display:inline-block;margin-top:6px;">
-            ${{pendente:"Ainda não criado",criado:"Criado — falta convite",convites_enviados:"Criado e com convites"}[J.sympla_status]||esc(J.sympla_status)}
+          <span class="selo ${J.sympla_status==="criado"?"ok":"pend"}" style="display:inline-block;margin-top:6px;">
+            ${{pendente:"Ainda não criado",criado:"Criado"}[J.sympla_status]||esc(J.sympla_status)}
           </span>
+          <p class="meta" style="margin-top:4px;">Evento e convite são feitos na mão, direto no painel do Sympla — aqui é só o link.</p>
         </div>
       </div>
       <div id="jd-aviso"></div>
@@ -670,8 +671,8 @@ async function desenharJantar(){
     <div class="cartao">
       <h2>Logo para a página do evento</h2>
       <p class="sub" style="margin-bottom:10px;">
-        Fica guardada aqui pronta pra criação do evento no Sympla — na mão ou pelo robô,
-        já que o Sympla não tem como buscar ela sozinho.
+        Fica guardada aqui pra usar na hora de criar o evento no Sympla — baixe e suba
+        no painel deles junto com a mensagem acima.
       </p>
       <div class="barra">
         <div><label>Arquivo (PNG ou JPG)</label><input type="file" id="jl-arquivo" accept="image/png,image/jpeg"></div>
@@ -903,10 +904,9 @@ async function salvarDadosJantar(){
   finally{ b.disabled = false; b.textContent = "Salvar"; }
 }
 
-// Logo do jantar, pronta pra criação do evento no Sympla (na mão ou
-// pelo robô — o Sympla não tem como buscar o arquivo sozinho). Mesmo
-// padrão de bucket privado + signed URL que os uploads de patrocinador
-// já usam.
+// Logo do jantar, pronta pra usar na criação manual do evento no Sympla.
+// Mesmo padrão de bucket privado + signed URL que os uploads de
+// patrocinador já usam.
 async function carregarLogoJantar(){
   const box = $("#jl-preview");
   if(!J.logo_storage_path){ box.innerHTML = ""; return; }
