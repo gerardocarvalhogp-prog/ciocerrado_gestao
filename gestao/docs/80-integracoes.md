@@ -45,6 +45,26 @@ dependa de segmento precisa admitir exceção manual.
 importação manual pela tela não usa token nenhum, o organizador já está
 autenticado).
 
+### Formulário de inscrição — campos a personalizar na criação do evento
+
+Ao criar um evento novo no painel do Sympla, o formulário padrão ("Dados do
+participante": Nome, Sobrenome, E-mail) não basta — os campos abaixo têm que
+ser adicionados manualmente, na mesma ordem, antes de abrir a inscrição.
+Confirmado por print do painel em 2026-09-16.
+
+Todos os campos abaixo são obrigatórios (`*`):
+
+1. **E-mail Corporativo** — campo de texto curto. No print de referência o
+   rótulo saiu como "E=Mail Corporativo" (sinal de igual em vez de hífen) —
+   é digitação errada de quem cadastrou o formulário no Sympla; ao criar o
+   campo, digitar "E-mail Corporativo" corretamente.
+2. **Cargo** — texto curto
+3. **Empresa** — texto curto
+4. **Telefone** — com máscara `(__) ____-____`
+5. **CNPJ** — com máscara `__.___.___/____-__`
+6. **Termo de Consentimento** — bloco de texto + checkbox "Aceito", cobrindo
+   compartilhamento de dados pessoais e de imagem (fotos/vídeo)
+
 ---
 
 ## Autentique — contrato
