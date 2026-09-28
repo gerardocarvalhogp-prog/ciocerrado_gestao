@@ -6,6 +6,23 @@ import { dirname, resolve } from "node:path";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
+// Nenhum script deste modulo (obter-token, conectar, start) jamais leu
+// o .env pra dentro do process.env — todos so' faziam process.env.X
+// direto, contando com algo externo carregar o arquivo primeiro, e
+// nada carregava (achado em 28/09/2026, testando de verdade fora do
+// sandbox: GOOGLE_CLIENT_ID/SECRET preenchidos no .env, e o script
+// via os dois como vazio). process.loadEnvFile() e' nativo do Node
+// (>=20.6, por isso o bump em engines.node no package.json) e nao
+// precisa de dependencia nova. Falha em silencio se o arquivo nao
+// existir de proposito: na VPS (ver README, "Migracao pra VPS") as
+// variaveis vem do systemd/pm2, sem .env nenhum no disco — exigir o
+// arquivo ali quebraria um jeito de rodar que ja e' suportado.
+try {
+  process.loadEnvFile(resolve(AQUI, ".env"));
+} catch (e) {
+  if (e.code !== "ENOENT") throw e;
+}
+
 function obrigatoria(nome) {
   const v = process.env[nome];
   if (!v) throw new Error(`Falta a variavel de ambiente ${nome} — ver .env.example.`);

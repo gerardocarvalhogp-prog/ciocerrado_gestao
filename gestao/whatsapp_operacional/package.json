@@ -11,7 +11,7 @@
     "obter-token": "node obter_refresh_token.js"
   },
   "engines": {
-    "node": ">=18.17.0"
+    "node": ">=20.6.0"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc14",
