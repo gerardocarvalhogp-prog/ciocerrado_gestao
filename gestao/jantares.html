@@ -603,6 +603,23 @@ const achaSympla = (linha, ...alternativas) => {
   return "";
 };
 
+// Confere se a COLUNA existe no cabeçalho (não se tem valor numa linha
+// — isso achaSympla já resolve). Precisa disso separado porque o
+// export "Lista de participantes" de um jantar sem cobrança (a maioria
+// dos jantares do CIO Cerrado, convite direto, sem ingresso pago) nem
+// TEM a coluna "Estado de pagamento" — não é uma célula em branco, é
+// uma coluna que não existe. Confirmado com export real (Jantar
+// Executivo ACS Pro/CIO Cerrado — Cuiabá, 28/09/2026): cabeçalho
+// Ordem de inscrição/Nome/Sobrenome/Data compra/Email/E=Mail
+// Corporativo/Cargo/Empresa/Telefone/CNPJ, sem CPF nem pagamento.
+const colunaSymplaExiste = (linha, ...alternativas) => {
+  const chaves = Object.keys(linha);
+  return alternativas.some(alvo => {
+    const a = alvo.toLowerCase().normalize("NFD").replace(DIACRITICOS,"").replace(/[^a-z0-9]/g,"");
+    return chaves.some(c => c.toLowerCase().normalize("NFD").replace(DIACRITICOS,"").replace(/[^a-z0-9]/g,"").startsWith(a));
+  });
+};
+
 async function desenharJantar(){
   clearInterval(WG_POLL);   // reabrindo outro jantar (ou o mesmo) sem passar pelo botão Voltar
   const c = $("#conteudo");
@@ -912,6 +929,14 @@ async function lerPlanilhaSympla(ev){
     const wb  = XLSX.read(await f.arrayBuffer(), { type:"array" });
     const cru = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:"" });
 
+    // jantar sem ingresso pago (convite direto) exporta sem a coluna
+    // "Estado de pagamento" — nesse caso todo mundo listado já está
+    // confirmado (não existe estado a distinguir), então o padrão vira
+    // "aprovado" pra não rejeitar a planilha inteira por "pagamento não
+    // reconhecido". Quando a coluna existe, o comportamento não muda:
+    // célula em branco continua indo pra "outro estado", como sempre.
+    const temColunaPagamento = cru.length > 0 && colunaSymplaExiste(cru[0], "Estado de pagamento");
+
     JANTAR_SYMPLA = cru.map(l => ({
       nome: [achaSympla(l,"Nome"), achaSympla(l,"Sobrenome")].filter(Boolean).join(" ").trim(),
       email: achaSympla(l,"Email"),
@@ -922,7 +947,7 @@ async function lerPlanilhaSympla(ev){
       cpf: achaSympla(l,"CPF"),
       cnpj: achaSympla(l,"CNPJ"),
       sympla_id: achaSympla(l,"N ingresso","Numero ingresso","Ordem de inscricao"),
-      estado_pagamento: achaSympla(l,"Estado de pagamento")
+      estado_pagamento: temColunaPagamento ? achaSympla(l,"Estado de pagamento") : "aprovado"
     })).filter(l => l.nome || l.email);
 
     const aprov = JANTAR_SYMPLA.filter(l => l.estado_pagamento.toLowerCase()==="aprovado").length;
