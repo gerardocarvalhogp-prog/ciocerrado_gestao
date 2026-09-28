@@ -7,6 +7,13 @@
 .env
 .env.*
 *.key
+# ".env.*" acima bloqueia sem querer os arquivos-modelo tambem
+# (*.env.example, sem credencial nenhuma, feitos pra serem
+# versionados) — achado em 28/09/2026: whatsapp_operacional/.env.example
+# nunca tinha sido commitado por causa disso, README citava um arquivo
+# que nao existia no repositorio.
+!.env.example
+!**/.env.example
 
 # Sistema
 Thumbs.db
