@@ -480,6 +480,10 @@ ABAS.agenda = async function(){
               placeholder="Texto que vai na página do evento no Sympla — o que é o jantar, o que esperar, dress code, etc."></textarea>
           </div>
         </div>
+        <div class="barra">
+          <div style="min-width:100%;"><label>Link do Sympla (inscrição)</label>
+            <input type="text" id="j-sympla" placeholder="https://sympla.com.br/..."></div>
+        </div>
         <div id="j-aviso"></div>
         <button class="btn" id="j-salvar">Criar jantar</button>
       </div>
@@ -525,7 +529,8 @@ ABAS.agenda = async function(){
           p_observacoes: $("#j-obs").value.trim() || null,
           p_capacidade: parseInt($("#j-cap").value,10) || 8,
           p_cep: $("#j-cep").value.trim() || null,
-          p_mensagem: $("#j-mensagem").value.trim() || null
+          p_mensagem: $("#j-mensagem").value.trim() || null,
+          p_sympla_url: $("#j-sympla").value.trim() || null
         });
         abrirJantar(r.id);
       }catch(e){ aviso("#j-aviso", explicar(e)); }
