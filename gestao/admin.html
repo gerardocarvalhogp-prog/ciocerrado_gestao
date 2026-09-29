@@ -4653,11 +4653,15 @@ ABAS.patrocinadores = async function(){
     const atualizarBotaoLote = () => {
       $("#pt-ia-lote").disabled = $$(".pt-marcar").filter(cb => cb.checked).length === 0;
     };
-    $("#pt-marcar-todos").addEventListener("change", (e) => {
-      $$(".pt-marcar").forEach(cb => cb.checked = e.target.checked);
-      atualizarBotaoLote();
-    });
-    $$(".pt-marcar").forEach(cb => cb.addEventListener("change", atualizarBotaoLote));
+    // sem patrocinador nenhum cadastrado, a tabela (e o checkbox "marcar
+    // todos" dentro dela) nem é desenhada — só existe quando lista.length
+    if(lista.length){
+      $("#pt-marcar-todos").addEventListener("change", (e) => {
+        $$(".pt-marcar").forEach(cb => cb.checked = e.target.checked);
+        atualizarBotaoLote();
+      });
+      $$(".pt-marcar").forEach(cb => cb.addEventListener("change", atualizarBotaoLote));
+    }
 
     $("#pt-ia-lote").addEventListener("click", async () => {
       const trs = $$(".pt-marcar").filter(cb => cb.checked).map(cb => cb.closest("tr"));
