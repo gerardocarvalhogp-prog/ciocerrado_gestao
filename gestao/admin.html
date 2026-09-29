@@ -4474,8 +4474,11 @@ ABAS.patrocinadores = async function(){
       // cadastro de empresa e global, compartilhado entre eventos (ver
       // migration 20260909100000) — carrega aqui pra reconhecer, pelo
       // nome digitado, uma empresa que ja patrocinou outro evento e
-      // preencher o resto sozinho, em vez de redigitar tudo de novo
-      rpc("admin_listar_empresas", { p_limite: 2000 })
+      // preencher o resto sozinho, em vez de redigitar tudo de novo.
+      // p_so_patrocinadoras filtra fora quem so' e' empregador de
+      // gestor/CIO convidado e nunca foi patrocinador de nada — nao e'
+      // sugestao relevante neste campo especifico
+      rpc("admin_listar_empresas", { p_limite: 2000, p_so_patrocinadoras: true })
     ]);
 
     if(cotas.length === 0){
