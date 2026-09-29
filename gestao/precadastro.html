@@ -65,22 +65,18 @@ const TOKEN = new URLSearchParams(location.search).get("token") || "";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { db: { schema: "gestao" } });
 
-const $  = (s,r=document) => r.querySelector(s);
-const $$ = (s,r=document) => [...r.querySelectorAll(s)];
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-
+// esc/$/$$/rpc/explicar vêm de assets/design-system.js (globais, sem
+// <script type="module"> nenhuma tela usa) — declarar de novo aqui
+// (como esta tela fazia antes) é SyntaxError: "Identifier 'esc' has
+// already been declared", porque const/let de scripts classic
+// diferentes na mesma página compartilham o mesmo escopo de topo. O
+// erro para o parse do bloco inteiro antes de qualquer linha rodar —
+// é por isso que a tela ficava presa em "Carregando…" pra sempre, sem
+// nenhum aviso.
 function aviso(alvo, texto, tipo="erro"){
   const el = typeof alvo === "string" ? $(alvo) : alvo;
   if(!el) return;
   el.innerHTML = texto ? `<div class="aviso ${tipo}">${esc(texto)}</div>` : "";
-}
-function explicar(e){ return e?.message || String(e); }
-
-async function rpc(nome, params){
-  const { data, error } = await sb.rpc(nome, params);
-  if(error) throw error;
-  return data;
 }
 
 const c = $("#conteudo");
