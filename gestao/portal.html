@@ -506,6 +506,23 @@ $("#btn-sair").addEventListener("click", async () => {
 // =====================================================================
 // BOOT
 // =====================================================================
+
+// Link de e-mail (magic link/recuperação) que já foi usado, expirou, ou
+// foi clicado num navegador diferente do que pediu: o Supabase nunca cria
+// sessão e devolve o motivo na própria URL (hash ou query). Sem isto a
+// pessoa clica, cai de volta na tela de login, e não vê nenhum motivo —
+// parece que "não faz nada".
+(function mostrarErroDoLinkDeEmail(){
+  const doHash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const daQuery = new URLSearchParams(location.search);
+  const erro = doHash.get("error_description") || daQuery.get("error_description")
+            || doHash.get("error") || daQuery.get("error");
+  if(!erro) return;
+  aviso("#login-aviso",
+    "Link inválido ou expirado: " + decodeURIComponent(erro).replace(/\+/g," ") +
+    ". Peça um novo link, ou entre com e-mail e senha.");
+})();
+
 let iniciado = false;
 
 sb.auth.onAuthStateChange((evento) => {
