@@ -4096,6 +4096,13 @@ async function salvarCota(){
 
 async function blocoQuartos(){
   try{
+    // o card inteiro (inclusive o <details> "quarto por quarto") e
+    // recriado do zero abaixo — sem guardar isso agora e devolver
+    // depois, salvar o tipo de UM quarto fechava o accordion e perdia
+    // a busca, "expulsando" quem estava corrigindo varios em sequencia
+    const tinhaDetalhesAberto = $("#qi-detalhes")?.open || false;
+    const buscaAnterior = $("#qi-busca")?.value || "";
+
     const r = await rpc("admin_resumo_quartos", { p_evento_slug: EVENTO });
     const total = r.reduce((s,x) => s + Number(x.total), 0);
 
@@ -4172,7 +4179,11 @@ async function blocoQuartos(){
         </details>
       </div>`;
 
-    if($("#qi-detalhes").open) await carregarQuartosIndividual();
+    if(tinhaDetalhesAberto){
+      $("#qi-detalhes").open = true;
+      $("#qi-busca").value = buscaAnterior;
+      await carregarQuartosIndividual();
+    }
     $("#qi-detalhes").addEventListener("toggle", () => {
       if($("#qi-detalhes").open) carregarQuartosIndividual();
     });
