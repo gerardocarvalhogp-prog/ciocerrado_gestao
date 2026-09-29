@@ -4457,9 +4457,14 @@ ABAS.patrocinadores = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
   try{
-    const [lista, cotas] = await Promise.all([
+    const [lista, cotas, empresas] = await Promise.all([
       rpc("admin_listar_patrocinadores", { p_evento_slug: EVENTO }),
-      rpc("admin_listar_cotas",          { p_evento_slug: EVENTO })
+      rpc("admin_listar_cotas",          { p_evento_slug: EVENTO }),
+      // cadastro de empresa e global, compartilhado entre eventos (ver
+      // migration 20260909100000) — carrega aqui pra reconhecer, pelo
+      // nome digitado, uma empresa que ja patrocinou outro evento e
+      // preencher o resto sozinho, em vez de redigitar tudo de novo
+      rpc("admin_listar_empresas", { p_limite: 2000 })
     ]);
 
     if(cotas.length === 0){
@@ -4475,11 +4480,18 @@ ABAS.patrocinadores = async function(){
       <div class="cartao">
         <h2>Adicionar ou alterar</h2>
         <p class="sub" style="margin-bottom:12px;">
-          Empresa e cota bastam para cadastrar. O resto a análise busca no site — clique em
-          <strong>Buscar dados</strong> depois de informar a empresa.
+          Empresa e cota bastam para cadastrar. O cadastro de empresa é único e vale pra
+          qualquer evento — comece a digitar o nome: se ela já patrocinou algo antes, os
+          dados preenchem sozinhos. Senão, clique em <strong>Buscar dados</strong> depois de
+          informar a empresa.
         </p>
         <div class="barra">
-          <div style="min-width:220px;"><label>Empresa</label><input type="text" id="pt-empresa"></div>
+          <div style="min-width:220px;"><label>Empresa</label>
+            <input type="text" id="pt-empresa" list="pt-empresas-lista" autocomplete="off">
+            <datalist id="pt-empresas-lista">
+              ${empresas.map(e => `<option value="${esc(e.nome)}">`).join("")}
+            </datalist>
+          </div>
           <div style="max-width:160px;"><label>Cota</label>
             <select id="pt-cota">
               <option value="">Sem cota</option>
@@ -4567,6 +4579,28 @@ ABAS.patrocinadores = async function(){
 
     $("#pt-salvar").addEventListener("click", salvarPatrocinador);
     $("#pt-empresa").addEventListener("input", () => DS.limparInvalido($("#pt-empresa")));
+
+    // reconhece, pelo nome exato, uma empresa que ja existe no cadastro
+    // global (patrocinou outro evento, ou entrou via Cadastro > Empresas)
+    // e preenche o que ainda estiver vazio — nunca sobrescreve o que a
+    // pessoa ja digitou/editou na tela. So dispara ao sair do campo, nao
+    // a cada tecla: com nome parcial ainda nao ha' o que casar.
+    $("#pt-empresa").addEventListener("change", () => {
+      const nome = $("#pt-empresa").value.trim().toLowerCase();
+      if(!nome) return;
+      const emp = empresas.find(e => e.nome.trim().toLowerCase() === nome);
+      if(!emp) return;
+
+      const por = (sel, v) => { if(v && !$(sel).value.trim()) $(sel).value = v; };
+      por("#pt-cnpj", emp.cnpj); por("#pt-segmento", emp.segmento);
+      por("#pt-site", emp.site); por("#pt-resumo", emp.resumo);
+      por("#pt-vende", emp.o_que_vende);
+      por("#pt-cidade", emp.cidade); por("#pt-estado", emp.estado);
+      if(emp.natureza && !$("#pt-natureza").value) $("#pt-natureza").value = emp.natureza;
+      if($("#pt-cnpj").value || $("#pt-segmento").value || $("#pt-site").value) $("#pt-mais").open = true;
+
+      aviso("#pt-aviso", "Empresa já cadastrada — dados preenchidos a partir do cadastro global.", "ok");
+    });
 
     $("#pt-buscar").addEventListener("click", async () => {
       const nome = $("#pt-empresa").value.trim();
