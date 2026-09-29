@@ -3014,7 +3014,7 @@ ABAS.atividades = async function(){
     <p class="sub">Uma atividade por linha do dia. Cada uma tem sua própria lista de presença.</p>
 
     <div class="cartao">
-      <h2 style="margin-top:0;">Nova atividade</h2>
+      <h2 style="margin-top:0;" id="at-form-titulo">Nova atividade</h2>
       <div class="linha">
         <div><label>Nome</label><input type="text" id="at-nome" placeholder="Workshop de IA"></div>
         <div style="max-width:160px;"><label>Data</label><input type="date" id="at-data"></div>
@@ -3031,12 +3031,30 @@ ABAS.atividades = async function(){
       </div>
       <div id="at-aviso"></div>
       <button class="btn" id="at-salvar" style="margin-top:8px;">Adicionar</button>
+      <button class="btn sec" id="at-cancelar-edicao" style="margin-top:8px;margin-left:6px;display:none;">
+        Cancelar edição</button>
       <button class="btn sec" id="at-desligar" style="margin-top:8px;margin-left:6px;">
         Desligar atividades deste evento</button>
     </div>
 
     <div id="at-lista"></div>
     <div id="at-presenca"></div>`;
+
+  // null = criando atividade nova; com id, #at-salvar atualiza em vez
+  // de inserir (admin_salvar_atividade ja suporta os dois, so faltava
+  // a tela nunca ter oferecido o caminho de edicao)
+  let AT_EDITANDO = null;
+
+  const limparFormAtividade = () => {
+    AT_EDITANDO = null;
+    ["#at-nome","#at-data","#at-inicio","#at-fim","#at-local"].forEach(s => $(s).value = "");
+    $("#at-tipo").value = "geral";
+    $("#at-form-titulo").textContent = "Nova atividade";
+    $("#at-salvar").disabled = false;
+    $("#at-salvar").textContent = "Adicionar";
+    $("#at-cancelar-edicao").style.display = "none";
+  };
+  $("#at-cancelar-edicao").addEventListener("click", limparFormAtividade);
 
   const carregarLista = async () => {
     $("#at-lista").innerHTML = DS.skeletonLinhas(2);
@@ -3045,7 +3063,11 @@ ABAS.atividades = async function(){
       $("#at-lista").innerHTML = lista.length ? `
         <div class="cartao"><div class="rolagem"><table>
           <tr><th>Atividade</th><th>Quando</th><th>Local</th><th>Tipo</th><th>Presença</th><th></th></tr>
-          ${lista.map(a => `<tr data-id="${esc(a.id)}" data-nome="${esc(a.nome)}">
+          ${lista.map(a => `<tr data-id="${esc(a.id)}" data-nome="${esc(a.nome)}"
+                                data-data="${esc(a.data||"")}"
+                                data-inicio="${esc(a.horario_inicio?a.horario_inicio.slice(0,5):"")}"
+                                data-fim="${esc(a.horario_fim?a.horario_fim.slice(0,5):"")}"
+                                data-local="${esc(a.local||"")}" data-tipo="${esc(a.tipo_presenca)}">
             <td><strong>${esc(a.nome)}</strong></td>
             <td class="meta">${a.data ? dataBR(a.data) : "—"}
                 ${a.horario_inicio ? ` · ${a.horario_inicio.slice(0,5)}${a.horario_fim ? "–"+a.horario_fim.slice(0,5) : ""}` : ""}</td>
@@ -3054,6 +3076,7 @@ ABAS.atividades = async function(){
                   ? `<span class="selo alerta">Exclusiva</span>` : `<span class="meta">Geral</span>`}</td>
             <td><span class="selo ${Number(a.presentes) ? "ok" : "pend"}">${a.presentes} / ${a.esperados}</span></td>
             <td style="white-space:nowrap;">
+              <button class="btn sec mini at-editar">Editar</button>
               ${a.tipo_presenca === "exclusiva"
                 ? `<button class="btn sec mini at-convidados">Convidados</button>` : ""}
               <button class="btn sec mini at-presenca">Presença</button>
@@ -3065,6 +3088,21 @@ ABAS.atividades = async function(){
         </table></div></div>`
         : `<div class="cartao"><p class="meta" style="margin:0;">Nenhuma atividade cadastrada ainda.</p></div>`;
 
+      $$(".at-editar").forEach(b => b.addEventListener("click", () => {
+        const tr = b.closest("tr");
+        AT_EDITANDO = tr.dataset.id;
+        $("#at-nome").value = tr.dataset.nome;
+        $("#at-data").value = tr.dataset.data;
+        $("#at-inicio").value = tr.dataset.inicio;
+        $("#at-fim").value = tr.dataset.fim;
+        $("#at-local").value = tr.dataset.local;
+        $("#at-tipo").value = tr.dataset.tipo;
+        $("#at-form-titulo").textContent = `Editando "${tr.dataset.nome}"`;
+        $("#at-salvar").textContent = "Salvar alterações";
+        $("#at-cancelar-edicao").style.display = "";
+        window.scrollTo({ top:0, behavior:"smooth" });
+        $("#at-nome").focus();
+      }));
       $$(".at-presenca").forEach(b => b.addEventListener("click", () => {
         const tr = b.closest("tr");
         abrirPresenca(tr.dataset.id, tr.dataset.nome);
@@ -3077,8 +3115,11 @@ ABAS.atividades = async function(){
         const tr = b.closest("tr");
         if(!(await DS.confirmar(`Remove também o histórico de presença dela.`,
             {titulo:`Remover "${tr.dataset.nome}"?`, tom:"perigo", textoConfirmar:"Remover"}))) return;
-        try{ await rpc("admin_remover_atividade", { p_atividade_id: tr.dataset.id }); carregarLista(); }
-        catch(e){ aviso("#at-aviso", explicar(e)); }
+        try{
+          await rpc("admin_remover_atividade", { p_atividade_id: tr.dataset.id });
+          if(AT_EDITANDO === tr.dataset.id) limparFormAtividade();
+          carregarLista();
+        }catch(e){ aviso("#at-aviso", explicar(e)); }
       }));
     }catch(e){ aviso("#at-lista", explicar(e)); }
   };
@@ -3087,22 +3128,24 @@ ABAS.atividades = async function(){
     const nome = $("#at-nome").value.trim();
     if(!nome){ aviso("#at-aviso", "Informe o nome da atividade."); return; }
     const btn = $("#at-salvar");
+    const editando = AT_EDITANDO;
     btn.disabled = true; btn.textContent = "Salvando…";
     try{
       await rpc("admin_salvar_atividade", {
-        p_id: null, p_evento_slug: EVENTO, p_nome: nome,
+        p_id: editando, p_evento_slug: EVENTO, p_nome: nome,
         p_data: $("#at-data").value || null,
         p_horario_inicio: $("#at-inicio").value || null,
         p_horario_fim: $("#at-fim").value || null,
         p_local: $("#at-local").value.trim() || null,
         p_tipo_presenca: $("#at-tipo").value
       });
-      ["#at-nome","#at-data","#at-inicio","#at-fim","#at-local"].forEach(s => $(s).value = "");
-      $("#at-tipo").value = "geral";
-      aviso("#at-aviso", "");
+      limparFormAtividade();
+      aviso("#at-aviso", editando ? "Atividade atualizada." : "", editando ? "ok" : "erro");
       carregarLista();
-    }catch(e){ aviso("#at-aviso", explicar(e)); }
-    finally{ btn.disabled = false; btn.textContent = "Adicionar"; }
+    }catch(e){
+      aviso("#at-aviso", explicar(e));
+      btn.disabled = false; btn.textContent = editando ? "Salvar alterações" : "Adicionar";
+    }
   });
 
   $("#at-desligar").addEventListener("click", async () => {
