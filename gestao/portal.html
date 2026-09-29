@@ -378,6 +378,15 @@ function _emailLogin(){
   return v;
 }
 
+const SENHA_REGRA = "mínimo 8 caracteres, com letra, número e caractere especial";
+function senhaFraca(s){
+  if(s.length < 8) return true;
+  if(!/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(s)) return true;
+  if(!/[0-9]/.test(s)) return true;
+  if(!/[^A-Za-z0-9À-ÖØ-öø-ÿ]/.test(s)) return true;
+  return false;
+}
+
 $("#btn-entrar").addEventListener("click", async () => {
   const email = _emailLogin(); if(!email) return;
   const senha = $("#senha").value;
@@ -401,8 +410,8 @@ $("#btn-entrar").addEventListener("click", async () => {
 $("#btn-criar-senha").addEventListener("click", async () => {
   const email = _emailLogin(); if(!email) return;
   const senha = $("#senha").value;
-  if(senha.length < 8){
-    aviso("#login-aviso","Escolha uma senha de pelo menos 8 caracteres e clique em Criar senha.");
+  if(senhaFraca(senha)){
+    aviso("#login-aviso", `Senha fraca: ${SENHA_REGRA}.`);
     return;
   }
   const btn = $("#btn-criar-senha");
@@ -466,18 +475,18 @@ $("#senha").addEventListener("keydown", e => {
 // não troca nada, e no próximo acesso está travada de novo.
 sb.auth.onAuthStateChange(async (evento) => {
   if(evento !== "PASSWORD_RECOVERY") return;
-  const nova = prompt("Digite a nova senha (mínimo 8 caracteres):");
+  const nova = prompt(`Digite a nova senha (${SENHA_REGRA}):`);
   if(!nova) return;
-  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
+  if(senhaFraca(nova)){ DS.avisar(`Senha fraca: ${SENHA_REGRA}.`, {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
   DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
               : "Senha alterada. Use ela no próximo acesso.", {tom: error ? "erro" : "ok"});
 });
 
 async function trocarMinhaSenha(){
-  const nova = prompt("Nova senha (mínimo 8 caracteres):");
+  const nova = prompt(`Nova senha (${SENHA_REGRA}):`);
   if(!nova) return;
-  if(nova.length < 8){ DS.avisar("Senha muito curta.", {tom:"erro"}); return; }
+  if(senhaFraca(nova)){ DS.avisar(`Senha fraca: ${SENHA_REGRA}.`, {tom:"erro"}); return; }
   const { error } = await sb.auth.updateUser({ password: nova });
   DS.avisar(error ? ("Não consegui trocar a senha: " + error.message)
               : "Senha alterada.", {tom: error ? "erro" : "ok"});
