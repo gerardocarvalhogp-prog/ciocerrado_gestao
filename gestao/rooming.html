@@ -489,11 +489,12 @@ function desenhar(){
     <div class="trilha">${trilha()}</div>
     <div id="aviso-global"></div>
     <div id="area"></div>
+    <div id="quartoextra"></div>
     <div id="materiais"></div>
     <div id="meusdados"></div>
     <div id="indicar"></div>`;
 
-  if(STATUS.rooming_liberado) areaRooming();
+  if(STATUS.rooming_liberado){ areaRooming(); carregarQuartoExtra(); }
   else areaBloqueada();
   carregarMateriais();
   carregarMeusDados();
@@ -1013,6 +1014,211 @@ async function salvarRooming(){
     aviso("#aviso-rooming", explicar(e));
     btn.disabled = false; btn.textContent = "Confirmar dados";
   }
+}
+
+// =====================================================================
+// QUARTO EXTRA — além do que já vem com a inscrição
+//
+// part_comprar_quarto/part_cancelar_quarto_extra/part_listar_meus_quartos
+// existiram entre 01/09 e 09/09/2026, foram removidas por risco de
+// disputa com patrocinador pelo mesmo número de quarto, e voltaram em
+// 30/09/2026 só pescando do pool "avulso" (quartos.finalidade) — não
+// competem mais com os números reservados pra CIO/patrocinador/
+// organização/staff.
+// =====================================================================
+async function carregarQuartoExtra(){
+  const alvo = $("#quartoextra");
+  if(!alvo) return;
+  let meus = [], disp = [];
+  try{
+    [meus, disp] = await Promise.all([
+      rpc("part_listar_meus_quartos", { p_evento_slug: EVENTO }),
+      rpc("part_disponibilidade", { p_evento_slug: EVENTO })
+    ]);
+  }catch(e){ alvo.innerHTML = ""; return; }
+
+  const extras = meus.filter(r => r.origem === "extra");
+
+  alvo.innerHTML = `
+    <div class="cartao" style="margin-top:16px;">
+      <h2>Quarto extra</h2>
+      <p class="sub" style="margin-bottom:14px;">
+        Precisa de um quarto a mais, além do que já vem com sua inscrição? Reserve aqui —
+        o valor entra na sua fatura.
+      </p>
+
+      ${extras.length ? `<div id="qe-lista"></div>` : ""}
+
+      <table style="margin-top:${extras.length?"14px":"0"};">
+        <tr><th>Tipo</th><th>Livres</th><th>Valor</th><th></th></tr>
+        ${disp.map(d => `<tr>
+          <td style="text-transform:capitalize">${esc(d.tipo)}</td>
+          <td>${d.livres}</td>
+          <td>${d.valor ? moeda(d.valor) : "a combinar"}</td>
+          <td>${Number(d.livres) > 0
+            ? `<button class="btn sec mini qe-comprar" data-tipo="${esc(d.tipo)}" data-valor="${esc(d.valor??0)}">Reservar</button>`
+            : `<span class="selo pend">Esgotado</span>`}</td>
+        </tr>`).join("") || `<tr><td colspan="4" style="color:var(--suave)">Sem quartos livres no momento.</td></tr>`}
+      </table>
+      <div id="qe-aviso" style="margin-top:10px;"></div>
+    </div>`;
+
+  if(extras.length) desenharQuartosExtras(extras);
+
+  $$(".qe-comprar", alvo).forEach(b => b.addEventListener("click", async () => {
+    const v = Number(b.dataset.valor || 0);
+    const quanto = v > 0 ? moeda(v) : "valor a combinar com a organização";
+    if(!(await DS.confirmar(`Custo: ${quanto}, que entra na sua fatura.`,
+        {titulo:`Reservar um quarto ${b.dataset.tipo} extra?`}))) return;
+
+    b.disabled = true; b.textContent = "Reservando…";
+    try{
+      const r = await rpc("part_comprar_quarto", { p_evento_slug: EVENTO, p_tipo: b.dataset.tipo });
+      if(!r.ok){
+        aviso("#qe-aviso", "O último quarto desse tipo acabou de ser reservado por outra pessoa.");
+        carregarQuartoExtra();
+        return;
+      }
+      aviso("#qe-aviso", "Quarto extra reservado. Preencha quem vai dormir nele abaixo.", "ok");
+      carregarQuartoExtra();
+    }catch(e){
+      aviso("#qe-aviso", explicar(e));
+      b.disabled = false; b.textContent = "Reservar";
+    }
+  }));
+}
+
+function desenharQuartosExtras(extras){
+  const box = $("#qe-lista");
+  box.innerHTML = extras.map(q => `
+    <div class="cartao" data-reserva="${esc(q.reserva_id)}" style="background:#F5F7F5;margin-bottom:10px;">
+      <div class="pessoa-cab">
+        <strong>${esc(q.rotulo)} · <span style="text-transform:capitalize">${esc(q.tipo)}</span></strong>
+        <span class="selo ${q.status === "completo" ? "ok" : "pend"}">
+          ${q.status === "completo" ? "Preenchido" : "Pendente"}
+        </span>
+      </div>
+      <p class="sub" style="margin:6px 0 10px;">
+        ${q.ocupantes} de ${q.capacidade} ocupante(s)${q.quarto_numero ? ` · apto ${esc(q.quarto_numero)}` : ""}
+      </p>
+      <button class="btn sec mini qe-abrir">${q.status === "completo" ? "Editar ocupantes" : "Preencher ocupantes"}</button>
+      <button class="btn perigo mini qe-cancelar" style="margin-left:6px;">Cancelar quarto</button>
+      <div class="editor oculto" style="margin-top:14px;"></div>
+    </div>`).join("");
+
+  $$(".qe-abrir", box).forEach(b => b.addEventListener("click", async () => {
+    const card = b.closest("[data-reserva]");
+    const ed = card.querySelector(".editor");
+    if(!ed.classList.contains("oculto")){ ed.classList.add("oculto"); return; }
+    ed.classList.remove("oculto");
+    await abrirEditorQuartoExtra(ed, card.dataset.reserva);
+  }));
+
+  $$(".qe-cancelar", box).forEach(b => b.addEventListener("click", async () => {
+    const card = b.closest("[data-reserva]");
+    if(!(await DS.confirmar("O quarto volta a ficar disponível pro pool avulso.",
+        {titulo:"Cancelar este quarto extra?", tom:"perigo", textoConfirmar:"Cancelar reserva"}))) return;
+    try{
+      await rpc("part_cancelar_quarto_extra", { p_reserva_id: card.dataset.reserva });
+      aviso("#qe-aviso", "Quarto extra cancelado.", "ok");
+      carregarQuartoExtra();
+    }catch(e){ aviso("#qe-aviso", explicar(e)); }
+  }));
+}
+
+async function abrirEditorQuartoExtra(ed, reservaId){
+  ed.innerHTML = `<p class="carregando">Carregando ocupantes…</p>`;
+  let ocupantes = [];
+  try{
+    ocupantes = await rpc("part_listar_ocupantes_extra", { p_reserva_id: reservaId });
+  }catch(e){ /* reserva nova, sem ninguem ainda */ }
+  if(!ocupantes || ocupantes.length === 0){
+    ocupantes = [{ nome:"", cpf:"", data_nascimento:"", tipo:"adulto", usa_transfer:false, transfer_origem:null }];
+  }
+
+  ed.innerHTML = `
+    <div class="caixa-ocupantes"></div>
+    <button class="btn sec mini qe-add" style="margin-top:8px;" type="button">+ Outra pessoa</button>
+    <div class="barra" style="margin-top:10px;">
+      <label class="check"><input type="checkbox" class="qe-transfer"> Alguém vai usar o transfer</label>
+      <select class="qe-origem" disabled style="max-width:220px;">
+        <option value="">De onde?</option>
+        <option value="GYN">Saindo de Goiânia</option>
+        <option value="BSB">Saindo de Brasília</option>
+      </select>
+    </div>
+    <div id="qe-editor-aviso" style="margin-top:8px;"></div>
+    <button class="btn mini qe-salvar" style="margin-top:8px;">Salvar quarto</button>`;
+
+  const box = ed.querySelector(".caixa-ocupantes");
+  const campo = (o={}) => {
+    const el = document.createElement("div");
+    el.className = "pessoa";
+    el.innerHTML = `
+      <div class="barra">
+        <div><label>Nome</label><input type="text" class="qe-nome" value="${esc(o.nome||"")}"></div>
+        <div><label>CPF</label><input type="text" class="qe-cpf" value="${esc(o.cpf||"")}"></div>
+        <div><label>Tipo</label><select class="qe-tipo">
+          <option value="adulto" ${o.tipo!=="crianca"?"selected":""}>Adulto</option>
+          <option value="crianca" ${o.tipo==="crianca"?"selected":""}>Criança</option>
+        </select></div>
+        <div><label>Nascimento</label><input type="date" class="qe-nasc" value="${esc(o.data_nascimento||"")}"></div>
+        <div style="min-width:auto;"><button class="btn perigo mini qe-remover" type="button">Remover</button></div>
+      </div>`;
+    el.querySelector(".qe-remover").addEventListener("click", () => el.remove());
+    if(o.usa_transfer){
+      ed.querySelector(".qe-transfer").checked = true;
+      ed.querySelector(".qe-origem").disabled = false;
+      if(o.transfer_origem) ed.querySelector(".qe-origem").value = o.transfer_origem;
+    }
+    return el;
+  };
+  ocupantes.forEach(o => box.appendChild(campo(o)));
+
+  ed.querySelector(".qe-add").addEventListener("click", () => box.appendChild(campo()));
+
+  const chkTransfer = ed.querySelector(".qe-transfer");
+  const selOrigem = ed.querySelector(".qe-origem");
+  chkTransfer.addEventListener("change", () => { selOrigem.disabled = !chkTransfer.checked; });
+
+  ed.querySelector(".qe-salvar").addEventListener("click", async () => {
+    const lista = $$(".pessoa", box).map(r => ({
+      nome: r.querySelector(".qe-nome").value.trim(),
+      cpf: r.querySelector(".qe-cpf").value.trim() || null,
+      tipo: r.querySelector(".qe-tipo").value,
+      data_nascimento: r.querySelector(".qe-nasc").value || null
+    })).filter(o => o.nome !== "");
+
+    if(lista.length === 0){
+      aviso("#qe-editor-aviso", "Informe pelo menos um ocupante para salvar o quarto.");
+      return;
+    }
+    const semNasc = lista.find(o => o.tipo === "crianca" && !o.data_nascimento);
+    if(semNasc){
+      aviso("#qe-editor-aviso", `Informe a data de nascimento de ${semNasc.nome} — define a faixa de cobrança.`);
+      return;
+    }
+    if(chkTransfer.checked && !selOrigem.value){
+      aviso("#qe-editor-aviso", "Escolha de onde sai o transfer.");
+      return;
+    }
+
+    const btn = ed.querySelector(".qe-salvar");
+    btn.disabled = true; btn.textContent = "Salvando…";
+    try{
+      await rpc("part_salvar_ocupantes_extra", {
+        p_reserva_id: reservaId,
+        p_ocupantes: lista,
+        p_usa_transfer: chkTransfer.checked,
+        p_transfer_origem: chkTransfer.checked ? selOrigem.value : null
+      });
+      aviso("#qe-aviso", "Quarto extra salvo.", "ok");
+      carregarQuartoExtra();
+    }catch(e){
+      aviso("#qe-editor-aviso", explicar(e));
+      btn.disabled = false; btn.textContent = "Salvar quarto";
+    }
+  });
 }
 </script>
 </body>

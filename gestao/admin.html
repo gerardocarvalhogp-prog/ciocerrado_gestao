@@ -1985,9 +1985,19 @@ ABAS.quartos = async function(){
       if(!reservas.has(p.reserva_id))
         reservas.set(p.reserva_id, {
           reserva_id:p.reserva_id, empresa:p.empresa, quarto_tipo:p.quarto_tipo,
-          quarto_id:p.quarto_id, quarto_numero:p.quarto_numero, gente:[] });
+          quarto_id:p.quarto_id, quarto_numero:p.quarto_numero,
+          categoria:p.categoria_reserva, gente:[] });
       reservas.get(p.reserva_id).gente.push(p.nome);
     });
+
+    // "avulso" aceita qualquer reserva; "equipe" aceita organizacao OU
+    // staff, porque a reserva de equipe nao distingue as duas — mesma
+    // regra de admin_alocar_quarto, so pro seletor nao oferecer numero
+    // que o banco ia recusar
+    const compativel = (categoria, finalidade) =>
+      finalidade === "avulso" ||
+      (categoria === "equipe" ? (finalidade === "organizacao" || finalidade === "staff")
+                               : categoria === finalidade);
     const lista = [...reservas.values()];
     const semQuarto = lista.filter(r => !r.quarto_id).length;
 
@@ -2019,6 +2029,7 @@ ABAS.quartos = async function(){
     }
 
     const opcoes = r => livres
+      .filter(l => compativel(r.categoria, l.finalidade))
       .map(l => `<option value="${esc(l.id)}">${esc(l.numero||"s/n")} · ${esc(l.tipo)} (${l.capacidade})</option>`)
       .join("");
 
@@ -2066,6 +2077,8 @@ async function alocar(el, liberar=false){
       // o banco recusou por um motivo que a tela precisa explicar
       aviso("#aviso-global", r.motivo === "quarto_ocupado"
         ? "Esse quarto acabou de ser ocupado por outra reserva."
+        : r.motivo === "finalidade_incompativel"
+        ? `Esse número é reservado pra ${r.finalidade_quarto}, e essa reserva é de ${r.categoria_reserva} — a categoria do quarto mudou entre a lista carregar e você escolher.`
         : `Não cabe: a reserva tem ${r.ocupantes} pessoa(s) e o quarto comporta ${r.capacidade}.`);
     }
     ABAS.quartos();
@@ -4217,10 +4230,39 @@ async function blocoQuartos(){
           <div class="barra">
             <div><label>Buscar número ou bloco</label><input type="text" id="qi-busca" placeholder="205 ou Bloco A"></div>
           </div>
+
+          <p class="sub" style="margin:14px 0 4px;">
+            Reservar uma faixa inteira pra uma categoria de uma vez — ex.: 1 a 5 pra CIO,
+            7 a 10 pra Patrocinador. Pula quarto que já tem gente de outra categoria dentro.
+          </p>
+          <div class="barra">
+            <div style="max-width:120px;"><label>De</label><input type="text" id="qf-de" placeholder="1"></div>
+            <div style="max-width:120px;"><label>Até</label><input type="text" id="qf-ate" placeholder="5"></div>
+            <div><label>Categoria</label><select id="qf-finalidade">
+              ${OPCOES_FINALIDADE.map(([v,r]) => `<option value="${v}">${r}</option>`).join("")}
+            </select></div>
+            <div style="min-width:auto;"><button class="btn sec" id="qf-salvar">Aplicar na faixa</button></div>
+          </div>
+
           <div id="qi-aviso"></div>
           <div class="rolagem"><table id="qi-tabela"></table></div>
         </details>
       </div>`;
+
+    $("#qf-salvar").addEventListener("click", async () => {
+      const de = $("#qf-de").value.trim(), ate = $("#qf-ate").value.trim();
+      const finalidade = $("#qf-finalidade").value;
+      if(!de || !ate){ aviso("#qi-aviso","Informe a faixa de numeração."); return; }
+      const b = $("#qf-salvar");
+      b.disabled = true; b.textContent = "Aplicando…";
+      try{
+        const r = await rpc("admin_definir_finalidade_faixa",
+          { p_evento_slug: EVENTO, p_de: de, p_ate: ate, p_finalidade: finalidade });
+        aviso("#qi-aviso", `${r.alterados} quarto(s) da faixa ${de}–${ate} agora ${OPCOES_FINALIDADE.find(([v])=>v===finalidade)[1]}.`, "ok");
+        carregarQuartosIndividual();
+      }catch(e){ aviso("#qi-aviso", explicar(e)); }
+      finally{ b.disabled = false; b.textContent = "Aplicar na faixa"; }
+    });
 
     if(tinhaDetalhesAberto){
       $("#qi-detalhes").open = true;
@@ -4288,14 +4330,13 @@ async function blocoQuartos(){
   }catch(e){ aviso("#bl-quartos", explicar(e)); }
 }
 
-// Quem o quarto e — derivado em admin_listar_quartos_individual a
-// partir de reservas.patrocinador_id/participante_id/origem, nao um
-// status novo. "Avulso" cobre tanto disponivel quanto bloqueado: dos
-// dois jeitos, ninguem do evento esta reservado ali.
-const ROTULO_FINALIDADE = {
-  patrocinador: "Patrocinador", cio: "CIO",
-  equipe: "Organização / Staff", avulso: "Avulso"
-};
+// finalidade e reservada com antecedencia (admin_definir_finalidade_quarto)
+// — nao e mais so o que deriva do ocupante atual. "Avulso" e o pool
+// flexivel: e o que patro_comprar_quarto/part_comprar_quarto pescam.
+const OPCOES_FINALIDADE = [
+  ["cio", "CIO"], ["patrocinador", "Patrocinador"],
+  ["organizacao", "Organização"], ["staff", "Staff"], ["avulso", "Avulso"]
+];
 
 async function carregarQuartosIndividual(){
   const tbl = $("#qi-tabela");
@@ -4315,20 +4356,23 @@ async function carregarQuartosIndividual(){
           <option value="triplo" ${q.tipo==="triplo"?"selected":""}>Triplo</option>
         </select></td>
         <td class="meta">${esc(q.bloco||"—")}</td>
-        <td>${q.reserva_id
-          ? `<span class="meta">${esc(ROTULO_FINALIDADE[q.finalidade] || q.finalidade)}</span>`
-          : `<span class="meta">Avulso</span><br>
-             <select class="qi-status">
-              <option value="disponivel" ${q.status==="disponivel"?"selected":""}>Disponível p/ atribuir</option>
-              <option value="bloqueado"  ${q.status==="bloqueado" ?"selected":""}>Bloqueado p/ avulsa</option>
-             </select>`}</td>
+        <td>
+          <select class="qi-finalidade">
+            ${OPCOES_FINALIDADE.map(([v,r]) => `<option value="${v}" ${q.finalidade===v?"selected":""}>${r}</option>`).join("")}
+          </select>
+          <button class="btn sec mini qi-salvar-finalidade">Salvar</button>
+          ${!q.reserva_id ? `<br><select class="qi-status" style="margin-top:6px;">
+              <option value="disponivel" ${q.status==="disponivel"?"selected":""}>Disponível</option>
+              <option value="bloqueado"  ${q.status==="bloqueado" ?"selected":""}>Bloqueado (fora do evento)</option>
+             </select>
+             <button class="btn sec mini qi-salvar-status">Salvar</button>` : ""}
+        </td>
         <td>${q.reserva_id
           ? `<input type="text" class="qi-ocupado" value="${esc(q.ocupado_por||"")}" placeholder="Nome — Empresa">`
           : `<span class="meta">${esc(q.ocupado_por||"—")}</span>`}</td>
         <td style="white-space:nowrap;">
           <button class="btn sec mini qi-salvar">Salvar tipo</button>
-          ${q.reserva_id ? `<button class="btn sec mini qi-salvar-ocupado">Salvar ocupante</button>`
-                         : `<button class="btn sec mini qi-salvar-status">Salvar status</button>`}
+          ${q.reserva_id ? `<button class="btn sec mini qi-salvar-ocupado">Salvar ocupante</button>` : ""}
         </td>
       </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nada com essa busca.</td></tr>`}`;
 
@@ -4344,6 +4388,17 @@ async function carregarQuartosIndividual(){
       }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar tipo"; }
     }));
 
+    $$(".qi-salvar-finalidade", tbl).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const finalidade = tr.querySelector(".qi-finalidade").value;
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        await rpc("admin_definir_finalidade_quarto", { p_id: tr.dataset.id, p_finalidade: finalidade });
+        aviso("#qi-aviso", `Quarto reservado pra ${OPCOES_FINALIDADE.find(([v])=>v===finalidade)[1]}.`, "ok");
+        carregarQuartosIndividual();
+      }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar"; }
+    }));
+
     $$(".qi-salvar-status", tbl).forEach(b => b.addEventListener("click", async () => {
       const tr = b.closest("tr");
       const status = tr.querySelector(".qi-status").value;
@@ -4351,10 +4406,10 @@ async function carregarQuartosIndividual(){
       try{
         await rpc("admin_definir_status_quarto", { p_id: tr.dataset.id, p_status: status });
         aviso("#qi-aviso", status === "bloqueado"
-          ? "Quarto bloqueado — sai da lista de atribuição, fica livre pra contratação avulsa."
-          : "Quarto disponível de novo para a cota.", "ok");
+          ? "Quarto bloqueado — fora do pool do evento inteiro (nem avulso do sistema, é venda direta do hotel)."
+          : "Quarto disponível de novo.", "ok");
         carregarQuartosIndividual();
-      }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar status"; }
+      }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar"; }
     }));
 
     $$(".qi-salvar-ocupado", tbl).forEach(b => b.addEventListener("click", async () => {
