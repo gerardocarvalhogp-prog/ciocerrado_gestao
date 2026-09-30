@@ -4306,13 +4306,19 @@ async function carregarQuartosIndividual(){
           <option value="triplo" ${q.tipo==="triplo"?"selected":""}>Triplo</option>
         </select></td>
         <td class="meta">${esc(q.bloco||"—")}</td>
-        <td class="meta">${esc(q.status)}</td>
+        <td>${q.reserva_id
+          ? `<span class="meta">${esc(q.status)}</span>`
+          : `<select class="qi-status">
+              <option value="disponivel" ${q.status==="disponivel"?"selected":""}>Disponível</option>
+              <option value="bloqueado"  ${q.status==="bloqueado" ?"selected":""}>Bloqueado (avulsa)</option>
+             </select>`}</td>
         <td>${q.reserva_id
           ? `<input type="text" class="qi-ocupado" value="${esc(q.ocupado_por||"")}" placeholder="Nome — Empresa">`
           : `<span class="meta">${esc(q.ocupado_por||"—")}</span>`}</td>
         <td style="white-space:nowrap;">
           <button class="btn sec mini qi-salvar">Salvar tipo</button>
-          ${q.reserva_id ? `<button class="btn sec mini qi-salvar-ocupado">Salvar ocupante</button>` : ""}
+          ${q.reserva_id ? `<button class="btn sec mini qi-salvar-ocupado">Salvar ocupante</button>`
+                         : `<button class="btn sec mini qi-salvar-status">Salvar status</button>`}
         </td>
       </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nada com essa busca.</td></tr>`}`;
 
@@ -4326,6 +4332,19 @@ async function carregarQuartosIndividual(){
         b.disabled = false; b.textContent = "Salvar tipo";
         blocoQuartos();
       }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar tipo"; }
+    }));
+
+    $$(".qi-salvar-status", tbl).forEach(b => b.addEventListener("click", async () => {
+      const tr = b.closest("tr");
+      const status = tr.querySelector(".qi-status").value;
+      b.disabled = true; b.textContent = "Salvando…";
+      try{
+        await rpc("admin_definir_status_quarto", { p_id: tr.dataset.id, p_status: status });
+        aviso("#qi-aviso", status === "bloqueado"
+          ? "Quarto bloqueado — sai da lista de atribuição, fica livre pra contratação avulsa."
+          : "Quarto disponível de novo para a cota.", "ok");
+        carregarQuartosIndividual();
+      }catch(e){ aviso("#qi-aviso", explicar(e)); b.disabled = false; b.textContent = "Salvar status"; }
     }));
 
     $$(".qi-salvar-ocupado", tbl).forEach(b => b.addEventListener("click", async () => {
