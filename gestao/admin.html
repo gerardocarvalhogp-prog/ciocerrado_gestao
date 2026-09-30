@@ -4288,6 +4288,15 @@ async function blocoQuartos(){
   }catch(e){ aviso("#bl-quartos", explicar(e)); }
 }
 
+// Quem o quarto e — derivado em admin_listar_quartos_individual a
+// partir de reservas.patrocinador_id/participante_id/origem, nao um
+// status novo. "Avulso" cobre tanto disponivel quanto bloqueado: dos
+// dois jeitos, ninguem do evento esta reservado ali.
+const ROTULO_FINALIDADE = {
+  patrocinador: "Patrocinador", cio: "CIO",
+  equipe: "Organização / Staff", avulso: "Avulso"
+};
+
 async function carregarQuartosIndividual(){
   const tbl = $("#qi-tabela");
   if(!tbl) return;
@@ -4297,7 +4306,7 @@ async function carregarQuartosIndividual(){
       p_evento_slug: EVENTO, p_busca: $("#qi-busca").value.trim() || null
     });
     tbl.innerHTML = `
-      <tr><th>Número</th><th>Tipo</th><th>Bloco</th><th>Status</th><th>Ocupado por</th><th></th></tr>
+      <tr><th>Número</th><th>Tipo</th><th>Bloco</th><th>Categoria</th><th>Ocupado por</th><th></th></tr>
       ${lista.map(q => `<tr data-id="${esc(q.id)}" data-reserva="${esc(q.reserva_id||"")}">
         <td>${esc(q.numero||"—")}</td>
         <td><select class="qi-tipo">
@@ -4307,10 +4316,11 @@ async function carregarQuartosIndividual(){
         </select></td>
         <td class="meta">${esc(q.bloco||"—")}</td>
         <td>${q.reserva_id
-          ? `<span class="meta">${esc(q.status)}</span>`
-          : `<select class="qi-status">
-              <option value="disponivel" ${q.status==="disponivel"?"selected":""}>Disponível</option>
-              <option value="bloqueado"  ${q.status==="bloqueado" ?"selected":""}>Bloqueado (avulsa)</option>
+          ? `<span class="meta">${esc(ROTULO_FINALIDADE[q.finalidade] || q.finalidade)}</span>`
+          : `<span class="meta">Avulso</span><br>
+             <select class="qi-status">
+              <option value="disponivel" ${q.status==="disponivel"?"selected":""}>Disponível p/ atribuir</option>
+              <option value="bloqueado"  ${q.status==="bloqueado" ?"selected":""}>Bloqueado p/ avulsa</option>
              </select>`}</td>
         <td>${q.reserva_id
           ? `<input type="text" class="qi-ocupado" value="${esc(q.ocupado_por||"")}" placeholder="Nome — Empresa">`
