@@ -521,6 +521,17 @@ $("#btn-sair").addEventListener("click", async () => {
   aviso("#login-aviso",
     "Link inválido ou expirado: " + decodeURIComponent(erro).replace(/\+/g," ") +
     ". Peça um novo link, ou entre com e-mail e senha.");
+  // limpa hash/query da URL: sem isso a mensagem fica presa na aba (o
+  // hash nao vai pro servidor, entao so some se alguem limpar) e volta
+  // a aparecer em qualquer recarregamento, mesmo sem nenhum link novo
+  // ter sido clicado — parecendo erro nas tentativas seguintes.
+  // Vai depois de um setTimeout(0) pra nao brigar com o proprio parser
+  // assincrono de sessao do supabase-js, que le esse mesmo hash.
+  setTimeout(() => {
+    for(const chave of ["error","error_description","error_code"]) daQuery.delete(chave);
+    const queryLimpa = daQuery.toString();
+    history.replaceState(null, "", location.pathname + (queryLimpa ? "?"+queryLimpa : ""));
+  }, 0);
 })();
 
 let iniciado = false;
