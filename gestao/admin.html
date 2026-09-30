@@ -5768,6 +5768,20 @@ function desenharProspeccao(){
 // para nao cobrar, o valor fica em zero.
 const ITENS_FIXOS = ["acompanhante_adulto","crianca","transfer"];
 
+// Todo item aqui é lido por nome EXATO em algum lugar do cálculo de
+// fatura — texto livre deixava passar erro de digitação sem aviso
+// nenhum: o preço ficava salvo, só nunca era encontrado por quem
+// calcula. Rótulo é só o que aparece na tela; o valor é o que importa.
+const ITENS_PRECO = [
+  { valor: "acompanhante_adulto", rotulo: "Acompanhante adulto" },
+  { valor: "crianca",             rotulo: "Criança" },
+  { valor: "transfer",            rotulo: "Transfer" },
+  { valor: "quarto_single",       rotulo: "Quarto extra · single" },
+  { valor: "quarto_duplo",        rotulo: "Quarto extra · duplo" },
+  { valor: "quarto_triplo",       rotulo: "Quarto extra · triplo" },
+  { valor: "entrega_brinde_quarto", rotulo: "Entrega de brinde no quarto" }
+];
+
 ABAS.precos = async function(){
   const c = $("#conteudo");
   c.innerHTML = `
@@ -5778,16 +5792,9 @@ ABAS.precos = async function(){
       <h2>Adicionar ou alterar</h2>
       <div class="barra">
         <div><label>Item</label>
-          <input type="text" id="pr-item" list="pr-sugestoes" placeholder="ex.: crianca">
-          <datalist id="pr-sugestoes">
-            <option value="acompanhante_adulto">
-            <option value="crianca">
-            <option value="transfer">
-            <option value="quarto_single">
-            <option value="quarto_duplo">
-            <option value="quarto_triplo">
-            <option value="entrega_brinde_quarto">
-          </datalist></div>
+          <select id="pr-item">
+            ${ITENS_PRECO.map(i => `<option value="${esc(i.valor)}">${esc(i.rotulo)}</option>`).join("")}
+          </select></div>
         <div><label>Descrição</label><input type="text" id="pr-desc" placeholder="Como aparece na fatura"></div>
         <div style="max-width:110px;"><label>Idade de</label><input type="text" id="pr-imin" placeholder="—"></div>
         <div style="max-width:110px;"><label>até</label><input type="text" id="pr-imax" placeholder="—"></div>
@@ -5842,7 +5849,15 @@ async function listarPrecos(){
 
     $$("#pr-lista .editar").forEach(b => b.addEventListener("click", () => {
       const tr = b.closest("tr");
-      $("#pr-item").value  = tr.dataset.item;
+      const sel = $("#pr-item");
+      // linha antiga com item que não bate com nenhum da lista (de
+      // antes desta tela virar select): preserva o valor exato num
+      // option extra, em vez de trocar pra outro item calado
+      if(!ITENS_PRECO.some(i => i.valor === tr.dataset.item)){
+        sel.insertAdjacentHTML("afterbegin",
+          `<option value="${esc(tr.dataset.item)}">${esc(tr.dataset.item)} (não reconhecido)</option>`);
+      }
+      sel.value = tr.dataset.item;
       $("#pr-desc").value  = tr.dataset.desc;
       $("#pr-imin").value  = tr.dataset.imin;
       $("#pr-imax").value  = tr.dataset.imax;
@@ -5897,8 +5912,14 @@ async function salvarPreco(){
     });
     aviso("#pr-aviso",
       `Preço de "${r.item}"${r.faixa || ""} salvo em ${moeda(valor)}.`, "ok");
-    ["#pr-item","#pr-desc","#pr-valor","#pr-imin","#pr-imax"]
-      .forEach(s => $(s).value = "");
+    // tira o option "(não reconhecido)" que a edição de uma linha
+    // antiga possa ter injetado — sem isso ele fica acumulando toda
+    // vez que alguém edita um item legado
+    $$("#pr-item option").forEach(o => {
+      if(!ITENS_PRECO.some(i => i.valor === o.value)) o.remove();
+    });
+    ["#pr-desc","#pr-valor","#pr-imin","#pr-imax"].forEach(s => $(s).value = "");
+    $("#pr-item").selectedIndex = 0;
     listarPrecos();
   }catch(e){ aviso("#pr-aviso", explicar(e)); }
   finally{ btn.disabled = false; btn.textContent = "Salvar preço"; }
