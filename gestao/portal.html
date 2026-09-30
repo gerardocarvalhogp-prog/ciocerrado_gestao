@@ -2018,6 +2018,12 @@ async function enviarIndicacao(){
       .forEach(s => $(s).value = "");
     carregarResumoIndicacoes();
     listarIndicacoes();
+    // mesmo motivo do salvar quarto: PATRO.indicacoes_feitas so muda
+    // recarregando o painel, e o resumo de pendencias le PATRO direto,
+    // sem RPC propria — sem isto a pendencia "nenhum CIO indicado"
+    // ficava presa ate a pessoa dar F5.
+    await recarregarPainel();
+    calcularPendencias();
   }catch(e){
     aviso("#i-aviso", explicar(e));
   }finally{
