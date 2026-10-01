@@ -2009,10 +2009,11 @@ ABAS.quartos = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
   try{
-    const [pessoas, livres, quartosFisicos] = await Promise.all([
+    const [pessoas, livres, quartosFisicos, categoriasResort] = await Promise.all([
       rpc("admin_listar_alocacao", { p_evento_slug: EVENTO, p_apenas_sem_quarto:false }),
       rpc("admin_quartos_livres",  { p_evento_slug: EVENTO }),
-      rpc("admin_listar_quartos_individual", { p_evento_slug: EVENTO })
+      rpc("admin_listar_quartos_individual", { p_evento_slug: EVENTO }),
+      rpc("admin_listar_categorias_quarto", { p_evento_slug: EVENTO })
     ]);
 
     // agrupa por reserva: o quarto e da reserva, nao da pessoa
@@ -2059,24 +2060,8 @@ ABAS.quartos = async function(){
       <button class="btn sec mini" id="q-exportar" style="margin-bottom:10px;">Exportar mapa de quartos</button>
       <div class="cartao"><div class="rolagem"><table id="q-tabela"></table></div></div>`;
 
-    // Mesmo formato do Mapa de Alocações do resort (prédio/andar/corredor/
-    // categoria física, importado em admin_importar_mapa_quartos) — uma
-    // aba por prédio, uma linha por apartamento, vazio incluso (pra não
-    // esconder vaga livre do relatório que vai pro resort).
-    $("#q-exportar").addEventListener("click", () => {
-      const ordenados = [...quartosFisicos].sort((a,b) =>
-        `${a.bloco||""}|${a.andar||""}|${a.corredor||""}`.localeCompare(`${b.bloco||""}|${b.andar||""}|${b.corredor||""}`)
-        || (Number(a.numero) - Number(b.numero) || String(a.numero||"").localeCompare(String(b.numero||""))));
-      exportarPorAba(
-        ordenados.map(q => ({
-          ...q, bloco: q.bloco || "Sem prédio",
-          qtde: q.reserva_id ? (reservas.get(q.reserva_id)?.gente.length || 1) : 0
-        })),
-        "bloco",
-        [["andar","Andar"],["corredor","Corredor"],["numero","Nº do apto"],
-         ["categoria","Categoria"],["ocupado_por","Ocupação"],["qtde","Qtde"]],
-        "mapa-de-quartos-cio-cerrado.xlsx");
-    });
+    $("#q-exportar").addEventListener("click", (ev) => exportarMapaDeQuartos(
+      ev.currentTarget, quartosFisicos, categoriasResort, reservas));
 
     if(SOU_ADMIN){
       await blocoQuartos();
@@ -2505,6 +2490,156 @@ async function exportarEtiquetasComQR(lista){
   a.href = url; a.download = "etiquetas-com-qr-cio-cerrado.xlsx";
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+}
+
+async function salvarWorkbookExcelJS(wb, nomeArquivo){
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nomeArquivo;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function estilarCabecalho(row){
+  row.font = { bold:true, color:{ argb:"FFFFFFFF" } };
+  row.eachCell(c => {
+    c.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FF1F3864" } };
+    c.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
+    c.alignment = { vertical:"middle" };
+  });
+}
+
+// Mailing do evento, no mesmo formato enviado pelo organizador como
+// exemplo: título com o nome e a data do evento, ID sequencial e as
+// mesmas colunas de admin_rel_mailing (PERFIL, NOME, CARGO, EMPRESA,
+// E-MAIL, TELEFONE, CNPJ, SEGMENTO, ESTADO), cabeçalho destacado e
+// congelado pra rolar a lista sem perder a coluna.
+async function exportarMailingEvento(botao, linhas){
+  if(typeof ExcelJS === "undefined"){
+    DS.avisar("Gerador de Excel não carregou. Recarregue a página.", {tom:"erro"});
+    return;
+  }
+  if(botao){ botao.disabled = true; botao.textContent = "Gerando…"; }
+  try{
+    const evs = await rpc("admin_listar_eventos");
+    const ev = evs.find(e => e.slug === EVENTO);
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("MAILING");
+    ws.columns = [
+      { width:6 },{ width:18 },{ width:28 },{ width:40 },{ width:30 },
+      { width:34 },{ width:18 },{ width:20 },{ width:30 },{ width:8 }
+    ];
+
+    ws.mergeCells(1,1,1,10);
+    const titulo = ws.getCell(1,1);
+    titulo.value = `MAILING ${(ev?.nome || EVENTO).toUpperCase()}`;
+    titulo.font = { bold:true, size:20 };
+    titulo.alignment = { horizontal:"center", vertical:"middle" };
+    ws.getRow(1).height = 30;
+
+    const partes = [ev?.local, ev?.data_inicio ? dataBR(ev.data_inicio) : null,
+                     ev?.data_fim ? `a ${dataBR(ev.data_fim)}` : null].filter(Boolean);
+    if(partes.length){
+      ws.mergeCells(2,1,2,10);
+      const sub = ws.getCell(2,1);
+      sub.value = partes.join(" — ").toUpperCase();
+      sub.font = { bold:true, size:13 };
+      sub.alignment = { horizontal:"center" };
+      ws.getRow(2).height = 20;
+    }
+
+    const headerRow = ws.getRow(4);
+    headerRow.values = ["ID","PERFIL","NOME","CARGO","EMPRESA","E-MAIL","TELEFONE","CNPJ","SEGMENTO","ESTADO"];
+    estilarCabecalho(headerRow);
+    ws.views = [{ state:"frozen", ySplit: 4 }];
+
+    linhas.forEach((l,i) => ws.addRow([
+      i+1, l.perfil||"", l.nome||"", l.cargo||"", l.empresa||"",
+      l.email||"", fone(l.telefone), l.cnpj||"", l.segmento||"", l.estado||""
+    ]));
+
+    await salvarWorkbookExcelJS(wb, "mailing-cio-cerrado.xlsx");
+  }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+  if(botao){ botao.disabled = false; botao.textContent = "Exportar Excel"; }
+}
+
+// Mapa de quartos no mesmo formato do Mapa de Alocações que o resort
+// manda (exemplo enviado pelo organizador): uma aba por prédio, com a
+// legenda de categorias físicas (CÓDIGO/CATEGORIA/DESCRIÇÃO/QTDE/
+// OCUPADOS) em cima e o mapa apartamento a apartamento embaixo —
+// prédio/andar/corredor/categoria/ocupação, vazio incluso, pra não
+// esconder vaga livre do relatório que vai pro resort. QTDE de gente
+// por apartamento vem do mesmo agrupamento por reserva que a tela
+// "Separar quartos" já calcula (admin_listar_alocacao) — sem round-trip
+// extra ao banco.
+async function exportarMapaDeQuartos(botao, quartosFisicos, categoriasResort, reservas){
+  if(typeof ExcelJS === "undefined"){
+    DS.avisar("Gerador de Excel não carregou. Recarregue a página.", {tom:"erro"});
+    return;
+  }
+  if(botao){ botao.disabled = true; botao.textContent = "Gerando…"; }
+  try{
+    const qtdePessoas = q => q.reserva_id ? (reservas.get(q.reserva_id)?.gente.length || 1) : 0;
+
+    const porBloco = new Map();
+    quartosFisicos.forEach(q => {
+      const bloco = q.bloco || "Sem prédio";
+      if(!porBloco.has(bloco)) porBloco.set(bloco, []);
+      porBloco.get(bloco).push(q);
+    });
+
+    const wb = new ExcelJS.Workbook();
+    const usados = new Set();
+
+    [...porBloco.entries()].sort((a,b) => a[0].localeCompare(b[0])).forEach(([bloco, quartosDoBloco]) => {
+      let base = bloco.replace(/[:\\\/\?\*\[\]]/g, "").trim().slice(0, 31) || "Prédio";
+      let nome = base, n = 2;
+      while(usados.has(nome)){ nome = `${base.slice(0, 28)} ${n}`; n++; }
+      usados.add(nome);
+
+      const ws = wb.addWorksheet(nome);
+      ws.columns = [
+        { width:16 },{ width:30 },{ width:45 },{ width:10 },
+        { width:14 },{ width:18 },{ width:32 },{ width:8 }
+      ];
+
+      const cabLegenda = ws.addRow(["CÓDIGO","CATEGORIA","DESCRIÇÃO","QTDE","OCUPADOS"]);
+      estilarCabecalho(cabLegenda);
+
+      let totalQtde = 0, totalOcupados = 0;
+      [...categoriasResort].sort((a,b) => a.codigo.localeCompare(b.codigo)).forEach(cat => {
+        const doBloco = quartosDoBloco.filter(q => (q.categoria||"").toUpperCase() === cat.codigo.toUpperCase());
+        const qtdeCat = doBloco.length;
+        const ocupCat = doBloco.filter(q => q.reserva_id).length;
+        totalQtde += qtdeCat; totalOcupados += ocupCat;
+        ws.addRow([cat.codigo, cat.nome||"", cat.descricao||"", qtdeCat, ocupCat]);
+      });
+      const totRow = ws.addRow(["","","TOTAL", totalQtde, totalOcupados]);
+      totRow.font = { bold:true };
+
+      ws.addRow([]);
+      const tituloMapa = ws.addRow(["MAPA DE ALOCAÇÕES"]);
+      tituloMapa.font = { bold:true, size:13 };
+
+      const cabMapa = ws.addRow(["PRÉDIO","ANDAR","CORREDOR","Nº DO APTO","CATEGORIA","DISTRIBUIÇÃO","OCUPAÇÃO","QTDE"]);
+      estilarCabecalho(cabMapa);
+
+      const ordenados = [...quartosDoBloco].sort((a,b) =>
+        `${a.andar||""}|${a.corredor||""}`.localeCompare(`${b.andar||""}|${b.corredor||""}`)
+        || (Number(a.numero) - Number(b.numero) || String(a.numero||"").localeCompare(String(b.numero||""))));
+
+      ordenados.forEach(q => ws.addRow([
+        bloco, q.andar||"", q.corredor||"", q.numero||"", q.categoria||"",
+        "CIO CERRADO", q.ocupado_por||"", qtdePessoas(q) || ""
+      ]));
+    });
+
+    await salvarWorkbookExcelJS(wb, "mapa-de-quartos-cio-cerrado.xlsx");
+  }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
+  if(botao){ botao.disabled = false; botao.textContent = "Exportar mapa de quartos"; }
 }
 
 // Gera o QR de cada cracha na propria pagina (biblioteca ja carregada
@@ -3479,12 +3614,7 @@ async function relMailing(){
           <td>${esc(r.empresa||"—")}</td><td class="meta">${esc(r.email)}</td>
           <td class="meta">${esc(r.segmento||"—")}</td></tr>`).join("")}</table>
       </div>`;
-    $("#x-mailing").addEventListener("click", () => exportar(
-      l.map((r,i) => ({ ...r, id: i+1 })),
-      [["id","ID"],["perfil","PERFIL"],["nome","NOME"],["cargo","CARGO"],["empresa","EMPRESA"],
-      ["email","E-MAIL"],["telefone","TELEFONE"],["cnpj","CNPJ"],
-      ["segmento","SEGMENTO"],["estado","ESTADO"]
-    ], "mailing-cio-cerrado.xlsx", "MAILING"));
+    $("#x-mailing").addEventListener("click", (ev) => exportarMailingEvento(ev.currentTarget, l));
   }catch(e){ aviso(box, explicar(e)); }
 }
 
