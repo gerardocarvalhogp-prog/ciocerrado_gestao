@@ -398,6 +398,40 @@ function exportar(linhas, colunas, nomeArquivo, nomeAba="Dados"){
   XLSX.writeFile(wb, nomeArquivo);
 }
 
+// Mesmo formato do exportar() acima, mas uma aba por grupo (ex.: um
+// patrocinador por página) em vez de uma aba só — pra consolidar vários
+// relatórios pequenos num unico arquivo. Nome de aba do Excel tem limite
+// de 31 caracteres e nao aceita : \ / ? * [ ]; sanitiza e desempata nome
+// repetido (duas empresas que viram o mesmo nome truncado).
+function exportarPorAba(linhas, campoGrupo, colunas, nomeArquivo){
+  if(!linhas || linhas.length === 0){
+    aviso("#aviso-global","Não há dados para exportar."); return;
+  }
+  const grupos = new Map();
+  linhas.forEach(l => {
+    const chave = l[campoGrupo] || "Sem patrocinador";
+    if(!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push(l);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const usados = new Set();
+  grupos.forEach((itens, chave) => {
+    const dados = itens.map(l => {
+      const o = {};
+      colunas.forEach(([campo,titulo]) => o[titulo] = l[campo] ?? "");
+      return o;
+    });
+    const ws = XLSX.utils.json_to_sheet(dados);
+    let base = String(chave).replace(/[:\\\/\?\*\[\]]/g, "").trim().slice(0, 31) || "Patrocinador";
+    let nome = base, n = 2;
+    while(usados.has(nome)){ nome = `${base.slice(0, 28)} ${n}`; n++; }
+    usados.add(nome);
+    XLSX.utils.book_append_sheet(wb, ws, nome);
+  });
+  XLSX.writeFile(wb, nomeArquivo);
+}
+
 // =====================================================================
 // LOGIN
 // =====================================================================
@@ -2021,7 +2055,14 @@ ABAS.quartos = async function(){
             <option value="sem">Só as sem número</option>
           </select></div>
       </div>
+      <button class="btn sec mini" id="q-exportar" style="margin-bottom:10px;">Exportar mapa de quartos</button>
       <div class="cartao"><div class="rolagem"><table id="q-tabela"></table></div></div>`;
+
+    $("#q-exportar").addEventListener("click", () => exportar(
+      pessoas.map(p => ({ ...p, quarto_numero: p.quarto_numero || "s/n" })),
+      [["empresa","Empresa"],["nome","Nome"],["quarto_tipo","Tipo de quarto"],
+       ["quarto_numero","Quarto"]],
+      "mapa-de-quartos-cio-cerrado.xlsx", "Mapa de quartos"));
 
     if(SOU_ADMIN){
       await blocoQuartos();
@@ -2842,7 +2883,30 @@ ABAS.sessoes = async function(){
         <div id="sm-tabela" style="margin-top:10px;"></div>
       </div>
 
+      <div class="cartao">
+        <h2>Mailing consolidado</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Todo mundo confirmado em alguma mesa ou jantar deste evento, num único
+          arquivo — uma aba do Excel por patrocinador.
+        </p>
+        <button class="btn sec mini" id="sg-mailing">Exportar mailing de todo o evento</button>
+        <div id="sg-aviso"></div>
+      </div>
+
       <div id="s-detalhe"></div>`;
+
+    $("#sg-mailing").addEventListener("click", async (ev) => {
+      const b = ev.currentTarget;
+      b.disabled = true; b.textContent = "Gerando…";
+      try{
+        const l = await rpc("admin_mailing_evento", { p_evento_slug: EVENTO });
+        exportarPorAba(l.map(x => ({ ...x, tipo: String(x.tipo).replace(/_/g, " ") })), "patrocinador",
+          [["tipo","Tipo"],["nome","Nome"],["cargo","Cargo"],["empresa","Empresa"],
+           ["email","E-mail"],["telefone","Telefone"],["rotulo","Identificação"]],
+          "mailing-completo-cio-cerrado.xlsx");
+      }catch(e){ aviso("#sg-aviso", explicar(e)); }
+      b.disabled = false; b.textContent = "Exportar mailing de todo o evento";
+    });
 
     $("#sm-tabela").innerHTML = matriz.length ? `<div class="rolagem"><table>
         <tr><th>Patrocinador</th><th>Cota</th><th>Tipo</th><th>Data</th><th>Vagas</th><th>CIO</th><th>Empresa do CIO</th></tr>
