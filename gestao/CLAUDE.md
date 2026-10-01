@@ -127,7 +127,17 @@ Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
       coluna a coluna, função a função, política a política
 - [x] Publicado em `https://ciocerrado.netlify.app/gestao/`
 - [x] Rastreio de brindes, da promessa até a entrega no quarto
-- [ ] Pagamento da fatura, webhook do Autentique, espelho de quartos do resort
+- [x] Pagamento da fatura — já existia (aba Financeiro, `admin_marcar_fatura` /
+      `admin_definir_pagamento_patrocinador`); o item ficou marcado como
+      pendente por desatualização deste checklist, não por faltar.
+- [x] Webhook do Autentique — Edge Function `autentique-webhook` +
+      `webhook_contrato_assinado`. Falta configurar no lado de fora do código:
+      `AUTENTIQUE_TOKEN` e `AUTENTIQUE_WEBHOOK_SECRET` como secrets da function,
+      e cadastrar a URL no painel do Autentique (se eles tiverem essa opção —
+      não confirmado nesta sessão, sem acesso à internet para checar a conta
+      de verdade). Sem isso configurado, `integracao.py --status` continua
+      sendo o caminho que funciona.
+- [ ] Espelho de quartos do resort
 
 ### O que está verificado e o que não está
 
