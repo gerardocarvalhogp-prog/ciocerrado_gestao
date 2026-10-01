@@ -2515,7 +2515,14 @@ function estilarCabecalho(row){
 // exemplo: título com o nome e a data do evento, ID sequencial e as
 // mesmas colunas de admin_rel_mailing (PERFIL, NOME, CARGO, EMPRESA,
 // E-MAIL, TELEFONE, CNPJ, SEGMENTO, ESTADO), cabeçalho destacado e
-// congelado pra rolar a lista sem perder a coluna.
+// congelado pra rolar a lista sem perder a coluna — mais a pesquisa de
+// perfil de quem já respondeu (admin_rel_pesquisa: faturamento,
+// orçamento de TI, LGPD, uma coluna por área de investimento e uma por
+// pergunta de perfil, achatando os dois objetos JSON do mesmo jeito que
+// o export da aba "Pesquisa de perfil" já faz). A pesquisa não vem de
+// nenhuma API do Sympla acessível por aqui — é o que já foi importado
+// na aba "Pesquisa de perfil" a partir do export .xlsx que o Sympla
+// manda; quem ainda não respondeu sai com essas colunas em branco.
 async function exportarMailingEvento(botao, linhas){
   if(typeof ExcelJS === "undefined"){
     DS.avisar("Gerador de Excel não carregou. Recarregue a página.", {tom:"erro"});
@@ -2526,14 +2533,30 @@ async function exportarMailingEvento(botao, linhas){
     const evs = await rpc("admin_listar_eventos");
     const ev = evs.find(e => e.slug === EVENTO);
 
+    const areas = new Set(), perfilChaves = new Set();
+    linhas.forEach(l => {
+      Object.keys(l.investimentos||{}).forEach(k => areas.add(k));
+      Object.keys(l.perfil||{}).forEach(k => perfilChaves.add(k));
+    });
+    const areasOrd = [...areas].sort();
+    const perfilOrd = [...perfilChaves].sort();
+
+    const cabecalhoFixo = [
+      "ID","PERFIL","NOME","CARGO","EMPRESA","E-MAIL","TELEFONE","CNPJ","SEGMENTO","ESTADO",
+      "FATURAMENTO","ORÇAMENTO TI","COLABORADORES","COLABORADORES TI","ERP ATUAL",
+      "DISPOSITIVOS","TERCEIRIZADOS","LGPD","RESPONDEU PESQUISA"
+    ];
+    const cabecalho = [...cabecalhoFixo, ...areasOrd, ...perfilOrd];
+
+    const largurasFixas = [
+      6,18,28,40,30,34,18,20,30,8, // ID..ESTADO
+      22,22,16,16,20,26,30,10,16   // FATURAMENTO..RESPONDEU PESQUISA
+    ];
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("MAILING");
-    ws.columns = [
-      { width:6 },{ width:18 },{ width:28 },{ width:40 },{ width:30 },
-      { width:34 },{ width:18 },{ width:20 },{ width:30 },{ width:8 }
-    ];
+    ws.columns = cabecalho.map((_,i) => ({ width: largurasFixas[i] ?? 16 }));
 
-    ws.mergeCells(1,1,1,10);
+    ws.mergeCells(1,1,1,cabecalho.length);
     const titulo = ws.getCell(1,1);
     titulo.value = `MAILING ${(ev?.nome || EVENTO).toUpperCase()}`;
     titulo.font = { bold:true, size:20 };
@@ -2543,7 +2566,7 @@ async function exportarMailingEvento(botao, linhas){
     const partes = [ev?.local, ev?.data_inicio ? dataBR(ev.data_inicio) : null,
                      ev?.data_fim ? `a ${dataBR(ev.data_fim)}` : null].filter(Boolean);
     if(partes.length){
-      ws.mergeCells(2,1,2,10);
+      ws.mergeCells(2,1,2,cabecalho.length);
       const sub = ws.getCell(2,1);
       sub.value = partes.join(" — ").toUpperCase();
       sub.font = { bold:true, size:13 };
@@ -2552,14 +2575,24 @@ async function exportarMailingEvento(botao, linhas){
     }
 
     const headerRow = ws.getRow(4);
-    headerRow.values = ["ID","PERFIL","NOME","CARGO","EMPRESA","E-MAIL","TELEFONE","CNPJ","SEGMENTO","ESTADO"];
+    headerRow.values = cabecalho;
     estilarCabecalho(headerRow);
     ws.views = [{ state:"frozen", ySplit: 4 }];
 
-    linhas.forEach((l,i) => ws.addRow([
-      i+1, l.perfil||"", l.nome||"", l.cargo||"", l.empresa||"",
-      l.email||"", fone(l.telefone), l.cnpj||"", l.segmento||"", l.estado||""
-    ]));
+    linhas.forEach((l,i) => {
+      const fixos = [
+        i+1, l.perfil_ingresso||"", l.nome||"", l.cargo||"", l.empresa||"",
+        l.email||"", fone(l.telefone), l.cnpj||"", l.segmento||"", l.estado||"",
+        l.faturamento||"", l.orcamento_ti||"", l.colaboradores||"", l.colaboradores_ti||"",
+        l.erp_atual||"", l.dispositivos||"", l.terceirizados||"",
+        l.consentimento_lgpd ? "aceito" : "", l.respondeu ? "sim" : "não"
+      ];
+      const dinamicos = [
+        ...areasOrd.map(a => (l.investimentos||{})[a] ?? ""),
+        ...perfilOrd.map(p => (l.perfil||{})[p] ?? "")
+      ];
+      ws.addRow([...fixos, ...dinamicos]);
+    });
 
     await salvarWorkbookExcelJS(wb, "mailing-cio-cerrado.xlsx");
   }catch(e){ DS.avisar(explicar(e), {tom:"erro"}); }
@@ -3559,7 +3592,11 @@ ABAS.relatorios = function(){
 
     <div class="cartao">
       <h2>Mailing list</h2>
-      <p class="sub" style="margin-bottom:10px;">Participantes aprovados, com CNPJ e segmento.</p>
+      <p class="sub" style="margin-bottom:10px;">
+        Participantes aprovados, com CNPJ, segmento e a pesquisa de perfil
+        (faturamento, orçamento de TI, áreas de investimento) de quem já
+        respondeu — importada na aba "Pesquisa de perfil".
+      </p>
       <button class="btn sec" id="r-mailing">Carregar</button>
       <div id="box-mailing"></div>
     </div>
@@ -3604,9 +3641,16 @@ async function relMailing(){
   const box = $("#box-mailing");
   box.innerHTML = DS.skeletonCartoes(3);
   try{
-    const l = await puxarTudo("admin_rel_mailing");
+    // admin_rel_pesquisa ja traz tudo que admin_rel_mailing trazia
+    // (nome/empresa/cargo/email/telefone/segmento/estado/cnpj) MAIS a
+    // pesquisa de perfil — so' assim o mailing nao fica sem o tipo de
+    // ingresso nem sem quem ja respondeu
+    const l = await puxarTudo("admin_rel_pesquisa");
+    const semResposta = l.filter(x => !x.respondeu).length;
     box.innerHTML = `
-      <p class="meta" style="margin:10px 0;">${l.length} registro(s).</p>
+      <p class="meta" style="margin:10px 0;">
+        ${l.length} registro(s)${semResposta ? ` · ${semResposta} ainda sem pesquisa respondida` : ""}.
+      </p>
       <button class="btn sec mini" id="x-mailing">Exportar Excel</button>
       <div class="rolagem" style="max-height:280px;margin-top:10px;">
         <table><tr><th>Nome</th><th>Cargo</th><th>Empresa</th><th>E-mail</th><th>Segmento</th></tr>
