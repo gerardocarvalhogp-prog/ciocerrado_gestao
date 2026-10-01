@@ -13,6 +13,14 @@
 -- no sistema, nao mexe no destinatario de producao (continuaria indo
 -- pro gestor de verdade assim que o dominio for verificado e
 -- contratos reais passarem a gerar o aviso).
+--
+-- v1 desta migration so pegava status 'enfileirada' e deu erro — entre
+-- a limpeza da fila e esta migration o organizador ja tinha clicado
+-- "Enviar toda a fila" pelo menos uma vez, e o 403 do Resend fez a
+-- notificacao virar 'erro' em vez de continuar pendente. Corrigido pra
+-- pegar os dois estados e, se achou em 'erro', reabrir pra
+-- 'enfileirada' (limpando o erro antigo) pra "Enviar toda a fila"
+-- tentar de novo.
 -- =====================================================================
 
 set search_path = gestao, public;
@@ -21,6 +29,7 @@ do $$
 declare
   v_evento_teste uuid;
   v_id uuid;
+  v_status_antigo text;
   v_destinatario_antigo text;
 begin
   select id into v_evento_teste from eventos where slug = 'teste2027';
@@ -28,18 +37,22 @@ begin
     raise exception 'Evento "teste2027" nao encontrado';
   end if;
 
-  select id, destinatario into v_id, v_destinatario_antigo
+  select id, status, destinatario into v_id, v_status_antigo, v_destinatario_antigo
   from notificacoes
-  where status = 'enfileirada' and tipo = 'contrato_assinado' and evento_id = v_evento_teste
+  where status in ('enfileirada','erro') and tipo = 'contrato_assinado' and evento_id = v_evento_teste
   order by created_at desc
   limit 1;
 
   if v_id is null then
-    raise exception 'Nenhuma notificacao contrato_assinado pendente em teste2027 — a fila ja foi esvaziada ou enviada?';
+    raise exception 'Nenhuma notificacao contrato_assinado (enfileirada ou com erro) em teste2027 — sumiu de vez?';
   end if;
 
-  update notificacoes set destinatario = 'gerardocarvalhogp@gmail.com'
-   where id = v_id;
+  update notificacoes set
+    destinatario = 'gerardocarvalhogp@gmail.com',
+    status = 'enfileirada',
+    erro = null
+  where id = v_id;
 
-  raise notice 'Notificacao % redirecionada de % para gerardocarvalhogp@gmail.com.', v_id, v_destinatario_antigo;
+  raise notice 'Notificacao % (estava %) redirecionada de % para gerardocarvalhogp@gmail.com e reaberta para enfileirada.',
+    v_id, v_status_antigo, v_destinatario_antigo;
 end $$;
