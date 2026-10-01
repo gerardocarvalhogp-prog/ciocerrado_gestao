@@ -633,7 +633,7 @@ def enviar_contratos(supa, evento, producao):
                 "enviado_em": agora(),
             })
             enfileirar(supa, evento, g["email"], "contrato_enviado",
-                       "Seu contrato do CIO Cerrado Experience")
+                       "Seu contrato do CIO Cerrado Experience", nome=g.get("nome"))
             log.info("  enviado: %s", g["email"])
 
         except Exception as e:
@@ -735,7 +735,7 @@ def lembretes(supa, evento, producao):
             log.info("  [seguro] lembrete para %s", g["email"])
             continue
 
-        enfileirar(supa, evento, g["email"], "contrato_lembrete", assunto)
+        enfileirar(supa, evento, g["email"], "contrato_lembrete", assunto, nome=g.get("nome"))
         supa.patch("contratos", {"id": f"eq.{c['id']}"}, {
             "lembretes_enviados": (c.get("lembretes_enviados") or 0) + 1,
             "ultimo_lembrete_em": agora(),
@@ -793,11 +793,15 @@ def processar_emails(supa, evento, producao, limite=200):
     ok = falhou = 0
 
     for n in fila:
-        nome = (n.get("destinatario") or "").split("@")[0]
-        modelo = CORPO.get(n["tipo"], PADRAO)
-        texto = modelo.format(nome=nome,
-                              assunto=n.get("assunto") or "",
-                              link=link_do_tipo(n["tipo"]))
+        # corpo ja vem pronto desde enfileirar(); so reconstroi aqui pra
+        # notificacao antiga, enfileirada antes dessa coluna existir
+        texto = n.get("corpo")
+        if not texto:
+            nome = (n.get("destinatario") or "").split("@")[0]
+            modelo = CORPO.get(n["tipo"], PADRAO)
+            texto = modelo.format(nome=nome,
+                                  assunto=n.get("assunto") or "",
+                                  link=link_do_tipo(evento["slug"], n["tipo"]))
 
         if not producao:
             log.info("  [seguro] %s -> %s", n["tipo"], n["destinatario"])
@@ -830,11 +834,20 @@ def processar_emails(supa, evento, producao, limite=200):
     log.info("E-mails: %d enviado(s), %d com erro.", ok, falhou)
 
 
-def link_do_tipo(tipo):
-    base = os.environ.get("CERRADO_SITE", "https://ciocerrado.netlify.app")
-    if tipo.startswith("contrato"):
-        return f"{base}/rooming.html?evento={EVENTO_SLUG}"
-    return f"{base}/rooming.html?evento={EVENTO_SLUG}"
+def link_do_tipo(evento_slug, tipo):
+    # o sistema de gestao vive em /gestao/ no Netlify (o site tambem serve
+    # o agendamento de massagem na raiz, preparar-site.js/netlify.toml) —
+    # o default sem o prefixo gerava link 404 em todo e-mail com {link},
+    # achado em 01/10/2026 testando o aviso de contrato assinado.
+    #
+    # evento_slug vem de quem chama (evento["slug"]), nao da global
+    # EVENTO_SLUG — essa so reflete CERRADO_EVENTO/o padrao do --evento,
+    # NAO o --evento de verdade passado na linha de comando. Rodar com
+    # --evento teste2027 gerava link pro evento errado (cerrado2027, o
+    # default) sempre que a global nao batia com o evento da chamada —
+    # mesmo achado de 01/10/2026, mesma correcao.
+    base = os.environ.get("CERRADO_SITE", "https://ciocerrado.netlify.app/gestao")
+    return f"{base}/rooming.html?evento={evento_slug}"
 
 
 # =====================================================================
@@ -857,17 +870,29 @@ def br(d):
     return "/".join(reversed(str(d)[:10].split("-")))
 
 
-def enfileirar(supa, evento, email, tipo, assunto):
+def enfileirar(supa, evento, email, tipo, assunto, nome=None):
+    # o corpo ja sai RENDERIZADO (texto final, com o link certo) em vez de
+    # so o tipo/assunto crus — quem manda de verdade depois (--emails
+    # aqui, ou a Edge Function enviar-notificacoes chamada pelo botao
+    # "Enviar toda a fila" do admin.html) so usa o que ja esta pronto, sem
+    # recalcular nada. Antes so o caminho --emails montava o texto com
+    # link; quem clicava o botao do admin.html mandava um e-mail generico
+    # sem link nenhum pro rooming — achado em 01/10/2026 testando o aviso
+    # de contrato assinado.
+    modelo = CORPO.get(tipo, PADRAO)
+    corpo = modelo.format(nome=nome or email.split("@")[0],
+                          assunto=assunto or "", link=link_do_tipo(evento["slug"], tipo))
     supa.insert("notificacoes", {
         "evento_id": evento["id"], "destinatario": email,
-        "tipo": tipo, "assunto": assunto, "status": "enfileirada"})
+        "tipo": tipo, "assunto": assunto, "corpo": corpo, "status": "enfileirada"})
 
 
 def avisar_participante(supa, evento, participante_id, tipo, assunto):
-    p = supa.get("participantes", select="gestores!inner(email)",
+    p = supa.get("participantes", select="gestores!inner(nome,email)",
                  id=f"eq.{participante_id}", limit=1)
     if p:
-        enfileirar(supa, evento, p[0]["gestores"]["email"], tipo, assunto)
+        g = p[0]["gestores"]
+        enfileirar(supa, evento, g["email"], tipo, assunto, nome=g.get("nome"))
 
 
 # =====================================================================
