@@ -214,7 +214,13 @@ input[type=text],input[type=email],input[type=date],select,textarea{
 const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
 
-const EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+// Sem fallback pra um evento fixo: um CIO que cai aqui sem ?evento= (link
+// quebrado, favorito antigo, URL de confirmacao que perdeu a query string)
+// nao pode acabar vendo silenciosamente os dados de OUTRO evento soh
+// porque o nome bateu com o default — vira bloqueio explicito em
+// iniciar(), achado em 01/10/2026 (inscrito em teste2027, caiu em
+// cerrado2027 sem avisar, "nao encontramos inscricao" enganoso).
+const EVENTO = new URLSearchParams(location.search).get("evento");
 
 // Schema "gestao": separado do sistema de agendamento de massagem.
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
@@ -395,6 +401,14 @@ async function trocarMinhaSenha(){
 $("#email").addEventListener("keydown", e => { if(e.key==="Enter") $("#btn-entrar").click(); });
 
 $("#btn-cadastrar").addEventListener("click", async () => {
+  // mesmo caso de iniciar(): sem ?evento= na URL nao da pra saber em
+  // qual evento cadastrar — bloqueia aqui tambem, esse caminho (anon,
+  // antes de logar) nunca passa por iniciar()
+  if(!EVENTO){
+    aviso("#cad-aviso","Link incompleto — abra o link do seu e-mail de convite, ou peça um novo à organização.");
+    return;
+  }
+
   const nome  = $("#c-nome").value.trim();
   const email = $("#c-email").value.trim();
   if(!nome || !email){ aviso("#cad-aviso","Nome e e-mail são obrigatórios."); return; }
@@ -449,6 +463,17 @@ sb.auth.onAuthStateChange(ev => {
 async function iniciar(){
   if(iniciado) return;
   iniciado = true;
+
+  if(!EVENTO){
+    $("#app").classList.add("oculto");
+    $("#tela-login").classList.remove("oculto");
+    $("#tela-login").innerHTML = `<div class="cartao">
+      <h1>Link incompleto</h1>
+      <p class="sub">Esse link não diz a qual evento você está inscrito — abra o link do
+      seu e-mail de convite (ele já vem com o evento certo), ou peça um novo à organização.</p>
+    </div>`;
+    return;
+  }
 
   const { data:{ user } } = await sb.auth.getUser();
   if(!user) return;

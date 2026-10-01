@@ -131,13 +131,34 @@ Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
       `admin_definir_pagamento_patrocinador`); o item ficou marcado como
       pendente por desatualização deste checklist, não por faltar.
 - [x] Webhook do Autentique — Edge Function `autentique-webhook` +
-      `webhook_contrato_assinado`. Falta configurar no lado de fora do código:
-      `AUTENTIQUE_TOKEN` e `AUTENTIQUE_WEBHOOK_SECRET` como secrets da function,
-      e cadastrar a URL no painel do Autentique (se eles tiverem essa opção —
-      não confirmado nesta sessão, sem acesso à internet para checar a conta
-      de verdade). Sem isso configurado, `integracao.py --status` continua
-      sendo o caminho que funciona.
+      `webhook_contrato_assinado`. **Testado de ponta a ponta em produção em
+      01/10/2026**: endpoint cadastrado no painel do Autentique (evento
+      `signature.accepted`), contrato assinado no sandbox do Autentique
+      refletiu "assinado" no painel sem rodar `--status`, com o link do PDF
+      assinado também aparecendo. `verify_jwt = false` precisa estar ligado
+      nessa function (`supabase/config.toml`) — sem isso o gateway do
+      Supabase recusa a chamada do Autentique antes dela chegar no código.
 - [ ] Espelho de quartos do resort
+
+### Dois achados de 01/10/2026, ainda sem solução — ficam aqui até resolver
+
+- **Domínio não verificado no Resend**: a conta só deixa mandar e-mail pro
+  próprio endereço da conta (`gerardocarvalhogp@gmail.com`) até
+  `ciocerrado.com.br` ser verificado em resend.com/domains (registros
+  SPF/DKIM, DNS fica na Skymail). Até lá, todo aviso real (contrato
+  enviado/assinado, rooming confirmado) falha com 403 pra qualquer
+  destinatário que não seja essa conta — bloqueia o uso de verdade do botão
+  "Enviar toda a fila" (aba Equipe).
+- **`?evento=` ausente na URL caía num evento errado, silenciosamente**:
+  `rooming.html` e `portal.html` tinham `|| "cerrado2027"` como fallback
+  quando a URL não trazia o evento — um CIO/patrocinador que caísse ali sem
+  o parâmetro (link quebrado, redirect de confirmação que perde a query
+  string) via silenciosamente os dados do evento de produção em vez de um
+  erro claro. Corrigido: as duas telas agora bloqueiam com mensagem
+  explícita ("Link incompleto") em vez de adivinhar o evento.
+  `admin.html`/`checkin.html` têm o mesmo padrão mas não foram mexidas —
+  são operadas por equipe logada com seletor de evento visível, risco bem
+  menor que um link de e-mail de uso único.
 
 ### O que está verificado e o que não está
 
