@@ -29,10 +29,12 @@
 -- A Edge Function e' quem decide SE o documento foi assinado de verdade
 -- (reconsultando a API do Autentique com AUTENTIQUE_TOKEN, a mesma
 -- consulta GraphQL que ler_status ja usa) — esta RPC confia nisso e so
--- aplica o estado. Design deliberado: o payload que o Autentique manda no
--- POST do webhook nao e' tratado como fonte de verdade (formato nao
--- confirmado, assinatura do webhook nao verificada), so' como aviso pra
--- ir reconferir na API autenticada.
+-- aplica o estado. Design deliberado, mesmo com o formato do payload do
+-- webhook ja confirmado na doc oficial deles (01/10/2026): o POST nunca
+-- vira fonte de verdade sozinho, so' um aviso de "va reconferir" — mantem
+-- o MESMO criterio de "assinado" que --status ja usa (qualquer signatario,
+-- nao exige o documento inteiro fechar) e sobrevive a reentrega fora de
+-- ordem, que a propria doc do Autentique diz que pode acontecer.
 --
 -- Idempotente: reentrega do webhook (ou um signatario assinando por vez,
 -- com testemunha/parte fixos desde 20261001?) nao duplica o aviso nem

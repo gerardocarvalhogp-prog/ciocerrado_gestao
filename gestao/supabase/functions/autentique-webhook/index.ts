@@ -5,78 +5,105 @@
 // `integracao.py --status` na mao. Pedido do organizador em 01/10/2026
 // ("contrato assinado ainda nao refletiu no painel").
 //
-// AVISO DE CONFIANCA — LEIA ANTES DE CONFIGURAR
+// Formato do payload e nomes de evento conferidos na documentacao oficial
+// (https://docs.autentique.com.br/api/integration-basics/webhooks) em
+// 01/10/2026. Dois formatos de payload aparecem nos exemplos da propria
+// doc para evento de documento (versoes diferentes da API, aparentemente):
 //
-// Nao ha, nesta sessao, acesso a internet para confirmar ao vivo (a)
-// se a conta/plano do Autentique em uso tem a opcao de configurar uma
-// URL de webhook no painel deles, e (b) o formato exato do corpo que
-// eles enviam nesse POST. O design abaixo foi pensado para ser
-// tolerante a essa incerteza, em duas camadas:
+//   evento.data.object.id   (exemplo mais antigo da doc)
+//   evento.data.id          (exemplo mais recente da doc, "Document Object")
 //
-//   1. O payload do webhook NUNCA e tratado como prova de que o
-//      documento foi assinado — so como um aviso de "va conferir".
-//      Esta function extrai so o ID do documento do corpo (tentando
-//      varios caminhos comuns) e consulta de novo a API GraphQL do
-//      Autentique (a MESMA consulta que ler_status, em integracao.py,
-//      ja usa e que o organizador ja confirmou que funciona) para
-//      saber se esta assinado de verdade. Um payload forjado ou um
-//      formato diferente do esperado, na pior hipotese, faz a function
-//      ignorar o evento (nao reconhece o ID) ou reconsultar um
-//      documento que nao esta assinado (nao muda nada) — nunca marca
-//      um contrato como assinado so por confiar no POST recebido.
-//   2. Autenticacao do POST em si e por segredo compartilhado na URL
-//      (?chave=...), nao por verificacao de assinatura HMAC — porque o
-//      mecanismo de assinatura de webhook do Autentique (se existir)
-//      nao esta confirmado. Configure o mesmo valor em dois lugares:
+// extrairDocumentoId() tenta os dois. O ID do documento NAO e um UUID com
+// hifen (ex.: "1cf7d351a96696fdf450ba893f6720463599dd8c34e0aeda803d") —
+// o tipo GraphQL se chama "UUID" mas aceita essa string, confirmado pelo
+// `document(id: UUID!)` que ler_status ja usa com sucesso em producao.
 //
+// Eventos de assinatura (signature.accepted etc.) trazem o documento pai
+// como string solta em `evento.data.document`, nao aninhado.
+//
+// POR QUE AINDA RECONSULTA A API EM VEZ DE CONFIAR SO NO PAYLOAD
+//
+// Mesmo com o formato confirmado, o payload recebido continua sendo
+// tratado so como um AVISO de "va conferir", nao como prova — a function
+// sempre reconsulta a API GraphQL do Autentique (a MESMA consulta que
+// ler_status, em integracao.py, ja usa) antes de marcar qualquer coisa.
+// Isso mantem o MESMO criterio de "assinado" dos dois caminhos (webhook e
+// --status manual): quando QUALQUER signatario assinou — nao so quando o
+// documento inteiro fecha (document.finished exige TODOS, inclusive a
+// testemunha/parte fixas desde 01/10/2026, o que demoraria mais que o
+// necessario pra avisar o CIO). Tambem protege contra reentrega fora de
+// ordem — a doc e explicita que a ordem de entrega NAO e garantida.
+//
+// AUTENTICACAO DO POST
+//
+// Duas camadas, ambas opcionais apenas na falta de configuracao — pelo
+// menos uma tem que estar ativa (a function recusa rodar sem nenhuma):
+//
+//   1. Segredo compartilhado na URL (?chave=...) — funciona em qualquer
+//      plano. Configure:
 //        supabase secrets set AUTENTIQUE_WEBHOOK_SECRET=<valor-aleatorio-longo>
-//
-//      e na URL cadastrada no painel do Autentique:
-//
-//        https://<project-ref>.functions.supabase.co/autentique-webhook?chave=<mesmo-valor>
-//
-// Se o Autentique nao tiver opcao de configurar URL de webhook (so
-// notificacao por e-mail, por exemplo), esta function fica pronta mas
-// inerte — `integracao.py --status` continua sendo o caminho que
-// funciona, sem problema nenhum em rodar os dois.
+//      e cadastre a mesma URL+chave no painel do Autentique.
+//   2. Assinatura HMAC-SHA256 no header `x-autentique-signature` — e a
+//      forma que a doc deles recomenda, mas a opcao "Autenticacao" na
+//      tela de cadastro do endpoint aparecia marcada como "Pro" (print
+//      do organizador em 01/10/2026) — pode nao estar disponivel no
+//      plano atual. Se um dia ativar, configure:
+//        supabase secrets set AUTENTIQUE_WEBHOOK_SIGNING_SECRET=<o-secret-que-o-autentique-mostrar>
+//      e a function passa a EXIGIR a assinatura valida (nao so aceitar
+//      se vier), em vez de so conferir o ?chave= da URL.
 //
 // Devolve 200 ate para evento que nao reconhece (ID nao encontrado,
-// contrato nao encontrado) — webhook que responde erro demais costuma
-// ser desativado pelo provedor depois de algumas falhas, e novas
-// tentativas nao resolveriam um ID genuinamente desconhecido. So o
-// segredo errado devolve 401; falha de configuracao do servidor (sem
-// AUTENTIQUE_TOKEN) devolve 500, porque essa sim vale a pena reentregar
-// depois que alguem configurar o secret.
+// contrato nao encontrado) — a doc deles reentrega automaticamente em
+// 60s/120s/300s quando a resposta nao e 2xx, e reentregar nao resolveria
+// um ID genuinamente desconhecido. So segredo/assinatura invalidos
+// devolvem 401; falta de configuracao do servidor devolve 500 (essa sim
+// vale a pena reentregar depois de configurar o secret).
 // =====================================================================
 
-const SUPABASE_URL     = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE     = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const AUTENTIQUE_TOKEN = Deno.env.get("AUTENTIQUE_TOKEN") ?? "";
-const WEBHOOK_SECRET   = Deno.env.get("AUTENTIQUE_WEBHOOK_SECRET") ?? "";
-const AUTENTIQUE_API   = "https://api.autentique.com.br/v2/graphql";
+const SUPABASE_URL      = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_ROLE      = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const AUTENTIQUE_TOKEN  = Deno.env.get("AUTENTIQUE_TOKEN") ?? "";
+const WEBHOOK_SECRET    = Deno.env.get("AUTENTIQUE_WEBHOOK_SECRET") ?? "";
+const WEBHOOK_SIGNING_SECRET = Deno.env.get("AUTENTIQUE_WEBHOOK_SIGNING_SECRET") ?? "";
+const AUTENTIQUE_API    = "https://api.autentique.com.br/v2/graphql";
 
 const json = (corpo: unknown, status = 200) =>
   new Response(JSON.stringify(corpo), { status, headers: { "Content-Type": "application/json" } });
 
-// Varre o payload por um ID de documento, tentando os formatos mais
-// comuns de webhook primeiro; se nenhum bater, cai para procurar
-// qualquer string em formato UUID no JSON inteiro — os autentique_id
-// gravados em `contratos` sao UUIDs (a mesma consulta GraphQL usa
-// `document(id: UUID!)`).
+// Comparacao em tempo constante simples (sem depender de import externo) —
+// relevante so pra assinatura HMAC; o ?chave= da URL nao precisa disso,
+// e' so' um token de acesso, nao um segredo criptografico comparado contra
+// dado controlado por quem ataca.
+function comparaSeguro(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function assinaturaValida(corpoBruto: string, assinaturaHeader: string): Promise<boolean> {
+  const chave = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(WEBHOOK_SIGNING_SECRET),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(corpoBruto));
+  const calculada = Array.from(new Uint8Array(mac))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+  return comparaSeguro(calculada, assinaturaHeader.toLowerCase());
+}
+
+// Extrai o ID do documento conforme o tipo do evento — ver comentario no
+// topo do arquivo sobre os dois formatos confirmados na doc oficial.
 function extrairDocumentoId(corpo: any): string | null {
-  const caminhos = [
-    corpo?.document?.id,
-    corpo?.data?.document?.id,
-    corpo?.document_id,
-    corpo?.data?.id,
-    corpo?.id,
-  ];
-  for (const c of caminhos) {
-    if (typeof c === "string" && c.length > 0) return c;
+  const evento = corpo?.event;
+  const tipo: string = evento?.type ?? "";
+  const dados = evento?.data;
+
+  if (tipo.startsWith("signature.")) {
+    return typeof dados?.document === "string" ? dados.document : null;
   }
-  const texto = JSON.stringify(corpo ?? {});
-  const m = texto.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-  return m ? m[0] : null;
+  // document.* e qualquer tipo nao reconhecido: tenta os dois formatos
+  const id = dados?.object?.id ?? dados?.id;
+  return typeof id === "string" && id.length > 0 ? id : null;
 }
 
 async function autentiqueAssinado(documentoId: string): Promise<boolean> {
@@ -127,42 +154,56 @@ Deno.serve(async (req) => {
   if (!AUTENTIQUE_TOKEN) {
     return json({ erro: "AUTENTIQUE_TOKEN nao configurado (supabase secrets set AUTENTIQUE_TOKEN=...)." }, 500);
   }
-  if (!WEBHOOK_SECRET) {
-    return json({ erro: "AUTENTIQUE_WEBHOOK_SECRET nao configurado nesta function." }, 500);
+  if (!WEBHOOK_SECRET && !WEBHOOK_SIGNING_SECRET) {
+    return json({ erro: "Configure AUTENTIQUE_WEBHOOK_SECRET (?chave= na URL) e/ou AUTENTIQUE_WEBHOOK_SIGNING_SECRET (assinatura HMAC)." }, 500);
   }
 
-  const chave = new URL(req.url).searchParams.get("chave");
-  if (chave !== WEBHOOK_SECRET) {
-    return json({ erro: "Segredo invalido." }, 401);
+  // corpo bruto primeiro: a verificacao HMAC precisa dos bytes exatos
+  // recebidos, reserializar com JSON.stringify depois do parse pode dar
+  // uma string byte-a-byte diferente (espacos, ordem de chaves)
+  const corpoBruto = await req.text();
+
+  if (WEBHOOK_SIGNING_SECRET) {
+    const header = req.headers.get("x-autentique-signature") ?? "";
+    if (!header || !(await assinaturaValida(corpoBruto, header))) {
+      return json({ erro: "Assinatura HMAC invalida." }, 401);
+    }
+  } else {
+    // sem signing secret configurado, cai pro segredo da URL
+    const chave = new URL(req.url).searchParams.get("chave");
+    if (chave !== WEBHOOK_SECRET) {
+      return json({ erro: "Segredo invalido." }, 401);
+    }
   }
 
   let corpo: any = null;
   try {
-    corpo = await req.json();
+    corpo = JSON.parse(corpoBruto);
   } catch {
     return json({ ok: true, ignorado: "corpo nao e JSON valido" });
   }
 
+  const tipoEvento = corpo?.event?.type ?? "(desconhecido)";
   const documentoId = extrairDocumentoId(corpo);
   if (!documentoId) {
-    console.log("autentique-webhook: nao achou ID de documento no payload:", JSON.stringify(corpo));
-    return json({ ok: true, ignorado: "ID de documento nao encontrado no payload" });
+    console.log(`autentique-webhook: evento ${tipoEvento} sem ID de documento reconhecivel:`, corpoBruto.slice(0, 2000));
+    return json({ ok: true, evento: tipoEvento, ignorado: "ID de documento nao encontrado no payload" });
   }
 
   try {
     const assinado = await autentiqueAssinado(documentoId);
     if (!assinado) {
-      return json({ ok: true, documento: documentoId, assinado: false });
+      return json({ ok: true, evento: tipoEvento, documento: documentoId, assinado: false });
     }
     const resultado = await marcarAssinado(documentoId);
-    return json({ ok: true, documento: documentoId, assinado: true, resultado });
+    return json({ ok: true, evento: tipoEvento, documento: documentoId, assinado: true, resultado });
   } catch (e) {
     const msg = String(e);
     // contrato/documento que esta function nao conhece nao e erro
     // operacional (reentregar nao resolveria) — so registra e segue
     if (msg.includes("Nenhum contrato com autentique_id")) {
       console.log("autentique-webhook:", msg);
-      return json({ ok: true, documento: documentoId, ignorado: msg });
+      return json({ ok: true, evento: tipoEvento, documento: documentoId, ignorado: msg });
     }
     console.error("autentique-webhook: erro ao processar", documentoId, msg);
     return json({ erro: msg }, 500);
