@@ -2324,6 +2324,10 @@ ABAS.etiquetas = async function(){
   // "so quem ja tem numero" e filtro de cliente, nao vale ida ao banco —
   // ETIQ ja tem o campo apto, so precisa esconder quem esta vazio
   const visivel = () => $("#e-so-com-numero").checked ? ETIQ.filter(e => e.apto) : ETIQ;
+  // S/CRACHA fica NA TELA (quem filtra por "Sem crachá" precisa ver),
+  // mas nunca sai no relatório/Excel/impressão — a categoria já diz que
+  // não imprime crachá pra essa pessoa, exportar seria contraditório
+  const exportavel = () => visivel().filter(e => e.categoria !== "S/CRACHA");
 
   const carregar = async () => {
     $("#e-tabela").innerHTML = `<tr><td colspan="99">${DS.skeletonLinhas(2)}</td></tr>`;
@@ -2365,12 +2369,12 @@ ABAS.etiquetas = async function(){
   $("#e-exportar").addEventListener("click", () => exportar(
     // apto vazio em vez de nulo: a planilha de impressão espera a
     // coluna presente, mesmo quando não há hospedagem
-    visivel().map(e => ({ ...e, apto: e.apto || "" })),
+    exportavel().map(e => ({ ...e, apto: e.apto || "" })),
     [["apto","APTO"],["nome","NOME"],["empresa","EMPRESA"],["categoria","CATEGORIA"]],
     "etiquetas-cio-cerrado.xlsx", "Etiquetas"));
 
   $("#e-exportar-qr").addEventListener("click", async () => {
-    const lista = visivel();
+    const lista = exportavel();
     if(!lista.length){ DS.avisar("Nada para exportar com esse filtro.", {tom:"erro"}); return; }
     const btn = $("#e-exportar-qr");
     btn.disabled = true; btn.textContent = "Gerando…";
@@ -2380,7 +2384,7 @@ ABAS.etiquetas = async function(){
   });
 
   $("#e-imprimir").addEventListener("click", async () => {
-    const lista = visivel();
+    const lista = exportavel();
     if(!lista.length){ DS.avisar("Nada para imprimir com esse filtro.", {tom:"erro"}); return; }
     const btn = $("#e-imprimir");
     btn.disabled = true; btn.textContent = "Gerando…";
