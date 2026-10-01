@@ -73,6 +73,15 @@ CONTRATO_TEMPLATE_PATH = os.environ.get("CONTRATO_TEMPLATE_PATH", "")
 # Formato: "AAAA-MM-DDTHH:MM:SS.000-03:00". Vazio = sem prazo.
 AUTENTIQUE_DEADLINE = os.environ.get("AUTENTIQUE_DEADLINE", "")
 
+# Testemunha e parte fixas em todo contrato — mesmo par do pipeline
+# antigo (cerrado_contratos.py, Experience 2026). Vazio = pula esse
+# signatario (fica so o gestor), pra nao quebrar quem ainda nao
+# configurou.
+CONTRATO_TESTEMUNHA_EMAIL = os.environ.get(
+    "CONTRATO_TESTEMUNHA_EMAIL", "gerardo.carvalho@ciocerrado.com.br")
+CONTRATO_PARTE_EMAIL = os.environ.get(
+    "CONTRATO_PARTE_EMAIL", "kelson.duarte@ciocerrado.com.br")
+
 # Lembrete de contrato: dias sem assinar antes da primeira cobranca,
 # e intervalo minimo entre uma cobranca e a proxima.
 LEMBRETE_APOS_DIAS   = 3
@@ -497,22 +506,29 @@ def gerar_contrato_pdf(nome, cpf=""):
 def criar_documento_autentique(nome_doc, caminho_pdf, email, sandbox=True):
     """Sobe o PDF preenchido pro Autentique (createDocument, nao
     createDocumentFromTemplate — nao existe template cadastrado la).
-    Um signatario so (o gestor) — o modelo de dados do gestao nao
-    rastreia testemunha/co-signer, diferente do pipeline antigo que
-    tinha Gerardo e Kelson fixos. Sem posicionamento automatico do
-    carimbo de assinatura: depende do texto exato do template (o
-    pipeline antigo procurava "Participante / CIO" etc. no PDF), e
-    nao ha template de 2027 ainda pra saber se essas marcas existem —
-    o signatario posiciona a propria assinatura na tela do Autentique."""
+    Signatarios: o gestor, mais testemunha e parte fixas
+    (CONTRATO_TESTEMUNHA_EMAIL/CONTRATO_PARTE_EMAIL) — mesmo par do
+    pipeline antigo (Gerardo testemunha, Kelson parte). Sem
+    posicionamento automatico do carimbo de assinatura: depende do
+    texto exato do template (o pipeline antigo procurava
+    "Participante / CIO" etc. no PDF), e nao ha template de 2027
+    ainda pra saber se essas marcas existem — cada signatario
+    posiciona a propria assinatura na tela do Autentique."""
     documento = {"name": nome_doc}
     if AUTENTIQUE_DEADLINE:
         documento["deadline_at"] = AUTENTIQUE_DEADLINE
+
+    signatarios = [{"email": email, "action": "SIGN"}]
+    if CONTRATO_TESTEMUNHA_EMAIL:
+        signatarios.append({"email": CONTRATO_TESTEMUNHA_EMAIL, "action": "SIGN_AS_A_WITNESS"})
+    if CONTRATO_PARTE_EMAIL:
+        signatarios.append({"email": CONTRATO_PARTE_EMAIL, "action": "SIGN"})
 
     operations = json.dumps({
         "query": MUTATION_CRIAR_DOCUMENTO,
         "variables": {
             "document": documento,
-            "signers": [{"email": email, "action": "SIGN"}],
+            "signers": signatarios,
             "file": None,
             "sandbox": sandbox,
         },
