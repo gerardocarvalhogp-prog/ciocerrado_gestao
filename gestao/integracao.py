@@ -227,8 +227,17 @@ def sincronizar_sympla(supa, evento, producao):
             ignorados += 1
             continue
 
-        email = (p.get("email") or "").strip().lower()
         nome  = (p.get("first_name", "") + " " + p.get("last_name", "")).strip()
+
+        # corporativo primeiro: mesma prioridade do importador manual
+        # (admin.html, admin_importar_participantes_sympla) — o e-mail da
+        # conta Sympla pode ser pessoal, e e pra ele que o contrato ia
+        # (enviar_contratos manda pro gestores.email gravado aqui). Usar
+        # o pessoal tambem criaria gestor duplicado pra quem ja esta
+        # cadastrado com o corporativo.
+        email_corp = _campo_sympla(p.get("custom_form") or [],
+                                   "E-mail corporativo", "Email corporativo")
+        email = (email_corp or p.get("email") or "").strip().lower()
 
         # Sem e-mail nao ha como deduplicar nem enviar contrato.
         if not email or not nome:
