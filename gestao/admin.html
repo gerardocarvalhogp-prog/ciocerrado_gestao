@@ -3595,7 +3595,8 @@ ABAS.relatorios = function(){
       <p class="sub" style="margin-bottom:10px;">
         Participantes aprovados, com CNPJ, segmento e a pesquisa de perfil
         (faturamento, orçamento de TI, áreas de investimento) de quem já
-        respondeu — importada na aba "Pesquisa de perfil".
+        respondeu — o <code>integracao.py --sympla</code> traz isso
+        automaticamente do Sympla a cada sincronização.
       </p>
       <button class="btn sec" id="r-mailing">Carregar</button>
       <div id="box-mailing"></div>
@@ -5396,6 +5397,12 @@ ABAS.pesquisa = async function(){
 
     <div class="cartao">
       <h2>Importar respostas</h2>
+      <p class="sub" style="margin-bottom:12px;">
+        O <code>integracao.py --sympla</code> já importa isso automaticamente a cada
+        sincronização, lendo direto do Sympla — não depende de ninguém subir arquivo.
+        Este upload aqui é só um jeito manual de forçar uma atualização pontual, sem
+        esperar a próxima sincronização.
+      </p>
       <p class="sub" style="margin-bottom:12px;">
         Suba o export <strong>Lista de participantes</strong> do Sympla. As linhas de título antes do
         cabeçalho são ignoradas automaticamente. O casamento é pela coluna

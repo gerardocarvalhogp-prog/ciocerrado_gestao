@@ -10,6 +10,11 @@
 # Uso:
 #   python integracao.py --tudo
 #   python integracao.py --sympla          sincroniza inscricoes
+#                                           (e, de brinde, a pesquisa de perfil:
+#                                            faturamento, orcamento de TI, areas
+#                                            de investimento — lida do custom_form
+#                                            que a API do Sympla ja devolve, sem
+#                                            precisar subir arquivo na mao)
 #   python integracao.py --jantares        convidados de jantar (link do Sympla de cada jantar)
 #   python integracao.py --contratos       envia contratos pendentes
 #   python integracao.py --status          le status no Autentique
@@ -183,6 +188,67 @@ def _sympla_event_id_do_link(url):
 SYMPLA_API_BASE = "https://api.sympla.com.br/public/v3"
 
 
+# ---------------------------------------------------------------------
+# PESQUISA DE PERFIL  →  mesmo mapeamento de admin.html (MAPA_PESQ,
+# lerPesquisa()), so que lendo o custom_form que a API do Sympla ja
+# devolve junto de cada participante em vez de um .xlsx subido na mao.
+# Pedido do organizador em 01/10/2026: "Eu quero que voce pegue isso
+# via integracao. Nao dependa de eu subir o arquivo manual."
+#
+# O casamento de chave (_chave_pesquisa) precisa ser IGUAL ao da tela
+# (chave(), admin.html) — maiuscula, sem acento, mas SEM tirar espaco
+# nem pontuacao — senao as perguntas do formulario (que mudam de
+# redacao a cada edicao do Sympla) batem na tela e nao batem aqui, ou
+# vice-versa, e a pesquisa simplesmente para de casar sem erro nenhum.
+# ---------------------------------------------------------------------
+MAPA_PESQ = {
+    "E-MAIL CORPORATIVO": "email",
+    "Faturamento Anual da Emprea": "faturamento",
+    "Orçamento Anual da Área de TI(CAPEX e OPEX)": "orcamento_ti",
+    "Número de Colaboradores da Empresa": "colaboradores",
+    "Número Colaboradores de TI da Empresa": "colaboradores_ti",
+    "SISTEMA ERP ATUAL": "erp_atual",
+    "Quantidade de dispositivos(Desktops, notebooks, smartphones, etc.)": "dispositivos",
+    "Quais são seus serviços de TI já terceirizados ?": "terceirizados",
+    "TERMO DE CONSENTIMENTO E RESPONSABILIDADE – LGPD": "consentimento_lgpd",
+}
+
+
+def _chave_pesquisa(s):
+    s = unicodedata.normalize("NFD", (s or "").strip().upper())
+    return "".join(c for c in s if unicodedata.category(c) != "Mn")
+
+
+MAPA_PESQ_NORM = {_chave_pesquisa(k): v for k, v in MAPA_PESQ.items()}
+
+
+# Separa as respostas de um participante nos mesmos tres grupos que a
+# tela separa: campos mapeados (faturamento, orcamento_ti...), area de
+# investimento (pergunta comeca com "INVESTIMENTO") e "perfil" (resto,
+# qualquer outra pergunta de texto livre nao mapeada). Devolve None se
+# nao achou e-mail nenhum — sem e-mail, admin_importar_pesquisa nao tem
+# como casar com inscricao nenhuma.
+def _linha_pesquisa(nome, email, custom_form):
+    if not email:
+        return None
+    linha = {"nome": nome, "email": email, "investimentos": {}, "perfil": {}}
+    for c in (custom_form or []):
+        titulo = (c.get("name") or "").strip()
+        valor = str(c.get("value") or "").strip()
+        if not titulo:
+            continue
+        campo = MAPA_PESQ_NORM.get(_chave_pesquisa(titulo))
+        if campo:
+            if campo != "email" and valor:
+                linha[campo] = valor
+        elif _chave_pesquisa(titulo).startswith("INVESTIMENTO"):
+            if valor:
+                linha["investimentos"][re.sub(r"^INVESTIMENTO\s*", "", titulo, flags=re.I).strip()] = valor
+        elif valor:
+            linha["perfil"][titulo] = valor
+    return linha
+
+
 # Pagina o endpoint /events/{id}/participants da API publica do Sympla
 # ate esgotar. Vivia duplicado entre sincronizar_sympla e
 # sincronizar_jantares_sympla ate a revisao de arquitetura de
@@ -229,6 +295,7 @@ def sincronizar_sympla(supa, evento, producao):
     log.info("%d inscricao(oes) no Sympla.", len(participantes))
 
     novos = atualizados = ignorados = 0
+    linhas_pesquisa = []
 
     for p in participantes:
         # cancelado no Sympla nao entra nem atualiza
@@ -252,6 +319,15 @@ def sincronizar_sympla(supa, evento, producao):
         if not email or not nome:
             ignorados += 1
             continue
+
+        # Pesquisa de perfil: mesmas perguntas que o export manual do
+        # Sympla tem, so que lidas direto do custom_form da API — sem
+        # depender de ninguem subir arquivo. So' acumula aqui; o envio
+        # em lote (admin_importar_pesquisa) e' depois do loop, e so' de
+        # verdade em modo producao.
+        linha_pq = _linha_pesquisa(nome, email, p.get("custom_form"))
+        if linha_pq:
+            linhas_pesquisa.append(linha_pq)
 
         custom = {c.get("name"): c.get("value")
                   for c in (p.get("custom_form") or [])}
@@ -320,6 +396,23 @@ def sincronizar_sympla(supa, evento, producao):
 
     log.info("Sympla: %d novo(s), %d ja existiam, %d ignorado(s).",
              novos, atualizados, ignorados)
+
+    # admin_importar_pesquisa casa por e-mail contra os participantes
+    # DESTE evento — mesma funcao que a tela chama quando alguem sobe o
+    # .xlsx na mao, so' que a planilha "ja' vem pronta" da API.
+    if not linhas_pesquisa:
+        log.info("Pesquisa de perfil: nenhuma resposta no custom_form do Sympla.")
+    elif not producao:
+        log.info("  [seguro] pesquisa de perfil: %d resposta(s) seriam importadas.",
+                  len(linhas_pesquisa))
+    else:
+        r = supa.rpc("admin_importar_pesquisa",
+                      {"p_evento_slug": evento["slug"], "p_linhas": linhas_pesquisa}) or {}
+        log.info(
+            "Pesquisa de perfil: %d importado(s)%s%s.",
+            r.get("importados", 0),
+            f" · {r['nao_encontrados']} sem inscricao neste evento" if r.get("nao_encontrados") else "",
+            f" · {r['sem_email']} sem e-mail" if r.get("sem_email") else "")
 
 
 # ---------------------------------------------------------------------
