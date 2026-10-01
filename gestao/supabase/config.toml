@@ -60,3 +60,12 @@ additional_redirect_urls = ["https://ciocerrado.netlify.app"]
 [auth.email]
 enable_signup = true
 enable_confirmations = false
+
+# autentique-webhook e chamada pelo Autentique, de fora, sem JWT do
+# Supabase (eles nao sabem gerar um) — so o ?chave= na URL e, se
+# configurado, a assinatura HMAC no header x-autentique-signature. Sem
+# isto, o gateway do Supabase recusa a chamada ANTES dela chegar no
+# codigo da function (401 UNAUTHORIZED_NO_AUTH_HEADER, visto em
+# producao em 01/10/2026 — nao e erro do codigo, e o gateway na frente).
+[functions.autentique-webhook]
+verify_jwt = false
