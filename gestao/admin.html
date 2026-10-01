@@ -2009,9 +2009,10 @@ ABAS.quartos = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
   try{
-    const [pessoas, livres] = await Promise.all([
+    const [pessoas, livres, quartosFisicos] = await Promise.all([
       rpc("admin_listar_alocacao", { p_evento_slug: EVENTO, p_apenas_sem_quarto:false }),
-      rpc("admin_quartos_livres",  { p_evento_slug: EVENTO })
+      rpc("admin_quartos_livres",  { p_evento_slug: EVENTO }),
+      rpc("admin_listar_quartos_individual", { p_evento_slug: EVENTO })
     ]);
 
     // agrupa por reserva: o quarto e da reserva, nao da pessoa
@@ -2058,11 +2059,24 @@ ABAS.quartos = async function(){
       <button class="btn sec mini" id="q-exportar" style="margin-bottom:10px;">Exportar mapa de quartos</button>
       <div class="cartao"><div class="rolagem"><table id="q-tabela"></table></div></div>`;
 
-    $("#q-exportar").addEventListener("click", () => exportar(
-      pessoas.map(p => ({ ...p, quarto_numero: p.quarto_numero || "s/n" })),
-      [["empresa","Empresa"],["nome","Nome"],["quarto_tipo","Tipo de quarto"],
-       ["quarto_numero","Quarto"]],
-      "mapa-de-quartos-cio-cerrado.xlsx", "Mapa de quartos"));
+    // Mesmo formato do Mapa de Alocações do resort (prédio/andar/corredor/
+    // categoria física, importado em admin_importar_mapa_quartos) — uma
+    // aba por prédio, uma linha por apartamento, vazio incluso (pra não
+    // esconder vaga livre do relatório que vai pro resort).
+    $("#q-exportar").addEventListener("click", () => {
+      const ordenados = [...quartosFisicos].sort((a,b) =>
+        `${a.bloco||""}|${a.andar||""}|${a.corredor||""}`.localeCompare(`${b.bloco||""}|${b.andar||""}|${b.corredor||""}`)
+        || (Number(a.numero) - Number(b.numero) || String(a.numero||"").localeCompare(String(b.numero||""))));
+      exportarPorAba(
+        ordenados.map(q => ({
+          ...q, bloco: q.bloco || "Sem prédio",
+          qtde: q.reserva_id ? (reservas.get(q.reserva_id)?.gente.length || 1) : 0
+        })),
+        "bloco",
+        [["andar","Andar"],["corredor","Corredor"],["numero","Nº do apto"],
+         ["categoria","Categoria"],["ocupado_por","Ocupação"],["qtde","Qtde"]],
+        "mapa-de-quartos-cio-cerrado.xlsx");
+    });
 
     if(SOU_ADMIN){
       await blocoQuartos();
@@ -3465,8 +3479,9 @@ async function relMailing(){
           <td>${esc(r.empresa||"—")}</td><td class="meta">${esc(r.email)}</td>
           <td class="meta">${esc(r.segmento||"—")}</td></tr>`).join("")}</table>
       </div>`;
-    $("#x-mailing").addEventListener("click", () => exportar(l, [
-      ["perfil","PERFIL"],["nome","NOME"],["cargo","CARGO"],["empresa","EMPRESA"],
+    $("#x-mailing").addEventListener("click", () => exportar(
+      l.map((r,i) => ({ ...r, id: i+1 })),
+      [["id","ID"],["perfil","PERFIL"],["nome","NOME"],["cargo","CARGO"],["empresa","EMPRESA"],
       ["email","E-MAIL"],["telefone","TELEFONE"],["cnpj","CNPJ"],
       ["segmento","SEGMENTO"],["estado","ESTADO"]
     ], "mailing-cio-cerrado.xlsx", "MAILING"));
