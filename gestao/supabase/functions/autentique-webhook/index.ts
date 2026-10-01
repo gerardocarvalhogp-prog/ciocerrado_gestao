@@ -106,7 +106,7 @@ function extrairDocumentoId(corpo: any): string | null {
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
-async function autentiqueAssinado(documentoId: string): Promise<boolean> {
+async function autentiqueConsultar(documentoId: string): Promise<{ assinado: boolean; pdfAssinadoUrl: string | null }> {
   const r = await fetch(AUTENTIQUE_API, {
     method: "POST",
     headers: {
@@ -115,7 +115,11 @@ async function autentiqueAssinado(documentoId: string): Promise<boolean> {
     },
     body: JSON.stringify({
       query: `query($id: UUID!) {
-        document(id: $id) { id signatures { signed { created_at } } }
+        document(id: $id) {
+          id
+          signatures { signed { created_at } }
+          files { signed }
+        }
       }`,
       variables: { id: documentoId },
     }),
@@ -124,11 +128,18 @@ async function autentiqueAssinado(documentoId: string): Promise<boolean> {
   if (corpo.errors) {
     throw new Error(corpo.errors[0]?.message ?? "erro desconhecido do Autentique");
   }
-  const assinaturas = corpo?.data?.document?.signatures ?? [];
-  return assinaturas.some((s: any) => s?.signed);
+  const documento = corpo?.data?.document;
+  const assinaturas = documento?.signatures ?? [];
+  return {
+    assinado: assinaturas.some((s: any) => s?.signed),
+    // so existe depois que pelo menos uma assinatura fecha o arquivo —
+    // pode vir null mesmo com assinado=true se o Autentique ainda nao
+    // gerou o PDF final nesse instante
+    pdfAssinadoUrl: typeof documento?.files?.signed === "string" ? documento.files.signed : null,
+  };
 }
 
-async function marcarAssinado(autentiqueId: string) {
+async function marcarAssinado(autentiqueId: string, pdfAssinadoUrl: string | null) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/webhook_contrato_assinado`, {
     method: "POST",
     headers: {
@@ -138,7 +149,7 @@ async function marcarAssinado(autentiqueId: string) {
       "Accept-Profile": "gestao",
       "Content-Profile": "gestao",
     },
-    body: JSON.stringify({ p_autentique_id: autentiqueId }),
+    body: JSON.stringify({ p_autentique_id: autentiqueId, p_pdf_assinado_url: pdfAssinadoUrl }),
   });
   const texto = await r.text();
   if (!r.ok) throw new Error(`webhook_contrato_assinado: ${texto}`);
@@ -191,12 +202,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const assinado = await autentiqueAssinado(documentoId);
+    const { assinado, pdfAssinadoUrl } = await autentiqueConsultar(documentoId);
     if (!assinado) {
       return json({ ok: true, evento: tipoEvento, documento: documentoId, assinado: false });
     }
-    const resultado = await marcarAssinado(documentoId);
-    return json({ ok: true, evento: tipoEvento, documento: documentoId, assinado: true, resultado });
+    const resultado = await marcarAssinado(documentoId, pdfAssinadoUrl);
+    return json({ ok: true, evento: tipoEvento, documento: documentoId, assinado: true, pdfAssinadoUrl, resultado });
   } catch (e) {
     const msg = String(e);
     // contrato/documento que esta function nao conhece nao e erro

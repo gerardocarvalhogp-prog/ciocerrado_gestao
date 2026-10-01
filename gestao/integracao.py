@@ -662,14 +662,26 @@ def ler_status(supa, evento, producao):
         try:
             d = autentique("""
               query($id: UUID!) {
-                document(id: $id) { id signatures { signed { created_at } } }
+                document(id: $id) {
+                  id
+                  signatures { signed { created_at } }
+                  files { signed }
+                }
               }""", {"id": c["autentique_id"]})
 
             assinaturas = d["document"]["signatures"]
             if any(s.get("signed") for s in assinaturas):
                 if producao:
-                    supa.patch("contratos", {"id": f"eq.{c['id']}"},
-                               {"status": "assinado", "assinado_em": agora()})
+                    # files.signed so' existe depois que a assinatura fecha
+                    # o arquivo — pode nao vir ainda nesse instante; nesse
+                    # caso so nao mexe no autentique_url (webhook_contrato_
+                    # assinado, mesma regra do lado do webhook, completa
+                    # depois se um dia rodar de novo sem sobrescrever)
+                    pdf_assinado = (d["document"].get("files") or {}).get("signed")
+                    patch = {"status": "assinado", "assinado_em": agora()}
+                    if pdf_assinado:
+                        patch["autentique_url"] = pdf_assinado
+                    supa.patch("contratos", {"id": f"eq.{c['id']}"}, patch)
                     avisar_participante(supa, evento, c["participante_id"],
                                         "contrato_assinado",
                                         "Contrato assinado — complete sua hospedagem")

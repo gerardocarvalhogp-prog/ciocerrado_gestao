@@ -801,7 +801,8 @@ ABAS.painel = async function(){
           <td>${esc(l.nome)}</td>
           <td>${esc(l.empresa||"—")}</td>
           <td><span class="selo ${l.status_inscricao==="aprovado"?"ok":"pend"}">${esc(l.status_inscricao)}</span></td>
-          <td><span class="selo ${l.status_contrato==="assinado"?"ok":"alerta"}">${esc(l.status_contrato)}</span></td>
+          <td><span class="selo ${l.status_contrato==="assinado"?"ok":"alerta"}">${esc(l.status_contrato)}</span>
+              ${l.autentique_url ? ` <a href="${esc(l.autentique_url)}" target="_blank" rel="noopener" class="meta">ver</a>` : ""}</td>
           <td><span class="selo ${l.status_rooming==="completo"?"ok":"pend"}">${esc(l.status_rooming)}</span></td>
           <td>${l.usa_transfer ? "Sim" : "—"}</td>
           <td class="meta">${esc(l.quarto||"—")}</td>
