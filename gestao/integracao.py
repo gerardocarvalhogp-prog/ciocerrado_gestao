@@ -256,9 +256,14 @@ def sincronizar_sympla(supa, evento, producao):
         custom = {c.get("name"): c.get("value")
                   for c in (p.get("custom_form") or [])}
 
+        # CPF so' digitos, se o formulario do Sympla tiver essa pergunta.
+        cpf_bruto = _campo_sympla(p.get("custom_form") or [], "CPF")
+        cpf_digits = re.sub(r"\D", "", cpf_bruto or "") or None
+
         dados_gestor = {
             "nome": nome,
             "email": email,
+            "cpf": cpf_digits,
             "empresa": custom.get("Empresa") or p.get("company"),
             "cargo": custom.get("Cargo"),
             "telefone": p.get("phone"),
@@ -270,10 +275,29 @@ def sincronizar_sympla(supa, evento, producao):
             log.info("  [seguro] %s <%s>", nome, email)
             continue
 
-        g = supa.insert("gestores", dados_gestor, upsert_on="email_norm")
-        if not g:
-            g = supa.get("gestores", email=f"eq.{email}", select="id", limit=1)
-        gestor_id = g[0]["id"]
+        # CPF e a chave de verdade: o e-mail do Sympla pode ser pessoal
+        # ou corporativo dependendo da inscricao, e so o upsert por
+        # e-mail (abaixo) ja criou duplicata de gente que ja estava
+        # cadastrada com outro e-mail (achado em 01/10/2026). Se o CPF
+        # bate com um gestor que ja existe, usa ele e so completa o que
+        # faltava — nunca sobrescreve o que a organizacao ja curou.
+        gestor_id = None
+        if cpf_digits:
+            existente = supa.get("gestores", cpf_norm=f"eq.{cpf_digits}",
+                                 select="*", limit=1)
+            if existente:
+                g_atual = existente[0]
+                gestor_id = g_atual["id"]
+                so_falta = {k: v for k, v in dados_gestor.items()
+                           if v and not g_atual.get(k)}
+                if so_falta:
+                    supa.patch("gestores", {"id": f"eq.{gestor_id}"}, so_falta)
+
+        if gestor_id is None:
+            g = supa.insert("gestores", dados_gestor, upsert_on="email_norm")
+            if not g:
+                g = supa.get("gestores", email=f"eq.{email}", select="id", limit=1)
+            gestor_id = g[0]["id"]
 
         ja = supa.get("participantes",
                       evento_id=f"eq.{evento['id']}",
