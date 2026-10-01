@@ -2813,7 +2813,10 @@ ABAS.sessoes = async function(){
   const c = $("#conteudo");
   c.innerHTML = DS.skeletonCartoes(3);
   try{
-    const sessoes = await rpc("admin_listar_sessoes", { p_evento_slug: EVENTO, p_tipo: null });
+    const [sessoes, matriz] = await Promise.all([
+      rpc("admin_listar_sessoes", { p_evento_slug: EVENTO, p_tipo: null }),
+      rpc("admin_matriz_sessoes", { p_evento_slug: EVENTO })
+    ]);
 
     if(sessoes.length === 0){
       c.innerHTML = `<h1>Mesas e jantares</h1>
@@ -2828,7 +2831,37 @@ ABAS.sessoes = async function(){
       ${painelGerarSessoes()}
       <p class="sub">Na ordem de prioridade das cotas. Abra uma sessão para ver quem está dentro e sugerir nomes.</p>
       <div class="cartao"><table id="s-tabela"></table></div>
+
+      <div class="cartao">
+        <h2>Matriz · Patrocinador × Mesa × CIO escolhido</h2>
+        <p class="sub" style="margin-bottom:10px;">
+          Toda sessão do evento e quem está confirmado em cada uma, numa lista só —
+          mesa ainda vazia também aparece, pra não esconder vaga livre.
+        </p>
+        <button class="btn sec mini" id="sm-exportar">Exportar Excel</button>
+        <div id="sm-tabela" style="margin-top:10px;"></div>
+      </div>
+
       <div id="s-detalhe"></div>`;
+
+    $("#sm-tabela").innerHTML = matriz.length ? `<div class="rolagem"><table>
+        <tr><th>Patrocinador</th><th>Cota</th><th>Tipo</th><th>Data</th><th>Vagas</th><th>CIO</th><th>Empresa do CIO</th></tr>
+        ${matriz.map(m => `<tr>
+          <td><strong>${esc(m.patrocinador)}</strong></td>
+          <td class="meta">${esc(m.cota||"—")}</td>
+          <td style="text-transform:capitalize">${esc(String(m.tipo).replace("_"," "))}</td>
+          <td class="meta">${dataBR(m.data)}</td>
+          <td class="meta">${m.vagas}</td>
+          <td>${esc(m.cio_nome||"—")}</td>
+          <td class="meta">${esc(m.cio_empresa||"—")}</td>
+        </tr>`).join("")}
+      </table></div>` : `<div class="vazio">Nenhuma sessão cadastrada.</div>`;
+
+    $("#sm-exportar").addEventListener("click", () => exportar(
+      matriz.map(m => ({ ...m, data: m.data ? dataBR(m.data) : "" })),
+      [["patrocinador","Patrocinador"],["cota","Cota"],["tipo","Tipo"],["data","Data"],
+       ["vagas","Vagas"],["cio_nome","CIO"],["cio_empresa","Empresa do CIO"]],
+      "matriz-mesas-cio-cerrado.xlsx", "Matriz"));
 
     $("#s-tabela").innerHTML = `
       <tr><th>Patrocinador</th><th>Cota</th><th>Tipo</th><th>Data</th><th>Vagas</th><th></th></tr>
@@ -2914,20 +2947,15 @@ async function abrirSessao(id, s){
       <div class="cartao">
         <h2>Adicionar outro convidado</h2>
         <p class="sub" style="margin-bottom:10px;">
-          Sem cálculo de aderência — para quem não apareceu na lista acima.
+          Sem cálculo de aderência — para quem não apareceu na lista acima. Busca só em
+          quem já está inscrito e aprovado (passou pelo Sympla); não cadastra gente nova.
         </p>
         <div class="barra">
-          <div><label>Nome</label><input type="text" id="sv-nome"></div>
-          <div><label>Empresa</label><input type="text" id="sv-empresa"></div>
-          <div><label>Cargo</label><input type="text" id="sv-cargo"></div>
-        </div>
-        <div class="barra">
-          <div><label>E-mail</label><input type="email" id="sv-email"></div>
-          <div><label>Telefone</label><input type="text" id="sv-telefone"></div>
-          <div><label>Identificação</label><input type="text" id="sv-rotulo" placeholder="ex.: vegetariano"></div>
+          <div><label>Buscar por nome ou empresa</label>
+            <input type="text" id="sv-busca" placeholder="Digite para buscar…"></div>
         </div>
         <div id="sv-aviso"></div>
-        <button class="btn sec" id="sv-salvar" style="margin-top:8px;">Adicionar convidado</button>
+        <div id="sv-resultado"></div>
       </div>`;
 
     const bm = $("#s-mailing", box);
@@ -2965,32 +2993,46 @@ async function abrirSessao(id, s){
       }
     }));
 
-    $("#sv-salvar", box).addEventListener("click", async () => {
-      const nome = $("#sv-nome", box).value.trim();
-      if(!nome){
-        DS.marcarInvalido($("#sv-nome", box), "Informe o nome.");
-        $("#sv-nome", box).focus();
-        return;
-      }
-      DS.limparInvalido($("#sv-nome", box));
-      const b = $("#sv-salvar", box);
-      b.disabled = true; b.textContent = "Adicionando…";
+    const buscarParaAdicionar = async () => {
+      const termo = $("#sv-busca", box).value.trim();
+      const res = $("#sv-resultado", box);
+      res.innerHTML = DS.skeletonLinhas(1);
       try{
-        await rpc("admin_convidado_avulso", {
-          p_sessao_id: id,
-          p_nome: nome,
-          p_empresa: $("#sv-empresa", box).value.trim() || null,
-          p_email: $("#sv-email", box).value.trim() || null,
-          p_telefone: $("#sv-telefone", box).value.trim() || null,
-          p_cargo: $("#sv-cargo", box).value.trim() || null,
-          p_rotulo: $("#sv-rotulo", box).value.trim() || null
-        });
-        abrirSessao(id, s); ABAS.sessoes();
-      }catch(e){
-        aviso("#sv-aviso", explicar(e));
-        b.disabled = false; b.textContent = "Adicionar convidado";
-      }
+        const l = await rpc("admin_buscar_participantes_sessao",
+          { p_sessao_id: id, p_termo: termo || null });
+        res.innerHTML = l.length ? `<table>
+            <tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th></th></tr>
+            ${l.map(p => `<tr data-p="${esc(p.participante_id)}">
+              <td>${esc(p.nome)}</td>
+              <td>${esc(p.empresa||"—")}</td>
+              <td class="meta">${esc(p.cargo||"—")}</td>
+              <td><button class="btn mini sv-por">Adicionar</button></td>
+            </tr>`).join("")}</table>`
+          : `<div class="vazio">${termo
+              ? "Nada encontrado (ou já está em outra sessão deste tipo)."
+              : "Digite pra buscar entre os inscritos aprovados."}</div>`;
+
+        $$(".sv-por", res).forEach(b => b.addEventListener("click", async () => {
+          const tr = b.closest("tr");
+          b.disabled = true; b.textContent = "Adicionando…";
+          try{
+            await rpc("admin_adicionar_convidado_sessao",
+              { p_sessao_id: id, p_participante_id: tr.dataset.p });
+            abrirSessao(id, s); ABAS.sessoes();
+          }catch(e){
+            aviso("#sv-aviso", explicar(e));
+            b.disabled = false; b.textContent = "Adicionar";
+          }
+        }));
+      }catch(e){ aviso(res, explicar(e)); }
+    };
+
+    let svTimer;
+    $("#sv-busca", box).addEventListener("input", () => {
+      clearTimeout(svTimer);
+      svTimer = setTimeout(buscarParaAdicionar, 300);
     });
+    buscarParaAdicionar();
   }catch(e){ aviso(box, explicar(e)); }
 }
 
