@@ -3798,6 +3798,18 @@ async function blocoEvento(){
             </span>
           </div>
         </div>
+        <div class="barra">
+          <div style="min-width:220px;"><label>ID do evento no Sympla</label>
+            <input type="text" id="ev-sympla-id" placeholder="ex.: 2385910"
+                   value="${esc(e.sympla_event_id||"")}">
+            <span class="meta">
+              Diferente do link acima — é o identificador numérico que o <code>integracao.py
+              --sympla</code> usa pra ler os inscritos pela API. Sem ele, a sincronização avisa
+              "evento sem sympla_event_id" e não importa ninguém. Fica no painel do Sympla, na
+              URL do evento ou em Configurações › Integrações.
+            </span>
+          </div>
+        </div>
         <div id="ev-aviso"></div>
         <button class="btn" id="ev-salvar">Salvar evento</button>
         <button class="btn sec" id="ev-novo" style="margin-left:6px;">Novo evento</button>
@@ -3809,7 +3821,7 @@ async function blocoEvento(){
       // datas e prazos do anterior sem ninguem perceber — e, pior, com o
       // link de inscricao do evento antigo
       ["#ev-slug","#ev-nome","#ev-local","#ev-ini","#ev-fim",
-       "#ev-pc","#ev-pr","#ev-pcan","#ev-pup","#ev-sympla"].forEach(s => $(s).value = "");
+       "#ev-pc","#ev-pr","#ev-pcan","#ev-pup","#ev-sympla","#ev-sympla-id"].forEach(s => $(s).value = "");
       $("#ev-status").value = "rascunho";
       $("#ev-slug").focus();
       aviso("#ev-aviso",
@@ -3836,7 +3848,8 @@ async function blocoEvento(){
           // padrao seguro: o relogio so anda quando alguem diz que
           // a escolha abriu
           p_escolha_abre_em: $("#ev-abre").value || null,
-          p_sympla_url: $("#ev-sympla").value.trim() || null
+          p_sympla_url: $("#ev-sympla").value.trim() || null,
+          p_sympla_event_id: $("#ev-sympla-id").value.trim() || null
         });
         const novo = r.slug !== EVENTO;
         await carregarSeletorEventos();
