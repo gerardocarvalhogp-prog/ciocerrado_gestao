@@ -2117,6 +2117,7 @@ async function blocoEquipe(){
               <option value="single">Single</option>
               <option value="duplo" selected>Duplo</option>
               <option value="triplo">Triplo</option>
+              <option value="quadruplo">Quádruplo</option>
             </select></div>
           <div style="min-width:auto;"><button class="btn" id="og-salvar">Salvar</button></div>
         </div>
@@ -3903,6 +3904,7 @@ async function blocoCotas(){
           <div style="max-width:100px;"><label>Singles</label><input type="text" id="co-q-single" placeholder="0"></div>
           <div style="max-width:100px;"><label>Duplos</label><input type="text" id="co-q-duplo" placeholder="0"></div>
           <div style="max-width:100px;"><label>Triplos</label><input type="text" id="co-q-triplo" placeholder="0"></div>
+          <div style="max-width:100px;"><label>Quádruplos</label><input type="text" id="co-q-quadruplo" placeholder="0"></div>
           <div style="max-width:110px;"><label>Vagas mesa</label><input type="text" id="co-mesa" placeholder="0"></div>
           <div style="max-width:110px;"><label>Reunião</label>
             <select id="co-reuniao"><option value="0">Não</option><option value="1">Sim</option></select></div>
@@ -3999,6 +4001,7 @@ async function blocoCotas(){
       $("#co-q-single").value = q.single || "";
       $("#co-q-duplo").value  = q.duplo  || "";
       $("#co-q-triplo").value = q.triplo || "";
+      $("#co-q-quadruplo").value = q.quadruplo || "";
       $("#co-mesa").value = t.mesa;
       $("#co-reuniao").value = t.reuniao;
       $("#co-jantar").value = t.jantar;
@@ -4016,7 +4019,7 @@ async function blocoCotas(){
     }));
 
     $("#co-cancelar").addEventListener("click", () => {
-      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
+      ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-q-quadruplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
         .forEach(s => $(s).value = "");
       ["#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
         .forEach(s => $(s).checked = false);
@@ -4121,7 +4124,7 @@ async function salvarCota(){
   if(!COTA_UNICA && $("#co-ordem")) DS.limparInvalido($("#co-ordem"));
 
   const quartos = {};
-  [["single","#co-q-single"],["duplo","#co-q-duplo"],["triplo","#co-q-triplo"]]
+  [["single","#co-q-single"],["duplo","#co-q-duplo"],["triplo","#co-q-triplo"],["quadruplo","#co-q-quadruplo"]]
     .forEach(([t,s]) => {
       const n = parseInt($(s).value, 10);
       if(n > 0) quartos[t] = n;
@@ -4150,7 +4153,7 @@ async function salvarCota(){
       p_prazo_upload: $("#co-up-prazo").value || null,
       p_valor_sugerido: parseFloat($("#co-valor").value.replace(",",".")) || null
     });
-    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
+    ["#co-nome","#co-mesa","#co-q-single","#co-q-duplo","#co-q-triplo","#co-q-quadruplo","#co-limite-ind","#co-up-prazo","#co-valor","#co-up-logo"]
       .forEach(s => $(s).value = "");
     ["#co-up-banner","#co-up-revista","#co-up-apresentacao","#co-up-video"]
       .forEach(s => $(s).checked = false);
@@ -4190,6 +4193,7 @@ async function blocoQuartos(){
               <option value="single">Single</option>
               <option value="duplo" selected>Duplo</option>
               <option value="triplo">Triplo</option>
+              <option value="quadruplo">Quádruplo</option>
             </select></div>
           <div><label>Bloco</label><input type="text" id="qt-bloco" placeholder="Bloco A"></div>
           <div style="min-width:auto;"><button class="btn" id="qt-criar">Criar faixa</button></div>
@@ -4208,6 +4212,7 @@ async function blocoQuartos(){
                 <option value="single">Single</option>
                 <option value="duplo" selected>Duplo</option>
                 <option value="triplo">Triplo</option>
+                <option value="quadruplo">Quádruplo</option>
               </select></div>
             <div style="min-width:auto;">
               <button class="btn sec" id="qt-alterar" title="Corrige o tipo de quartos já criados nesta faixa">
@@ -4368,6 +4373,7 @@ async function carregarQuartosIndividual(){
           <option value="single" ${q.tipo==="single"?"selected":""}>Single</option>
           <option value="duplo"  ${q.tipo==="duplo" ?"selected":""}>Duplo</option>
           <option value="triplo" ${q.tipo==="triplo"?"selected":""}>Triplo</option>
+          <option value="quadruplo" ${q.tipo==="quadruplo"?"selected":""}>Quádruplo</option>
         </select></td>
         <td class="meta">${esc(q.bloco||"—")}</td>
         <td>
@@ -4575,7 +4581,7 @@ async function blocoCategorias(){
             <td><input type="text" class="cat-cap" value="${c.capacidade}"
                        style="max-width:60px;"></td>
             <td><select class="cat-tipo">
-                  ${["single","duplo","triplo"].map(t =>
+                  ${["single","duplo","triplo","quadruplo"].map(t =>
                     `<option value="${t}" ${t===c.tipo?"selected":""}>${t}</option>`).join("")}
                 </select></td>
             <td><button class="btn sec mini cat-salvar">Salvar</button></td>
@@ -5858,6 +5864,7 @@ const ITENS_PRECO = [
   { valor: "quarto_single",       rotulo: "Quarto extra · single" },
   { valor: "quarto_duplo",        rotulo: "Quarto extra · duplo" },
   { valor: "quarto_triplo",       rotulo: "Quarto extra · triplo" },
+  { valor: "quarto_quadruplo",    rotulo: "Quarto extra · quádruplo" },
   { valor: "entrega_brinde_quarto", rotulo: "Entrega de brinde no quarto" }
 ];
 
