@@ -29,6 +29,14 @@ begin
   select count(*) into v_qtd_sobrevive from gestores where nome = 'GERARDO CARVALHO';
   select count(*) into v_qtd_perde     from gestores where nome = 'GERARDO CARVALHO DA JUNIOR';
 
+  -- 05/10/2026: num banco que nao tem esse dado (db reset do zero, ambiente
+  -- de teste) pula em vez de abortar o historico inteiro. No hospedado
+  -- esta migration ja rodou; isto nao muda nada la.
+  if v_qtd_sobrevive = 0 and v_qtd_perde = 0 then
+    raise notice 'nenhum dos dois gestores existe — pulando: este banco nao tem o dado que esta migration corrige';
+    return;
+  end if;
+
   if v_qtd_sobrevive <> 1 then
     raise exception '% gestor(es) "GERARDO CARVALHO" — esperado exatamente 1', v_qtd_sobrevive;
   end if;

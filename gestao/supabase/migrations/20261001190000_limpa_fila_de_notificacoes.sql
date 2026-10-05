@@ -24,7 +24,11 @@ declare
 begin
   select id into v_evento_teste from eventos where slug = 'teste2027';
   if v_evento_teste is null then
-    raise exception 'Evento "teste2027" nao encontrado';
+    -- 05/10/2026: num banco que nao tem esse dado (db reset do zero, ambiente
+    -- de teste) pula em vez de abortar o historico inteiro. No hospedado
+    -- esta migration ja rodou; isto nao muda nada la.
+    raise notice 'Evento "teste2027" nao encontrado — pulando: este banco nao tem o dado que esta migration corrige';
+    return;
   end if;
 
   select count(*) into v_antes from notificacoes where status = 'enfileirada';

@@ -26,22 +26,24 @@ select 'pode_ver_patrocinador(NULL) = ' || coalesce(pode_ver_patrocinador(null::
 select patro_salvar_quarto(:'res1'::uuid,
   '[{"nome":"Ana Souza","cpf":"11122233344","tipo":"adulto","usa_transfer":true},
     {"nome":"Rui Lima","cpf":"55566677788","tipo":"adulto","usa_transfer":false}]'::jsonb,
-  true, 'GYN', true, 'Kit cafe');
+  true, 'GYN');
+-- brinde saiu de patro_salvar_quarto (20260901140000): lista da empresa
+select patro_salvar_brinde(:'alfa'::uuid, true, 'Kit cafe', null, 'quarto') ->> 'ok' as brinde;
 
 \echo '-- estado dos quartos da Alfa:'
-select rotulo, status, ocupantes, usa_transfer, transfer_origem,
-       brinde_vai_enviar, brinde_descricao
+select rotulo, status, ocupantes, usa_transfer, transfer_origem
 from patro_listar_quartos(:'alfa'::uuid) order by rotulo;
+select descricao, destino, status from patro_listar_brindes(:'alfa'::uuid);
 
 \echo ''
 \echo '=== 4b · Ana tenta 3 pessoas num duplo (deve FALHAR) ==='
 select patro_salvar_quarto(:'res1'::uuid,
-  '[{"nome":"A"},{"nome":"B"},{"nome":"C"}]'::jsonb, false, null, false, null);
+  '[{"nome":"A"},{"nome":"B"},{"nome":"C"}]'::jsonb, false, null);
 
 \echo ''
 \echo '=== 4c · transfer com origem invalida (deve FALHAR) ==='
 select patro_salvar_quarto(:'res1'::uuid,
-  '[{"nome":"A"}]'::jsonb, true, 'XYZ', false, null);
+  '[{"nome":"A"}]'::jsonb, true, 'XYZ');
 reset role;
 
 \echo ''
@@ -58,7 +60,7 @@ where p.empresa='Alfa Cloud' order by fi.descricao;
 set role authenticated;
 set request.jwt.claims = '{"email":"bruno@beta.test","role":"authenticated"}';
 select patro_salvar_quarto(:'res1'::uuid,
-  '[{"nome":"Invasor","tipo":"adulto"}]'::jsonb, false, null, false, null);
+  '[{"nome":"Invasor","tipo":"adulto"}]'::jsonb, false, null);
 \echo '-- e tenta cancelar o quarto extra da Alfa (deve FALHAR):'
 select patro_cancelar_quarto_extra(:'res_extra'::uuid);
 reset role;

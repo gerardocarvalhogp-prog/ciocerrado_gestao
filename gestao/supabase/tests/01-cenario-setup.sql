@@ -133,12 +133,16 @@ select patro_salvar_quarto(
   :'res_alfa'::uuid,
   '[{"nome":"Ana Souza","cpf":"11122233344","tipo":"adulto","usa_transfer":true},
     {"nome":"Rui Lima","cpf":"55566677788","tipo":"adulto","usa_transfer":false}]'::jsonb,
-  true, 'GYN', true, 'Kit cafe'
+  true, 'GYN'
 );
+-- brinde deixou de ser por quarto em 26/08 e virou lista da empresa em
+-- 01/09 (20260901140000): sai de patro_salvar_quarto, entra aqui
+select patro_salvar_brinde(:'alfa'::uuid, true, 'Kit cafe', null, 'quarto') ->> 'ok' as brinde;
 
 \echo '-- o quarto virou completo e o brinde entrou?'
-select rotulo, status, ocupantes, usa_transfer, transfer_origem, brinde_vai_enviar, brinde_descricao
+select rotulo, status, ocupantes, usa_transfer, transfer_origem
 from patro_listar_quartos(:'alfa'::uuid);
+select descricao, destino, status from patro_listar_brindes(:'alfa'::uuid);
 
 \echo ''
 \echo '=== TESTE 5 · Ana compra quarto extra e a fatura recalcula ==='
@@ -162,7 +166,7 @@ select empresa, cota, quartos_total from patro_meu_painel('cerrado2027');
 \echo '-- Bruno tenta salvar no quarto da Alfa (deve FALHAR):'
 select patro_salvar_quarto(
   :'res_alfa'::uuid,
-  '[{"nome":"Invasor","tipo":"adulto"}]'::jsonb, false, null, false, null);
+  '[{"nome":"Invasor","tipo":"adulto"}]'::jsonb, false, null);
 reset role;
 
 \echo ''

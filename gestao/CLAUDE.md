@@ -119,7 +119,7 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
 **29 tabelas, 6 views, 368 colunas, 143 funções, 37 políticas de RLS,
-8 migrations.** Desatualizado — são **141 migrations** em 05/10/2026, mas os
+8 migrations.** Desatualizado — são **142 migrations** em 05/10/2026, mas os
 outros números (tabelas/views/colunas/funções/políticas) não foram reconferidos
 desde então porque exigem consulta ao catálogo do banco hospedado, que este
 arquivo não tem como fazer sozinho. Antes de confiar nesses quatro números,
@@ -129,9 +129,9 @@ rode de novo a consulta do README §8.
 - [x] Front: portal do patrocinador, rooming, admin, check-in, jantares
 - [x] **Uma linhagem só** — o `db reset` local reproduz o hospedado
       coluna a coluna, função a função, política a política.
-      **Quebrado desde 29/09:** migrations de dado que fazem `raise
-      exception` quando não acham a linha param o reset num banco vazio
-      (ver `supabase/tests/LEIA-ME.md` pro contorno)
+      (Ficou quebrado de 29/09 a 05/10 por migrations de dado que
+      abortavam em banco vazio — consertado; ver
+      `supabase/tests/LEIA-ME.md`.)
 - [x] Publicado em `https://ciocerrado.netlify.app/gestao/`
 - [x] Rastreio de brindes, da promessa até a entrega no quarto
 - [x] Pagamento da fatura — já existia (aba Financeiro, `admin_marcar_fatura` /
@@ -228,10 +228,9 @@ reserva sem conseguir comprar quarto extra, faixa de quarto com 4 dígitos
 cortada, funções sem escopo de staff por evento...). **Todos corrigidos
 no mesmo dia** (`20261005090000` a `20261005140000`), a pedido do
 organizador, e os testes afirmam o comportamento novo — lista com a
-migration de cada um em `supabase/tests/LEIA-ME.md`. Essas 6 migrations
-estão aplicadas e testadas no banco local; **ainda não foram pro
-hospedado** (`supabase db push` é decisão do organizador — o projeto é o
-mesmo do sistema de massagem em produção).
+migration de cada um em `supabase/tests/LEIA-ME.md`. Mais uma sobra da
+mesma varredura — `admin_preparar_cobranca` sem escopo por evento — saiu
+em `20261005150000`. Todas no hospedado desde 05/10/2026.
 
 Daqui pra frente a regra é a de sempre: migration de comportamento nova
 entra com teste no mesmo commit. O `23` olha o catálogo inteiro (função

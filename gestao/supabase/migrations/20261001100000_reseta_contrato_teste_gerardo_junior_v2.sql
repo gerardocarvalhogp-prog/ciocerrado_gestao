@@ -23,7 +23,11 @@ begin
    where nome = 'GERARDO CARVALHO DA JUNIOR';
 
   if v_qtd_gestores = 0 then
-    raise exception 'Nenhum gestor "GERARDO CARVALHO DA JUNIOR" encontrado';
+    -- 05/10/2026: num banco que nao tem esse dado (db reset do zero, ambiente
+    -- de teste) pula em vez de abortar o historico inteiro. No hospedado
+    -- esta migration ja rodou; isto nao muda nada la.
+    raise notice 'Nenhum gestor "GERARDO CARVALHO DA JUNIOR" encontrado — pulando: este banco nao tem o dado que esta migration corrige';
+    return;
   end if;
   if v_qtd_gestores > 1 then
     raise exception '% gestores com esse nome — resolva a duplicata antes de resetar', v_qtd_gestores;

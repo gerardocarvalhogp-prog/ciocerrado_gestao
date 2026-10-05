@@ -20,6 +20,7 @@
 --      pulada no envio se a pendencia ja foi resolvida; a lista mostra
 --      quando foi a ultima cobranca (20260901150000)
 --   6. staff de outro evento nao le o financeiro da cota (20261005110000)
+--      nem monta a previa de cobranca (20261005150000)
 --
 -- A compra de quarto extra pelo CIO (20260901160000, refeita em
 -- 20260930140000, consertada em 20261005100000) esta no 13.
@@ -178,6 +179,16 @@ set request.jwt.claims = '{"email":"cob14-admin@teste.invalido","role":"authenti
 \echo '-- contrato do CIO pendente ha 5 dias: aparece na lista, nunca cobrado — deve PASSAR'
 select ultima_cobranca_em is null as nunca_cobrado_ok
 from admin_pendencias_lista('cob14','contrato_assinado') where sujeito_id=:'part'::uuid;
+
+set request.jwt.claims = '{"email":"cob14-staff@teste.invalido","role":"authenticated"}';
+\echo '-- staff do evento monta a previa da cobranca, com o e-mail do CIO — deve PASSAR'
+select admin_preparar_cobranca(:'part'::uuid,'contrato_assinado') ::text like '%cio14@teste.invalido%' as previa_ok;
+set request.jwt.claims = '{"email":"cob14-fora@teste.invalido","role":"authenticated"}';
+savepoint s_previa_fora;
+\echo '-- staff de OUTRO evento monta a previa (e veria o e-mail) — 20261005150000 — deve FALHAR'
+select admin_preparar_cobranca(:'part'::uuid,'contrato_assinado');
+rollback to s_previa_fora;
+set request.jwt.claims = '{"email":"cob14-admin@teste.invalido","role":"authenticated"}';
 
 \echo '-- admin cobra — deve PASSAR'
 select (admin_disparar_cobranca(:'part'::uuid,'contrato_assinado','Assine o contrato','Corpo') ->> 'enfileiradas')::int = 1 as enfileirou_ok;

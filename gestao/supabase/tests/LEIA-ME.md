@@ -27,15 +27,19 @@ de preço cadastrado nele).
 `supabase db reset`, depois `01` (que monta o cenário), depois o que
 você quiser exercitar.
 
-**Atenção (05/10/2026): o `db reset` do zero não passa mais.** Desde
-`20260929190000`, várias migrations de DADO (vincular CIO de teste por
-nome, resetar contrato de teste, limpar fila do hospedado...) fazem
-`raise exception` quando não acham a linha que procuram — e num banco
-vazio nunca acham. Pra subir um banco local até a ponta foi preciso
-marcar essas como aplicadas (`supabase migration repair --local
---status applied <versao>`) e aplicar o resto com `supabase migration
-up --local --include-all`. Isso afeta a família `01`–`05`; a família
-transacional não precisa de reset.
+**O `db reset` do zero voltou a passar em 05/10/2026.** De 29/09 a
+05/10, 17 migrations de DADO (vincular CIO de teste por nome, resetar
+contrato de teste, limpar fila do hospedado...) faziam `raise exception`
+quando não achavam a linha que procuravam — e num banco vazio nunca
+acham. A guarda "alvo não encontrado" de cada uma virou `raise notice` +
+`return` (no hospedado elas já tinham rodado; não muda nada lá). Conferido
+no mesmo dia: reset do zero, depois a suíte inteira — `01`→`02`→`03`,
+`01`→`05`, e `04`, `07`–`23` — só com as recusas esperadas.
+
+`01` e `02` estavam desatualizados desde 01/09 (chamavam
+`patro_salvar_quarto` com os dois parâmetros de brinde que saíram e liam
+`brinde_vai_enviar`); foram ajustados pro brinde da empresa
+(`patro_salvar_brinde`).
 
 A diferença nasceu de um problema real: o banco local passou a ter a
 importação do CADASTRO 2025, com 1056 gestores. Um `db reset` para rodar
@@ -133,7 +137,7 @@ a reserva testada não tinha ocupante e a função não devolvia nada. O
 
 ## Achados de 05/10/2026 — todos corrigidos
 
-Os testes `13`–`23` acharam 12 comportamentos que divergiam do que a
+Os testes `13`–`23` acharam 13 comportamentos que divergiam do que a
 migration ou o CLAUDE.md diziam. Ficaram uma rodada marcados como
 `ACHADO`; o organizador mandou corrigir todos no mesmo dia, e cada bloco
 virou "deve PASSAR"/"deve FALHAR" de verdade, citando a migration:
@@ -150,6 +154,7 @@ virou "deve PASSAR"/"deve FALHAR" de verdade, citando a migration:
 | `20` | `jantar_grupo_obter` estourava "status is ambiguous" pra qualquer jantar | `20261005140000` |
 | `20` | convidado novo vindo do Sympla não recebia o aviso de WhatsApp | `20261005140000` |
 | `20`, `23` | `_jantar_enfileirar_whatsapp_confirmacao` executável por `anon` | `20261005140000` |
+| `14` | `admin_preparar_cobranca` (prévia com o e-mail do pendente) sem escopo de staff por evento — sobra da varredura | `20261005150000` |
 | `20` | importação (jantar e evento) criava gestor a partir de linha recusada/cancelada | `20261005140000` |
 | `20` | telefone fixo ganhava o 9 e virava celular inexistente | `20261005140000` |
 

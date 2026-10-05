@@ -32,7 +32,11 @@ declare v_evento_id uuid; v_vinculados int;
 begin
   select id into v_evento_id from eventos where nome = 'Teste da Ferramenta 2027';
   if v_evento_id is null then
-    raise exception 'Evento "Teste da Ferramenta 2027" nao encontrado (busca por nome exato) — confira o nome certo em admin.html (Estrutura) antes de rodar isto';
+    -- 05/10/2026: num banco que nao tem esse dado (db reset do zero, ambiente
+    -- de teste) pula em vez de abortar o historico inteiro. No hospedado
+    -- esta migration ja rodou; isto nao muda nada la.
+    raise notice 'Evento "Teste da Ferramenta 2027" nao encontrado (busca por nome exato) — confira o nome certo em admin.html (Estrutura) antes de rodar isto — pulando: este banco nao tem o dado que esta migration corrige';
+    return;
   end if;
 
   insert into participantes (evento_id, gestor_id, status, origem, aprovado_em, aprovado_por)

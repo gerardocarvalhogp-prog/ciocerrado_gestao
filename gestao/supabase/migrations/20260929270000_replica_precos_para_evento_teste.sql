@@ -18,7 +18,11 @@ declare v_real_id uuid; v_teste_id uuid; v_copiados int;
 begin
   select id into v_real_id from eventos where nome = 'CIO Cerrado Experience 2027';
   if v_real_id is null then
-    raise exception 'Evento "CIO Cerrado Experience 2027" nao encontrado (busca por nome exato)';
+    -- 05/10/2026: num banco que nao tem esse dado (db reset do zero, ambiente
+    -- de teste) pula em vez de abortar o historico inteiro. No hospedado
+    -- esta migration ja rodou; isto nao muda nada la.
+    raise notice 'Evento "CIO Cerrado Experience 2027" nao encontrado (busca por nome exato) — pulando: este banco nao tem o dado que esta migration corrige';
+    return;
   end if;
 
   select id into v_teste_id from eventos where nome = 'Teste da Ferramenta 2027';

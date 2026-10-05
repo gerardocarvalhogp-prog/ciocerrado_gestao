@@ -23,7 +23,11 @@ declare v_empresa_id uuid; v_removidos int;
 begin
   select id into v_empresa_id from empresas where lower(trim(nome)) = lower('SAP');
   if v_empresa_id is null then
-    raise exception 'Empresa "SAP" nao encontrada no cadastro — confira o nome exato em admin.html (Patrocinadores) antes de rodar isto';
+    -- 05/10/2026: num banco que nao tem esse dado (db reset do zero, ambiente
+    -- de teste) pula em vez de abortar o historico inteiro. No hospedado
+    -- esta migration ja rodou; isto nao muda nada la.
+    raise notice 'Empresa "SAP" nao encontrada no cadastro — confira o nome exato em admin.html (Patrocinadores) antes de rodar isto — pulando: este banco nao tem o dado que esta migration corrige';
+    return;
   end if;
 
   delete from usuarios_patrocinador
