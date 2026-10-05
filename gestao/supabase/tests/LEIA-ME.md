@@ -7,8 +7,8 @@ docker exec -i supabase_db_gestao-cio-cerrado psql -U postgres -d postgres -q \
 
 ## Duas famílias, e a diferença importa
 
-**`04` e `07` rodam em transação e desfazem tudo no fim.** Podem rodar
-contra um banco com dado dentro, quantas vezes quiser, sem `db reset`.
+**`04`, `07` e `12` rodam em transação e desfazem tudo no fim.** Podem
+rodar contra um banco com dado dentro, quantas vezes quiser, sem `db reset`.
 
 **`01`, `02`, `03` e `05` gravam de verdade** e exigem banco limpo:
 `supabase db reset`, depois `01` (que monta o cenário), depois o que
@@ -31,6 +31,11 @@ Quando der, vale converter `01`–`03` e `05` para o mesmo formato.
 | `04` | fatura congelada: estimada acompanha o rooming, emitida e paga não |
 | `05` | reserva da indicação e janela por cota |
 | `07` | cortesia do acompanhante, teto de 4, transfer por pessoa, brinde da empresa e seu custo, preço do quarto adicional, correção do tipo de faixa |
+| `08` | quarto de equipe (staff/organização): só admin cria, teto de 4, aparece em admin_listar_alocacao, remover libera o quarto |
+| `09` | "App do evento" é admin-only nas 4 funções que exportam dado de participante, não só na tela (achado do relatório de segurança do Cowork) |
+| `10` | staff só enxerga o evento associado em `admin_eventos`; admin vê todos — amostra de 4 funções |
+| `11` | mesmo escopo por evento, agora nas funções que recebem id de sessão/reserva/brinde/atividade/checkin em vez do slug direto |
+| `12` | mesa/sessão: limite de vagas ao adicionar, trava de CIO duplicado no mesmo tipo (mas não entre tipos), reconfirmar não esbarra na própria vaga, busca só traz quem pode entrar, quarto quádruplo |
 
 `03` e `05` **não rodam juntos**: os dois criam mesa redonda para as
 mesmas empresas e `sessoes` não tem chave única. `01` também não é

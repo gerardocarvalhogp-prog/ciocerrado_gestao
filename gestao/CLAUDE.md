@@ -119,7 +119,11 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
 **29 tabelas, 6 views, 368 colunas, 143 funções, 37 políticas de RLS,
-8 migrations.**
+8 migrations.** Desatualizado — são **135 migrations** em 05/10/2026, mas os
+outros números (tabelas/views/colunas/funções/políticas) não foram reconferidos
+desde então porque exigem consulta ao catálogo do banco hospedado, que este
+arquivo não tem como fazer sozinho. Antes de confiar nesses quatro números,
+rode de novo a consulta do README §8.
 
 - [x] Banco, funções e RLS
 - [x] Front: portal do patrocinador, rooming, admin, check-in, jantares
@@ -138,18 +142,40 @@ Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
       assinado também aparecendo. `verify_jwt = false` precisa estar ligado
       nessa function (`supabase/config.toml`) — sem isso o gateway do
       Supabase recusa a chamada do Autentique antes dela chegar no código.
-- [ ] Espelho de quartos do resort
+- [x] Espelho de quartos do resort — mecanismo existe desde 26/08
+      (`admin_importar_mapa_quartos`, prédio/andar/corredor/categoria física) e
+      ganhou exportação no mesmo formato em 01/10 (`exportarMapaDeQuartos`,
+      aba Quartos). Falta só reimportar o mapa real do Tauá para a edição
+      2027 quando o resort mandar — o de 2026 foi só o exemplo usado pra
+      validar o formato.
+- [x] Limite de vagas e duplicidade de CIO nas mesas/jantares (01/10) —
+      `admin_adicionar_convidado_sessao` passou a respeitar `sessoes.vagas` e
+      a recusar o mesmo CIO confirmado em duas sessões do mesmo tipo; busca
+      (`admin_buscar_participantes_sessao`) só oferece quem pode entrar de
+      verdade. Coberto por teste automatizado (`supabase/tests/12`).
+- [x] Quarto "quádruplo" (capacidade 4) como tipo válido em todo o sistema
+      (01/10) — coberto por `supabase/tests/12`.
+- [x] Mailing list e pesquisa de perfil num relatório só (01–05/10) —
+      `admin_rel_pesquisa` ganhou o tipo de ingresso e virou a fonte do
+      mailing, com os campos da pesquisa (faturamento, orçamento de TI,
+      áreas de investimento) achatados em colunas. Desde 05/10,
+      `integracao.py --sympla` importa a pesquisa sozinho, lendo o
+      `custom_form` que a API do Sympla já devolve — **mas isso nunca rodou
+      de verdade em produção ainda**, só testado isoladamente com dado
+      fictício.
 
-### Dois achados de 01/10/2026, ainda sem solução — ficam aqui até resolver
+### Achados de 01/10/2026
 
-- **Domínio não verificado no Resend**: a conta só deixa mandar e-mail pro
-  próprio endereço da conta (`gerardocarvalhogp@gmail.com`) até
-  `ciocerrado.com.br` ser verificado em resend.com/domains (registros
-  SPF/DKIM, DNS fica na Skymail). Até lá, todo aviso real (contrato
-  enviado/assinado, rooming confirmado) falha com 403 pra qualquer
-  destinatário que não seja essa conta — bloqueia o uso de verdade do botão
-  "Enviar toda a fila" (aba Equipe).
-- **`?evento=` ausente na URL caía num evento errado, silenciosamente**:
+- **Domínio não verificado no Resend — ainda sem solução, depende do
+  organizador** (ver "O que depende do organizador" abaixo): a conta só
+  deixa mandar e-mail pro próprio endereço da conta
+  (`gerardocarvalhogp@gmail.com`) até `ciocerrado.com.br` ser verificado
+  em resend.com/domains (registros SPF/DKIM, DNS fica na Skymail). Até
+  lá, todo aviso real (contrato enviado/assinado, rooming confirmado)
+  falha com 403 pra qualquer destinatário que não seja essa conta —
+  bloqueia o uso de verdade do botão "Enviar toda a fila" (aba Equipe).
+- **`?evento=` ausente na URL caía num evento errado, silenciosamente —
+  CORRIGIDO no mesmo dia**:
   `rooming.html` e `portal.html` tinham `|| "cerrado2027"` como fallback
   quando a URL não trazia o evento — um CIO/patrocinador que caísse ali sem
   o parâmetro (link quebrado, redirect de confirmação que perde a query
@@ -165,27 +191,49 @@ Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
 Conferido no banco local (`supabase db reset` + `supabase/tests/`):
 
 - o baseline sobe do zero e o resultado bate com o hospedado
-- os seis arquivos de teste exercitam portal, rooming, fila da mesa
-  redonda, fatura, reserva com janela e brindes — trocando de papel com
-  `request.jwt.claims`, como o PostgREST faz
+- os arquivos de teste (`01` a `12`) exercitam portal, rooming, fila da
+  mesa redonda, fatura, reserva com janela, brindes, quarto de equipe,
+  admin-only no "App do evento", staff escopado por evento, e (desde
+  05/10) limite de vaga + duplicidade de CIO na mesa/jantar + quarto
+  quádruplo — trocando de papel com `request.jwt.claims`, como o
+  PostgREST faz
 - fatura complementar cobra a diferença, é idempotente no recálculo e
   vira crédito quando alguém sai depois de pagar
 - a reserva da indicação resiste de baixo para cima: o indicado pela
   Ouro não aparece para a Esmeralda
 
-Conferido no hospedado, por consulta ao catálogo e por requisição real
-com a chave anon (ver README §8):
+**A suíte NÃO acompanha o ritmo do sistema.** Entre a migration que o
+teste `11` cobre (31/08) e a que o `12` cobre (05/10) foram **mais de 60
+migrations sem teste nenhum** — quádruplo e limite de vaga ganharam
+cobertura retroativa em 05/10 porque alguém perguntou "o que está
+pendente nos testes", mas o resto desse intervalo (uploads de
+patrocinador, pré-cadastro por link, materiais do CIO, grupos de
+WhatsApp, categoria de quarto, pool avulso, CPF/CNPJ como chave de
+importação, webhook do Autentique, mailing consolidado, mapa de quartos
+no formato do resort...) só foi validado manualmente, ao vivo, por
+Gerardo testando `teste2027` — nunca por teste automatizado. Isso é
+dívida real, não só desatualização de checklist: escrever teste pra
+esse intervalo é trabalho que não depende do organizador, só ainda não
+foi priorizado.
 
-- as 97 RPCs que as telas chamam existem, com os nomes de parâmetro
-  batendo
-- `anon` e `authenticated` não leem tabela nem view nenhuma do schema
-- `anon` só executa `part_autocadastro`, `is_staff` e
+Conferido no hospedado, por consulta ao catálogo e por requisição real
+com a chave anon (ver README §8), em 25/08/2026 — **não reconferido
+desde então**:
+
+- as 97 RPCs que as telas chamavam existiam, com os nomes de parâmetro
+  batendo (hoje são bem mais de 97; a lista não foi atualizada)
+- `anon` e `authenticated` não liam tabela nem view nenhuma do schema
+- `anon` só executava `part_autocadastro`, `is_staff` e
   `meus_patrocinadores`
 - zero achados de nível ERROR no `supabase db advisors`
 
-**Não** verificado: as telas rodando contra o hospedado com um usuário
-de verdade, logado por magic link. Tudo foi medido no Postgres e pela
-API — ninguém nunca clicou.
+**Como ficou o item "ninguém nunca clicou":** ao longo de 01–05/10/2026
+Gerardo testou ao vivo contra o hospedado, logado de verdade — inclusive
+um bug real de produção (`?evento=` ausente levando a um evento errado
+silenciosamente, corrigido no mesmo dia). Dá pra considerar resolvido
+na prática, mas nunca foi formalmente registrado como "sim, login por
+magic link testado" — fica como um checklist informal, não uma prova
+automatizada.
 
 ### Três armadilhas
 
@@ -204,6 +252,18 @@ API — ninguém nunca clicou.
    `/gestao/`). O deploy sai de `_site`, montado pelo
    `preparar-site.js` — publicar a raiz direto põe `.sql`, `.py` e
    `.md` em URL pública, como já aconteceu uma vez.
+4. **`unaccent`/`pgcrypto` precisam estar instaladas no schema
+   `public`, não num schema `extensions` separado**, se algum dia
+   alguém tentar reconstruir o banco num Postgres puro (fora do CLI do
+   Supabase) pra rodar migration ou teste. O baseline faz
+   `SET search_path = 'public'` de propósito (comentário já explica o
+   motivo do `unaccent('unaccent', ...)`) — instalar as extensões em
+   outro schema faz esse `search_path` não as enxergar, e a primeira
+   função que chama `unaccent` ou `gen_random_uuid()` quebra com "function
+   does not exist", um erro que não tem nada a ver com a causa real.
+   Achado replicando o histórico inteiro de migrations num Postgres
+   local avulso em 05/10/2026, só pra validar `supabase/tests/12` antes
+   de commitar.
 
 ### O CLI mente sobre o código de saída
 
@@ -218,4 +278,13 @@ código.
 - dados reais de 2027 — hoje são 4 patrocinadores de ~61 e 8
   participantes de ~130, e `sympla_event_id` está vazio
 - credenciais do `integracao.py` (Sympla, Autentique, Resend)
-- um teste de ponta a ponta com login de verdade
+- domínio `ciocerrado.com.br` verificado no Resend (registros SPF/DKIM
+  na Skymail) — sem isso, nenhum e-mail real sai da fila (ver "achados"
+  acima)
+- rodar `integracao.py --sympla --producao` de verdade pelo menos uma
+  vez, pra confirmar que a importação automática da pesquisa de perfil
+  (05/10) casa com os títulos reais das perguntas do formulário do
+  Sympla — testado só com dado fictício até aqui
+- confirmar que `supabase db push` está em dia no hospedado com as
+  migrations mais recentes (a partir de `20261001230000`, quádruplo em
+  diante) antes de testar as telas que dependem delas
