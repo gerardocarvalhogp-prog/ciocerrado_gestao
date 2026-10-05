@@ -212,11 +212,10 @@ a `20261001280000`), **61 são de schema/comportamento** e todas têm teste agor
 — 3 já estavam no `12`, as outras 58 nos arquivos novos; **20 são de
 DADO** (vincular CIO de teste por nome, resetar contrato de teste, limpar
 fila do hospedado...) e não têm teste por natureza: dependem de linha que
-só existe no hospedado. Única parte de comportamento sem cobertura: a
-**corrida** de `_garantir_reserva` (20260918090000) — o teste prova que
-ela não duplica em sequência e que o índice único existe, mas duas
-transações concorrentes de verdade precisariam de duas conexões (dblink),
-e isso não foi montado.
+só existe no hospedado. A **corrida** de `_garantir_reserva`
+(20260918090000) tem teste próprio, `supabase/tests/24-...py`, com duas
+sessões `psql` de verdade disputando o mesmo duplo clique — com prova
+negativa (sem a trava, o teste falha).
 
 `supabase/tests/confere.py` roda os testes e diz sozinho se toda recusa
 esperada recusou e toda checagem `_ok` bateu — antes, a saída era lida a

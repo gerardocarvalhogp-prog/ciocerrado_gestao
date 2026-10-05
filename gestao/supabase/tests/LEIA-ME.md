@@ -14,6 +14,29 @@ python supabase/tests/confere.py supabase/tests/1[2-9]-*.sql supabase/tests/2*.s
 `confere.py` roda cada arquivo e diz, sozinho, se toda recusa esperada
 recusou e toda checagem bateu — ver "Formato que o confere.py lê", abaixo.
 
+## O 24 é diferente: duas conexões
+
+```bash
+python supabase/tests/24-corrida-na-reserva-do-cio.py
+```
+
+Corrida só existe com duas transações abertas ao mesmo tempo, e um `.sql`
+roda numa conexão só. O `24` abre duas sessões `psql`: A salva a
+hospedagem e segura a transação aberta; B salva a mesma hospedagem
+enquanto A está aberta. Passa se B começou antes do commit de A e só
+terminou depois dele (esperou a trava `FOR UPDATE` de `_garantir_reserva`),
+sem erro, com uma reserva só. Os tempos são medidos dentro do banco
+(`clock_timestamp()`), não no relógio do Python — o `docker exec` tem
+latência variável. Se numa rodada as duas sessões nem se sobrepuserem,
+ela é declarada inconclusiva e repetida (até 3x), nunca dada como passou.
+
+Grava de verdade (as duas sessões precisam ver o participante), com
+prefixo `cob24`, e apaga tudo no fim, mesmo se falhar.
+
+Prova negativa feita em 05/10/2026: com a trava tirada de
+`_garantir_reserva` no banco local, B estoura `duplicate key ...
+reservas_participante_ativa_uk` e o teste acusa.
+
 ## Duas famílias, e a diferença importa
 
 **`04` e `07` a `23` rodam em transação e desfazem tudo no fim.** Podem
@@ -74,6 +97,7 @@ Quando der, vale converter `01`–`03` e `05` para o mesmo formato.
 | `21` | padrão de cadastro (trigger, 31/08), editar gestor, filtros, enriquecimento, empresa global entre eventos, CPF e CNPJ como chave |
 | `22` | webhook do Autentique (só service_role, idempotente, link do PDF, aviso com corpo), mailing do evento inteiro, pesquisa no mailing |
 | `23` | catálogo: service_role e admin inativo, nenhum papel de cliente lê tabela/view, views com security_invoker, RLS em toda tabela, índices, o que anon executa, overload órfão, escopo de staff por evento |
+| `24` | **corrida de verdade** no duplo clique de "salvar hospedagem": duas sessões `psql` ao mesmo tempo, a segunda espera a trava da primeira e reaproveita a mesma reserva (`.py`, ver abaixo) |
 
 `03` e `05` **não rodam juntos**: os dois criam mesa redonda para as
 mesmas empresas e `sessoes` não tem chave única. `01` também não é
