@@ -128,7 +128,10 @@ rode de novo a consulta do README §8.
 - [x] Banco, funções e RLS
 - [x] Front: portal do patrocinador, rooming, admin, check-in, jantares
 - [x] **Uma linhagem só** — o `db reset` local reproduz o hospedado
-      coluna a coluna, função a função, política a política
+      coluna a coluna, função a função, política a política.
+      **Quebrado desde 29/09:** migrations de dado que fazem `raise
+      exception` quando não acham a linha param o reset num banco vazio
+      (ver `supabase/tests/LEIA-ME.md` pro contorno)
 - [x] Publicado em `https://ciocerrado.netlify.app/gestao/`
 - [x] Rastreio de brindes, da promessa até a entrega no quarto
 - [x] Pagamento da fatura — já existia (aba Financeiro, `admin_marcar_fatura` /
@@ -191,7 +194,7 @@ rode de novo a consulta do README §8.
 Conferido no banco local (`supabase db reset` + `supabase/tests/`):
 
 - o baseline sobe do zero e o resultado bate com o hospedado
-- os arquivos de teste (`01` a `12`) exercitam portal, rooming, fila da
+- os arquivos de teste (`01` a `23`) exercitam portal, rooming, fila da
   mesa redonda, fatura, reserva com janela, brindes, quarto de equipe,
   admin-only no "App do evento", staff escopado por evento, e (desde
   05/10) limite de vaga + duplicidade de CIO na mesa/jantar + quarto
@@ -202,19 +205,36 @@ Conferido no banco local (`supabase db reset` + `supabase/tests/`):
 - a reserva da indicação resiste de baixo para cima: o indicado pela
   Ouro não aparece para a Esmeralda
 
-**A suíte NÃO acompanha o ritmo do sistema.** Entre a migration que o
-teste `11` cobre (31/08) e a que o `12` cobre (05/10) foram **mais de 60
-migrations sem teste nenhum** — quádruplo e limite de vaga ganharam
-cobertura retroativa em 05/10 porque alguém perguntou "o que está
-pendente nos testes", mas o resto desse intervalo (uploads de
-patrocinador, pré-cadastro por link, materiais do CIO, grupos de
-WhatsApp, categoria de quarto, pool avulso, CPF/CNPJ como chave de
-importação, webhook do Autentique, mailing consolidado, mapa de quartos
-no formato do resort...) só foi validado manualmente, ao vivo, por
-Gerardo testando `teste2027` — nunca por teste automatizado. Isso é
-dívida real, não só desatualização de checklist: escrever teste pra
-esse intervalo é trabalho que não depende do organizador, só ainda não
-foi priorizado.
+**Lacuna de 31/08 a 05/10 fechada em 05/10/2026** (`supabase/tests/13`
+a `23`, todos transacionais, cada um com evento próprio — não dependem
+de dado do banco). Das 81 migrations do intervalo (`20260831170000`
+a `20261001280000`), **61 são de schema/comportamento** e todas têm teste agora
+— 3 já estavam no `12`, as outras 58 nos arquivos novos; **20 são de
+DADO** (vincular CIO de teste por nome, resetar contrato de teste, limpar
+fila do hospedado...) e não têm teste por natureza: dependem de linha que
+só existe no hospedado. Única parte de comportamento sem cobertura: a
+**corrida** de `_garantir_reserva` (20260918090000) — o teste prova que
+ela não duplica em sequência e que o índice único existe, mas duas
+transações concorrentes de verdade precisariam de duas conexões (dblink),
+e isso não foi montado.
+
+`supabase/tests/confere.py` roda os testes e diz sozinho se toda recusa
+esperada recusou e toda checagem `_ok` bateu — antes, a saída era lida a
+olho. Os testes registraram **12 achados** (comportamento que diverge do
+que a migration ou este arquivo dizem), marcados `ACHADO` nos testes e
+listados em `supabase/tests/LEIA-ME.md` — nenhum foi consertado, todos
+esperam decisão do organizador. Os mais sérios: atividade exclusiva não
+reconhece CIO com rooming; `jantar_grupo_obter` quebrada pra qualquer
+jantar; convidado novo vindo do Sympla sem aviso de WhatsApp; um helper
+de WhatsApp executável por `anon`; CIO com reserva não consegue comprar
+quarto extra; faixa de quarto com 4 dígitos truncada; 6 funções sem
+escopo de staff por evento.
+
+Daqui pra frente a regra é a de sempre: migration de comportamento nova
+entra com teste no mesmo commit. O `23` olha o catálogo inteiro (função
+exposta a anon, overload órfão, view sem security_invoker, tabela sem
+RLS, função com `p_evento_slug` sem escopo) e pega sozinho quem esquecer
+essas regras numa migration futura.
 
 Conferido no hospedado, por consulta ao catálogo e por requisição real
 com a chave anon (ver README §8), em 25/08/2026 — **não reconferido
