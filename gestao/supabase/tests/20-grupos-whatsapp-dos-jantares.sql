@@ -18,6 +18,11 @@
 --   4. pipeline: solicitar (admin, >=1 confirmado, sem duplicar) ->
 --      daemon com chave service_role (pendentes, contatos, avancar) ->
 --      convites com o link so depois de 'criado'
+--
+-- E as correcoes de 05/10/2026 (achados deste teste, 20261005140000):
+-- jantar_grupo_obter volta a funcionar, convidado novo do Sympla ganha o
+-- aviso, linha recusada nao cria gestor, fixo nao vira celular, e o
+-- helper que enfileira WhatsApp nao e mais executavel por fora.
 -- =====================================================================
 
 \set ON_ERROR_STOP off
@@ -62,11 +67,11 @@ select norm_telefone_e164('(62) 99999-1234')   = '5562999991234'
    and norm_telefone_e164(null) is null as e164_ok;
 select telefone_e164 = '5562999991234' as coluna_gerada_ok from gestores where id=:'g_ana'::uuid;
 
-\echo '-- ACHADO (05/10/2026): numero FIXO com DDD (10 digitos, comeca com 2-5) tambem'
-\echo '-- ganha o 9 na frente, virando um celular que nao existe. O comentario da'
-\echo '-- migration diz "fixo continua com 8" e "numero que nao bate vira null em'
-\echo '-- vez de adivinhar — E.164 errado manda mensagem pro numero errado".'
-select norm_telefone_e164('(62) 3222-1111') as fixo_vira;
+\echo '-- telefone FIXO (comeca com 2-5) vira nulo em vez de ganhar um 9 e virar'
+\echo '-- celular inexistente (20261005140000) — com ou sem o 55 — deve PASSAR'
+select norm_telefone_e164('(62) 3222-1111') is null
+   and norm_telefone_e164('55 62 3222-1111') is null
+   and norm_telefone_e164('556299991234') = '556299991234' as fixo_nulo_ok;
 
 \echo ''
 \echo '#############################################'
@@ -99,17 +104,18 @@ select jantar_importar_convidados_sympla(:'jantar'::uuid, '[]'::jsonb);
 rollback to s_import_staff;
 
 set request.jwt.claims = '{"email":"cob20-admin@teste.invalido","role":"authenticated"}';
-\echo '-- 6 linhas: Carla nova (e-mail corporativo vence), Ana repetida, Bruno cancelou,'
-\echo '-- sem e-mail, e-mail invalido, pagamento pendente — deve PASSAR'
+\echo '-- 7 linhas: Carla nova (e-mail corporativo vence), Ana repetida, Bruno cancelou,'
+\echo '-- sem e-mail, e-mail invalido, pagamento pendente, cancelado sem cadastro — deve PASSAR'
 select (r ->> 'criados')::int = 1 and (r ->> 'atualizados')::int = 1 and (r ->> 'recusados')::int = 1
-   and (r ->> 'erros')::int = 3 as importou_ok
+   and (r ->> 'erros')::int = 3 and (r ->> 'gestores_novos')::int = 0 as importou_ok
 from jantar_importar_convidados_sympla(:'jantar'::uuid, '[
   {"nome":"Carla","email":"pessoal@x.test","email_corporativo":" CARLA20@teste.invalido ","estado_pagamento":"Aprovado","sympla_id":"S1"},
   {"nome":"Ana","email":"ana20@teste.invalido","estado_pagamento":"aprovado"},
   {"nome":"Bruno","email":"bruno20@teste.invalido","estado_pagamento":"Cancelado"},
   {"nome":"Sem Email","estado_pagamento":"aprovado"},
   {"nome":"Ruim","email":"nao-e-email","estado_pagamento":"aprovado"},
-  {"nome":"Pendente","email":"pend20@teste.invalido","estado_pagamento":"pendente"}
+  {"nome":"Pendente","email":"pend20@teste.invalido","estado_pagamento":"pendente"},
+  {"nome":"Cancelou Sem Cadastro","email":"canc20@teste.invalido","estado_pagamento":"cancelado"}
 ]'::jsonb) r;
 reset role;
 reset request.jwt.claims;
@@ -118,24 +124,17 @@ select status='confirmado' and origem='sympla' and sympla_id='S1' as carla_ok
 from jantar_convidados where jantar_id=:'jantar'::uuid and gestor_id=:'g_carla'::uuid;
 select count(*) = 1 as ana_um_aviso_so_ok from notificacoes where sujeito_id=:'jc_ana'::uuid;
 
-\echo '-- ACHADO (05/10/2026): Carla e NOVA no jantar, entrou confirmada pela importacao'
-\echo '-- e tem celular valido — mas o aviso de confirmacao NAO foi enfileirado. Na'
-\echo '-- funcao, "select exists(...), status into v_existia ..." nao devolve linha'
-\echo '-- quando o convidado ainda nao existe, v_existia fica NULL e'
-\echo '-- "if not (v_existia and ...)" nao entra. Todo convidado novo vindo do Sympla'
-\echo '-- (o caminho automatico do integracao.py --jantares) fica sem o aviso.'
-select count(*) as avisos_da_carla_esperado_1
+\echo '-- Carla e NOVA no jantar e entrou confirmada pela importacao: ganhou o aviso'
+\echo '-- de confirmacao (antes nao ganhava — 20261005140000) — deve PASSAR'
+select count(*) = 1 as aviso_da_carla_ok
 from notificacoes n join jantar_convidados jc on jc.id=n.sujeito_id
 where jc.jantar_id=:'jantar'::uuid and jc.gestor_id=:'g_carla'::uuid and n.tipo='jantar_confirmacao_inscricao';
 
 \echo '-- Bruno (cancelou no Sympla) virou recusado — deve PASSAR'
 select status = 'recusado' as bruno_recusado_ok from jantar_convidados where id=:'jc_bruno'::uuid;
-\echo '-- ACHADO (05/10/2026): a linha com pagamento "pendente" foi recusada (conta em'
-\echo '-- erros, nao entra no jantar) mas o gestor dela JA foi criado na base — a'
-\echo '-- funcao cria/atualiza o gestor antes de olhar o estado do pagamento. Vale'
-\echo '-- tambem pra linha "cancelado" de quem nao existia. Efeito: cadastro novo na'
-\echo '-- base de gestores a partir de inscricao nao concluida.'
-select exists (select 1 from gestores where email='pend20@teste.invalido') as gestor_de_linha_recusada_criado;
+\echo '-- linha recusada (pagamento pendente) e cancelamento de quem nem estava na'
+\echo '-- base NAO criam gestor (antes criavam — 20261005140000) — deve PASSAR'
+select not exists (select 1 from gestores where email in ('pend20@teste.invalido','canc20@teste.invalido')) as nao_criou_gestor_ok;
 
 update jantar_convidados set status='compareceu' where id=:'jc_ana'::uuid;
 set role authenticated;
@@ -162,13 +161,9 @@ select jantar_grupo_solicitar(:'jantar_vazio'::uuid);
 rollback to s_sem_confirmado;
 
 set request.jwt.claims = '{"email":"cob20-staff@teste.invalido","role":"authenticated"}';
-savepoint s_achado_obter;
-\echo '-- ACHADO (05/10/2026): jantar_grupo_obter (a que jantares.html chama pra mostrar'
-\echo '-- o estado do grupo) estoura com "column reference status is ambiguous" pra'
-\echo '-- QUALQUER jantar: o retorno declara uma coluna "status" e o subselect que'
-\echo '-- conta confirmados usa "status" sem qualificar. A tela nunca carrega.'
-select * from jantar_grupo_obter(:'jantar'::uuid);
-rollback to s_achado_obter;
+\echo '-- staff ve o estado: nenhum grupo ainda, 2 confirmados (antes a funcao'
+\echo '-- estourava "status is ambiguous" — 20261005140000) — deve PASSAR'
+select status is null and confirmados = 2 as obter_ok from jantar_grupo_obter(:'jantar'::uuid);
 savepoint s_solicitar_staff;
 \echo '-- staff solicita grupo (efeito externo real) — so admin — deve FALHAR'
 select jantar_grupo_solicitar(:'jantar'::uuid);
@@ -205,15 +200,11 @@ select jantar_grupo_enfileirar_convites(:'jantar'::uuid) = 2 as convites_ok;
 \echo '-- e o pedido saiu da lista de pendentes — deve PASSAR'
 select not exists (select 1 from jantar_grupos_pendentes() where jantar_id=:'jantar'::uuid) as saiu_pendentes_ok;
 
--- jantar_grupo_obter esta quebrada (ACHADO acima): confere direto na tabela
-reset role;
-reset request.jwt.claims;
-\echo '-- grupo gravado como criado, com link e data — deve PASSAR'
-select status = 'criado' and invite_link = 'https://chat.whatsapp.test/abc' and criado_em is not null
-       and whatsapp_group_jid = '123-456@g.us' as grupo_ok
-from jantar_grupos where jantar_id=:'jantar'::uuid;
 set role authenticated;
 set request.jwt.claims = '{"email":"cob20-admin@teste.invalido","role":"authenticated"}';
+\echo '-- a tela ve o grupo criado, com link e data — deve PASSAR'
+select status = 'criado' and invite_link = 'https://chat.whatsapp.test/abc' and criado_em is not null as grupo_ok
+from jantar_grupo_obter(:'jantar'::uuid);
 savepoint s_ja_criado;
 \echo '-- solicitar de novo depois de criado — deve FALHAR'
 select jantar_grupo_solicitar(:'jantar'::uuid);
@@ -236,21 +227,21 @@ from whatsapp_operacional_log where jantar_id=:'jantar'::uuid;
 
 \echo ''
 \echo '#############################################'
-\echo '# 5 · O HELPER INTERNO E EXPOSTO'
+\echo '# 5 · O HELPER INTERNO NAO E EXPOSTO'
 \echo '#############################################'
 set role anon;
 set request.jwt.claims = '{"role":"anon"}';
-savepoint s_achado_anon;
-\echo '-- ACHADO (05/10/2026): _jantar_enfileirar_whatsapp_confirmacao e SECURITY'
-\echo '-- DEFINER, sem _exige_*, e o comentario diz "sem GRANT, nunca exposta" — mas'
-\echo '-- nao tem REVOKE FROM PUBLIC, entao anon (so a chave publica do site)'
-\echo '-- executa e enfileira WhatsApp pra qualquer convidado cujo id conheca. A'
-\echo '-- autoverificacao da migration so olhava as 8 RPCs publicas, nao o helper.'
+savepoint s_helper_anon;
+\echo '-- anon (so a chave publica do site) chama o helper que enfileira WhatsApp'
+\echo '-- (antes executava — 20261005140000) — deve FALHAR'
 select _jantar_enfileirar_whatsapp_confirmacao(:'jc_ana'::uuid);
-reset role;
-reset request.jwt.claims;
-select count(*) as avisos_de_confirmacao_da_ana_era_1 from notificacoes where sujeito_id=:'jc_ana'::uuid and tipo='jantar_confirmacao_inscricao';
-rollback to s_achado_anon;
+rollback to s_helper_anon;
+set role authenticated;
+set request.jwt.claims = '{"email":"cob20-admin@teste.invalido","role":"authenticated"}';
+savepoint s_helper_logado;
+\echo '-- nem logado, nem admin: so roda por dentro das funcoes que a chamam — deve FALHAR'
+select _jantar_enfileirar_whatsapp_confirmacao(:'jc_ana'::uuid);
+rollback to s_helper_logado;
 
 reset role;
 reset request.jwt.claims;

@@ -21,6 +21,12 @@
 --   6. reservas.ocupado_por (20260909120000)
 --   7. _garantir_reserva nao duplica (20260918090000) — so a parte
 --      sequencial; a corrida de verdade precisaria de duas conexoes
+--
+-- E as correcoes de 05/10/2026 (achados deste teste):
+--   faixa de quarto com 4 digitos nao e mais cortada (20261005090000);
+--   CIO com reserva principal compra quarto extra, e "a reserva do CIO"
+--   continua sendo a principal (20261005100000); staff de outro evento
+--   nao lista nem bloqueia quarto (20261005110000)
 --   8. etiqueta de quarto de equipe leva o rotulo como empresa
 --      (20261001240000)
 -- =====================================================================
@@ -66,18 +72,20 @@ select pa.id as part from participantes pa join gestores g on g.id=pa.gestor_id
 
 set role authenticated;
 set request.jwt.claims = '{"email":"cob13-admin@teste.invalido","role":"authenticated"}';
--- numeros de 3 digitos de proposito: ver o ACHADO logo abaixo
 select (admin_criar_faixa_quartos('cob13', 301, 306, 'duplo', 'B13') ->> 'criados')::int = 6 as criou_seis_ok;
 
-savepoint s_achado_lpad;
-\echo '-- ACHADO (05/10/2026): faixa com numero de 4 digitos. admin_criar_faixa_quartos'
-\echo '-- faz lpad(numero, 3) — que no Postgres TRUNCA o que passa de 3: 1301..1306'
-\echo '-- viram todos "130", so o primeiro entra e a funcao devolve criados=1 sem'
-\echo '-- erro. Vem do baseline (24/08), nao de migration nova. Esperado: 6 quartos.'
-select admin_criar_faixa_quartos('cob13', 1301, 1306, 'duplo', 'B13') ->> 'criados' as criados_de_6;
-select array_agg(numero order by numero) as numeros_gravados
+-- faixa de 4 digitos fica so dentro deste savepoint: o resto do teste
+-- conta os 6 quartos 301..306
+savepoint s_faixa_4_digitos;
+\echo '-- faixa 1301..1306: seis quartos com o numero inteiro (antes o lpad cortava'
+\echo '-- em "130" e so um entrava — 20261005090000) — deve PASSAR'
+select (admin_criar_faixa_quartos('cob13', 1301, 1306, 'duplo', 'B13') ->> 'criados')::int = 6 as faixa_4_digitos_ok;
+select array_agg(numero order by numero) = array['1301','1302','1303','1304','1305','1306'] as numeros_inteiros_ok
 from admin_listar_quartos_individual('cob13','130');
-rollback to s_achado_lpad;
+\echo '-- e numero curto continua completado com zero (7 -> 007) — deve PASSAR'
+select (admin_criar_faixa_quartos('cob13', 7, 7, 'single') ->> 'criados')::int = 1 as criou_007;
+select count(*) = 1 as zero_a_esquerda_ok from admin_listar_quartos_individual('cob13','007');
+rollback to s_faixa_4_digitos;
 reset role;
 reset request.jwt.claims;
 
@@ -134,14 +142,14 @@ select admin_definir_status_quarto(
 \echo '-- quarto bloqueado some dos livres pra atribuir — deve PASSAR'
 select not exists (select 1 from admin_quartos_livres('cob13') where numero='306') as sumiu_dos_livres_ok;
 set request.jwt.claims = '{"email":"cob13-fora@teste.invalido","role":"authenticated"}';
-savepoint s_achado_escopo;
-\echo '-- ACHADO (05/10/2026): staff de OUTRO evento (sem admin_eventos pro cob13)'
-\echo '-- lista os quartos e bloqueia/desbloqueia quarto do cob13. As duas funcoes'
-\echo '-- (admin_listar_quartos_individual, admin_definir_status_quarto) checam so'
-\echo '-- _exige_staff(), nao o escopo por evento de 10/11. Esperado pelo padrao: recusar.'
-select count(*) as quartos_que_o_staff_de_fora_ve from admin_listar_quartos_individual('cob13');
-select admin_definir_status_quarto(:'q2'::uuid, 'bloqueado') ->> 'ok' = 'true' as staff_de_fora_bloqueou;
-rollback to s_achado_escopo;
+savepoint s_escopo_lista;
+\echo '-- staff de OUTRO evento lista os quartos do cob13 (20261005110000) — deve FALHAR'
+select count(*) from admin_listar_quartos_individual('cob13');
+rollback to s_escopo_lista;
+savepoint s_escopo_bloqueio;
+\echo '-- staff de OUTRO evento bloqueia quarto do cob13 — deve FALHAR'
+select admin_definir_status_quarto(:'q2'::uuid, 'bloqueado');
+rollback to s_escopo_bloqueio;
 set request.jwt.claims = '{"email":"cob13-staff@teste.invalido","role":"authenticated"}';
 
 savepoint s_status_inv;
@@ -217,17 +225,28 @@ set request.jwt.claims = '{"email":"cio13@teste.invalido","role":"authenticated"
 \echo '-- 306 (avulso) desbloqueado: aparece 1 livre pro CIO — deve PASSAR'
 select (select livres from part_disponibilidade('cob13') where tipo='duplo') = 1 as um_livre_ok;
 
-savepoint s_achado_extra;
-\echo '-- ACHADO (05/10/2026): CIO que JA TEM a reserva principal tenta comprar'
-\echo '-- quarto extra. 20260930140000 diz que isso volta a existir, mas o'
-\echo '-- indice unico reservas_participante_ativa_uk (20260918090000, de quando'
-\echo '-- o CIO nao comprava extra) so deixa UMA reserva ativa por participante.'
-\echo '-- Hoje estoura com duplicate key. Decisao do organizador — ver LEIA-ME.'
-select part_comprar_quarto('cob13', 'duplo');
-rollback to s_achado_extra;
+\echo '-- CIO que JA TEM a reserva principal compra o extra (antes: duplicate key no'
+\echo '-- indice unico — 20261005100000) e leva o 306 — deve PASSAR'
+select part_comprar_quarto('cob13', 'duplo') ->> 'reserva_id' as res_extra \gset
+select count(*) = 2 and bool_or(origem='extra' and quarto_numero='306')
+       and bool_or(origem<>'extra' and quarto_numero='303') as principal_e_extra_ok
+from part_listar_meus_quartos('cob13');
+\echo '-- o formulario da hospedagem principal continua so com a principal — deve PASSAR'
+select part_salvar_ocupantes_extra(:'res_extra'::uuid, '[{"nome":"Sogra Cob13"}]'::jsonb) ->> 'ok' as encheu_extra;
+select count(*) = 1 and bool_and(nome ilike 'cio cob treze') as rooming_principal_ok from part_listar_rooming('cob13');
+reset role;
+reset request.jwt.claims;
+\echo '-- _garantir_reserva segue devolvendo a principal, nao o extra — deve PASSAR'
+select _garantir_reserva(:'part'::uuid) = :'res_cio'::uuid as garantir_principal_ok;
+set role authenticated;
+set request.jwt.claims = '{"email":"cob13-staff@teste.invalido","role":"authenticated"}';
+\echo '-- e o CIO aparece UMA vez no painel, com o quarto da principal — deve PASSAR'
+select count(*) = 1 and bool_and(quarto = '303') as painel_uma_linha_ok
+from admin_rel_painel('cob13') where participante_id=:'part'::uuid;
+set request.jwt.claims = '{"email":"cio13@teste.invalido","role":"authenticated"}';
+select part_cancelar_quarto_extra(:'res_extra'::uuid) ->> 'ok' as devolveu_o_306;
 
--- a regra do pool em si se prova com um CIO que ainda nao tem reserva
--- nenhuma (rooming nao preenchido) — ai o indice nao atrapalha
+-- e com um CIO que ainda nao tem reserva nenhuma (rooming nao preenchido)
 set request.jwt.claims = '{"email":"cio13b@teste.invalido","role":"authenticated"}';
 \echo '-- CIO sem reserva compra e leva exatamente o 306 (o unico avulso) — deve PASSAR'
 select part_comprar_quarto('cob13', 'duplo') ->> 'ok' = 'true' as cio_comprou_ok;

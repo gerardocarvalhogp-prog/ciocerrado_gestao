@@ -131,25 +131,36 @@ a reserva testada não tinha ocupante e a função não devolvia nada. O
 - Dentro de `\echo '...'` não pode ter apóstrofo: o psql lê como começo
   de string e engole o resto da linha.
 
-## Achados em aberto (05/10/2026)
+## Achados de 05/10/2026 — todos corrigidos
 
-Registrados como `ACHADO` nos testes, nenhum consertado — decisão do
-organizador:
+Os testes `13`–`23` acharam 12 comportamentos que divergiam do que a
+migration ou o CLAUDE.md diziam. Ficaram uma rodada marcados como
+`ACHADO`; o organizador mandou corrigir todos no mesmo dia, e cada bloco
+virou "deve PASSAR"/"deve FALHAR" de verdade, citando a migration:
 
-| teste | o que acontece hoje |
-|---|---|
-| `13` | `admin_criar_faixa_quartos` trunca número de 4+ dígitos: `lpad(1301, 3)` vira `'130'`, a faixa 1301–1306 cria **um** quarto e devolve `criados: 1` sem erro (vem do baseline) |
-| `13` | CIO que já tem a reserva principal não consegue comprar quarto extra: o índice único `reservas_participante_ativa_uk` (18/09) só deixa uma reserva ativa por participante, e a compra voltou em 30/09 |
-| `13`, `14`, `23` | 6 funções com `p_evento_slug` checam só `_exige_staff()`, sem o escopo por evento de 10/11 — staff de outro evento lista quartos, bloqueia quarto, lê contrato/pagamento das cotas, cotas, patrocinadores e relatório do Lounge |
-| `17` | `patro_registrar_upload` aceita tipo que a cota não pede (vídeo) e logo além da quantidade da cota — só a tela deixa de oferecer |
-| `17` | arquivo **rejeitado** pelo admin continua contando como enviado: a pendência "arquivos enviados" segue concluída |
-| `19`, `23` | `admin_salvar_atividade` tem duas versões (7 e 8 parâmetros); chamada sem `p_tipo_presenca` dá "is not unique" |
-| `19` | atividade exclusiva casa a lista só por `participante:<id>`, mas CIO com rooming vira `ocupante:<id>` em `v_esperados` — some da lista da porta e o check-in recusa. No evento real todo CIO tem rooming |
-| `20` | `jantar_grupo_obter` estoura "column reference status is ambiguous" pra qualquer jantar — a tela de grupo de WhatsApp não carrega o estado |
-| `20` | convidado **novo** vindo da importação do Sympla entra confirmado e não recebe o aviso de WhatsApp (`v_existia` fica nulo quando a linha ainda não existe) |
-| `20`, `23` | `_jantar_enfileirar_whatsapp_confirmacao` (SECURITY DEFINER, sem checagem de papel) é executável por `anon` — falta `revoke ... from public` |
-| `20` | linha recusada na importação do jantar (pagamento pendente) já criou o gestor na base antes de ser recusada |
-| `20` | telefone fixo de 10 dígitos ganha o 9 na frente e vira um celular inexistente em `norm_telefone_e164` |
+| teste | o que acontecia | conserto |
+|---|---|---|
+| `13` | `admin_criar_faixa_quartos` cortava número de 4+ dígitos (`lpad(1301, 3)` = `'130'`): a faixa 1301–1306 criava **um** quarto, sem erro | `20261005090000` |
+| `13` | CIO com a reserva principal não conseguia comprar quarto extra (índice único de 18/09 × compra que voltou em 30/09) | `20261005100000` |
+| `13`, `14`, `23` | 6 funções com `p_evento_slug` (+ `admin_definir_status_quarto`) sem o escopo de staff por evento de 10/11 | `20261005110000` |
+| `17` | upload aceitava tipo que a cota não pede e logo além da quantidade | `20261005120000` |
+| `17` | arquivo rejeitado seguia fechando a pendência "arquivos enviados" | `20261005120000` |
+| `19`, `23` | `admin_salvar_atividade` com duas versões (7 e 8 parâmetros) | `20261005130000` |
+| `19` | atividade exclusiva não reconhecia CIO com rooming (`ocupante:<id>`) — sumia da lista da porta | `20261005130000` |
+| `20` | `jantar_grupo_obter` estourava "status is ambiguous" pra qualquer jantar | `20261005140000` |
+| `20` | convidado novo vindo do Sympla não recebia o aviso de WhatsApp | `20261005140000` |
+| `20`, `23` | `_jantar_enfileirar_whatsapp_confirmacao` executável por `anon` | `20261005140000` |
+| `20` | importação (jantar e evento) criava gestor a partir de linha recusada/cancelada | `20261005140000` |
+| `20` | telefone fixo ganhava o 9 e virava celular inexistente | `20261005140000` |
+
+O conserto do quarto extra mexeu em mais do que o índice: com mais de
+uma reserva ativa por CIO, todo lugar que lê "a reserva do CIO" passou a
+dizer qual (a principal, `origem <> 'extra'`) — `_garantir_reserva`,
+`part_meu_status`, `part_listar_rooming`, `v_painel_participantes` e a
+etapa de hospedagem em `v_pendencias_fatos`. O `13` cobre isso.
+
+O marcador `ACHADO` continua valendo pra rodadas futuras: comportamento
+que diverge e ainda espera decisão fica registrado, sem ser afirmado.
 
 ## O que saiu daqui
 

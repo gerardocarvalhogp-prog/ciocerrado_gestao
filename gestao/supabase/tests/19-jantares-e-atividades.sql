@@ -24,7 +24,9 @@
 --   6. sympla_status so 'pendente'/'criado' e o robo removido
 --      (20260921090000); criar ja com link vira 'criado'
 --      (20260928090000)
---   7. atividade geral x exclusiva (20260902220000)
+--   7. atividade geral x exclusiva (20260902220000); sem o overload
+--      orfao de admin_salvar_atividade, e a lista exclusiva reconhecendo
+--      o CIO que ja tem rooming (20261005130000, achados de 05/10/2026)
 -- =====================================================================
 
 \set ON_ERROR_STOP off
@@ -210,13 +212,9 @@ select admin_salvar_atividade(null,'cob19','Outra Cob19','2027-08-14','09:00','1
 select bool_and(case nome when 'Trilha Cob19' then tipo_presenca='exclusiva' else tipo_presenca='geral' end) as tipos_ok
 from admin_listar_atividades('cob19');
 
-savepoint s_achado_overload;
-\echo '-- ACHADO (05/10/2026): admin_salvar_atividade tem DUAS versoes (7 e 8 parametros)'
-\echo '-- — 20260902220000 criou a nova sem dropar a antiga, o mesmo problema que'
-\echo '-- 20260909170000 achou e consertou em admin_salvar_cota. A tela manda os 8 e'
-\echo '-- funciona; quem chamar sem p_tipo_presenca recebe "is not unique".'
-select admin_salvar_atividade(null,'cob19','Sem Tipo Cob19','2027-08-14','09:00','10:00','Sala');
-rollback to s_achado_overload;
+\echo '-- chamada sem p_tipo_presenca: uma funcao so (a de 7 parametros saiu —'
+\echo '-- 20261005130000), cai em geral — deve PASSAR'
+select admin_salvar_atividade(null,'cob19','Sem Tipo Cob19','2027-08-14','09:00','10:00','Sala') ->> 'ok' = 'true' as sem_tipo_ok;
 
 set request.jwt.claims = '{"email":"cob19-staff@teste.invalido","role":"authenticated"}';
 \echo '-- staff do evento define a lista fechada: Ana e Bruno — deve PASSAR'
@@ -240,21 +238,24 @@ reset role;
 reset request.jwt.claims;
 insert into atividade_convidados (atividade_id,participante_id) values (:'at_excl'::uuid,:'p_bruno'::uuid);
 select _garantir_reserva(:'p_bruno'::uuid) as res_bruno \gset
-insert into ocupantes (reserva_id,nome,tipo) values (:'res_bruno'::uuid,'Bruno Cob19','titular');
-select 'ocupante:' || id as cracha_bruno from ocupantes where reserva_id=:'res_bruno'::uuid \gset
+insert into ocupantes (reserva_id,nome,tipo) values
+  (:'res_bruno'::uuid,'Bruno Cob19','titular'),
+  (:'res_bruno'::uuid,'Esposa Bruno Cob19','adulto');
+select 'ocupante:' || id as cracha_bruno from ocupantes where reserva_id=:'res_bruno'::uuid and tipo='titular' \gset
+select 'ocupante:' || id as cracha_familiar from ocupantes where reserva_id=:'res_bruno'::uuid and tipo='adulto' \gset
 
 set role authenticated;
 set request.jwt.claims = '{"email":"cob19-staff@teste.invalido","role":"authenticated"}';
-savepoint s_achado_exclusiva;
-\echo '-- ACHADO (05/10/2026): Bruno esta na lista fechada, mas ja tem rooming. Em'
-\echo '-- v_esperados ele deixa de ser "participante:<id>" e passa a ser'
-\echo '-- "ocupante:<id>" — e a exclusiva so casa a lista por "participante:". Ele'
-\echo '-- some da lista da porta e o check-in pelo cracha e recusado. No evento de'
-\echo '-- verdade todo CIO tem rooming: a atividade exclusiva fica inutilizavel.'
-select count(*) filter (where nome ilike 'bruno%') as bruno_aparece_na_lista_da_porta
+\echo '-- Bruno esta na lista fechada e ja tem rooming: em v_esperados ele virou'
+\echo '-- "ocupante:<id>". Continua na lista da porta (antes sumia — 20261005130000)'
+\echo '-- e o check-in pelo cracha do quarto entra — deve PASSAR'
+select count(*) filter (where nome ilike 'bruno%') = 1 and count(*) = 2 as bruno_na_porta_ok
 from atividade_checkin_listar(:'at_excl'::uuid);
-select atividade_checkin_registrar(:'at_excl'::uuid, :'cracha_bruno');
-rollback to s_achado_exclusiva;
+select (atividade_checkin_registrar(:'at_excl'::uuid, :'cracha_bruno') ->> 'ja_estava')::boolean = false as bruno_entrou_ok;
+\echo '-- a familiar que dorme no quarto do Bruno NAO herda o lugar dele na lista — deve FALHAR'
+savepoint s_familiar;
+select atividade_checkin_registrar(:'at_excl'::uuid, :'cracha_familiar');
+rollback to s_familiar;
 
 reset role;
 reset request.jwt.claims;

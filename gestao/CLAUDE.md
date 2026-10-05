@@ -119,7 +119,7 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
 **29 tabelas, 6 views, 368 colunas, 143 funções, 37 políticas de RLS,
-8 migrations.** Desatualizado — são **135 migrations** em 05/10/2026, mas os
+8 migrations.** Desatualizado — são **141 migrations** em 05/10/2026, mas os
 outros números (tabelas/views/colunas/funções/políticas) não foram reconferidos
 desde então porque exigem consulta ao catálogo do banco hospedado, que este
 arquivo não tem como fazer sozinho. Antes de confiar nesses quatro números,
@@ -220,15 +220,18 @@ e isso não foi montado.
 
 `supabase/tests/confere.py` roda os testes e diz sozinho se toda recusa
 esperada recusou e toda checagem `_ok` bateu — antes, a saída era lida a
-olho. Os testes registraram **12 achados** (comportamento que diverge do
-que a migration ou este arquivo dizem), marcados `ACHADO` nos testes e
-listados em `supabase/tests/LEIA-ME.md` — nenhum foi consertado, todos
-esperam decisão do organizador. Os mais sérios: atividade exclusiva não
-reconhece CIO com rooming; `jantar_grupo_obter` quebrada pra qualquer
-jantar; convidado novo vindo do Sympla sem aviso de WhatsApp; um helper
-de WhatsApp executável por `anon`; CIO com reserva não consegue comprar
-quarto extra; faixa de quarto com 4 dígitos truncada; 6 funções sem
-escopo de staff por evento.
+olho. Os testes acharam **12 comportamentos** que divergiam do que a
+migration ou este arquivo diziam (atividade exclusiva que não reconhecia
+CIO com rooming, `jantar_grupo_obter` quebrada, convidado novo do Sympla
+sem aviso de WhatsApp, helper de WhatsApp executável por `anon`, CIO com
+reserva sem conseguir comprar quarto extra, faixa de quarto com 4 dígitos
+cortada, funções sem escopo de staff por evento...). **Todos corrigidos
+no mesmo dia** (`20261005090000` a `20261005140000`), a pedido do
+organizador, e os testes afirmam o comportamento novo — lista com a
+migration de cada um em `supabase/tests/LEIA-ME.md`. Essas 6 migrations
+estão aplicadas e testadas no banco local; **ainda não foram pro
+hospedado** (`supabase db push` é decisão do organizador — o projeto é o
+mesmo do sistema de massagem em produção).
 
 Daqui pra frente a regra é a de sempre: migration de comportamento nova
 entra com teste no mesmo commit. O `23` olha o catálogo inteiro (função

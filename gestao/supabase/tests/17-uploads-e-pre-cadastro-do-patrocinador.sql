@@ -20,6 +20,8 @@
 --   6. pre-cadastro por link (20260909160000): anon abre e envia com o
 --      token, so admin aprova/reprova, link vira so-leitura depois de
 --      decidido; token sem pgcrypto (20260929090000)
+--   7. o banco confere a cota no upload, e arquivo rejeitado nao fecha a
+--      pendencia (20261005120000, achados deste teste em 05/10/2026)
 -- =====================================================================
 
 \set ON_ERROR_STOP off
@@ -82,13 +84,18 @@ savepoint s_ordem_inv;
 select patro_registrar_upload(:'pa'::uuid,'logo','x/y.pdf','y.pdf',1,0);
 rollback to s_ordem_inv;
 
-savepoint s_achado_video;
-\echo '-- ACHADO (05/10/2026): a cota NAO pede video, mas patro_registrar_upload aceita'
-\echo '-- video (e logo de ordem 3, alem das 2 da cota). So a tela deixa de oferecer o'
-\echo '-- slot — o banco nao confere a cota. Pelo CLAUDE.md, regra fica na funcao.'
-select patro_registrar_upload(:'pa'::uuid,'video',:'pa'||'/video/1.mp4','v.mp4') ->> 'ok' as video_fora_da_cota_aceito,
-       patro_registrar_upload(:'pa'::uuid,'logo',:'pa'||'/logo/3.pdf','l3.pdf',1,3) ->> 'ok' as logo_3_aceito;
-rollback to s_achado_video;
+savepoint s_video_fora;
+\echo '-- video, que a cota NAO pede (20261005120000) — deve FALHAR'
+select patro_registrar_upload(:'pa'::uuid,'video',:'pa'||'/video/1.mp4','v.mp4');
+rollback to s_video_fora;
+savepoint s_logo_3;
+\echo '-- logo 3, alem dos 2 da cota — deve FALHAR'
+select patro_registrar_upload(:'pa'::uuid,'logo',:'pa'||'/logo/3.pdf','l3.pdf',1,3);
+rollback to s_logo_3;
+savepoint s_banner_2;
+\echo '-- banner de ordem 2 (so o logo tem varios) — deve FALHAR'
+select patro_registrar_upload(:'pa'::uuid,'banner',:'pa'||'/banner/2.pdf','b2.pdf',1,2);
+rollback to s_banner_2;
 
 set request.jwt.claims = '{"email":"patro17b@teste.invalido","role":"authenticated"}';
 savepoint s_alheio;
@@ -147,10 +154,9 @@ select status = 'concluida' as concluida_ok
 from v_pendencias where sujeito_id=:'pa'::uuid and etapa_chave='arquivos_enviados';
 
 update patrocinador_uploads set status='rejeitado' where patrocinador_id=:'pa'::uuid and tipo='banner';
-\echo '-- ACHADO (05/10/2026): banner REJEITADO pelo admin continua contando como'
-\echo '-- "arquivo enviado" — a pendencia segue concluida e ninguem e cobrado de'
-\echo '-- mandar outro. v_pendencias_fatos conta a linha, nao o status dela.'
-select status as status_da_pendencia_com_banner_rejeitado
+\echo '-- banner REJEITADO pelo admin nao conta como enviado: a pendencia volta a'
+\echo '-- ficar aberta (antes seguia concluida — 20261005120000) — deve PASSAR'
+select status = 'pendente' as rejeitado_reabre_ok
 from v_pendencias where sujeito_id=:'pa'::uuid and etapa_chave='arquivos_enviados';
 
 \echo ''

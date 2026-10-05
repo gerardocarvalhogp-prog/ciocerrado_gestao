@@ -113,44 +113,41 @@ select bool_and(has_function_privilege('anon', p.oid, 'execute')) and count(*) =
 from pg_proc p where p.pronamespace='gestao'::regnamespace
   and p.proname in ('part_autocadastro','pre_cadastro_obter','pre_cadastro_enviar','is_staff','meus_patrocinadores');
 
-\echo '-- ACHADO (05/10/2026): SECURITY DEFINER executavel por anon FORA dessa lista.'
-\echo '-- Funcao SECURITY DEFINER roda com o dono (postgres), entao anon executar e'
-\echo '-- anon escrever onde ela escreve. Esperado: lista vazia.'
-select p.proname as definer_exposta_a_anon
+\echo '-- e NENHUMA outra SECURITY DEFINER e executavel por anon: ela roda com o dono'
+\echo '-- (postgres), entao anon executar e anon escrever onde ela escreve. O helper de'
+\echo '-- WhatsApp estava aqui ate 20261005140000 — deve PASSAR'
+select coalesce(string_agg(p.proname, ', '), '') = '' as nenhuma_definer_exposta_ok
 from pg_proc p
 where p.pronamespace='gestao'::regnamespace and p.prosecdef
   and has_function_privilege('anon', p.oid, 'execute')
   and p.prorettype <> 'trigger'::regtype
-  and p.proname not in ('part_autocadastro','pre_cadastro_obter','pre_cadastro_enviar','is_staff','meus_patrocinadores')
-order by 1;
+  and p.proname not in ('part_autocadastro','pre_cadastro_obter','pre_cadastro_enviar','is_staff','meus_patrocinadores');
 
 \echo ''
 \echo '#############################################'
 \echo '# 6 · SEM OVERLOAD ORFAO'
 \echo '#############################################'
-\echo '-- ACHADO (05/10/2026): nome de funcao com mais de uma assinatura no gestao.'
-\echo '-- CREATE OR REPLACE com assinatura nova cria uma SEGUNDA funcao em vez de'
-\echo '-- trocar (20260909170000 ja achou e consertou isso uma vez). Esperado: vazio.'
-select proname as funcao_com_overload, count(*) as versoes
-from pg_proc where pronamespace='gestao'::regnamespace
-group by proname having count(*) > 1 order by 1;
+\echo '-- nenhum nome de funcao com mais de uma assinatura: CREATE OR REPLACE com'
+\echo '-- assinatura nova cria uma SEGUNDA funcao em vez de trocar (consertado em'
+\echo '-- admin_salvar_cota em 20260909170000 e em admin_salvar_atividade em'
+\echo '-- 20261005130000) — deve PASSAR'
+select coalesce(string_agg(proname, ', '), '') = '' as sem_overload_ok
+from (select proname from pg_proc where pronamespace='gestao'::regnamespace
+      group by proname having count(*) > 1) x;
 
 \echo ''
 \echo '#############################################'
 \echo '# 7 · ESCOPO DE STAFF POR EVENTO'
 \echo '#############################################'
-\echo '-- ACHADO (05/10/2026): funcao que recebe p_evento_slug e so chama _exige_staff()'
-\echo '-- — staff associado a OUTRO evento le os dados deste. 10/11 fecharam isso em'
-\echo '-- dezenas de funcoes; estas ficaram de fora (algumas sao de depois de 31/08,'
-\echo '-- outras foram recriadas depois). Esperado pelo padrao: vazio. O 13 e o 14'
-\echo '-- provam o vazamento rodando duas delas como staff de fora.'
-select p.proname as sem_escopo_por_evento
+\echo '-- nenhuma funcao que recebe p_evento_slug checa so _exige_staff() — staff de'
+\echo '-- OUTRO evento leria os dados deste. As 6 que restavam foram fechadas em'
+\echo '-- 20261005110000; o 13 e o 14 provam rodando como staff de fora — deve PASSAR'
+select coalesce(string_agg(p.proname, ', '), '') = '' as escopo_por_evento_ok
 from pg_proc p
 where p.pronamespace='gestao'::regnamespace
   and pg_get_function_arguments(p.oid) like '%p_evento_slug%'
   and p.prosrc ~ '_exige_staff\(\)'
-  and p.prosrc !~ '_exige_staff_do_evento|_exige_admin\(\)'
-order by 1;
+  and p.prosrc !~ '_exige_staff_do_evento|_exige_admin\(\)';
 
 rollback;
 

@@ -19,9 +19,10 @@
 --   5. cobranca grava o sujeito, bloqueia reenvio em 3 dias, e e'
 --      pulada no envio se a pendencia ja foi resolvida; a lista mostra
 --      quando foi a ultima cobranca (20260901150000)
+--   6. staff de outro evento nao le o financeiro da cota (20261005110000)
 --
 -- A compra de quarto extra pelo CIO (20260901160000, refeita em
--- 20260930140000) esta no 13 — inclusive o ACHADO do indice unico.
+-- 20260930140000, consertada em 20261005100000) esta no 13.
 -- =====================================================================
 
 \set ON_ERROR_STOP off
@@ -160,13 +161,14 @@ select admin_definir_pagamento_patrocinador(:'pat'::uuid, 1, 'pago');
 rollback to s_pag_staff;
 
 set request.jwt.claims = '{"email":"cob14-fora@teste.invalido","role":"authenticated"}';
-savepoint s_achado_fin;
-\echo '-- ACHADO (05/10/2026): staff de OUTRO evento le o contrato e o pagamento das'
-\echo '-- cotas do cob14. admin_listar_financeiro_cotas e admin_financeiro_cotas_resumo'
-\echo '-- checam so _exige_staff(), nao o escopo por evento de 10/11. Esperado: recusar.'
-select count(*) as linhas_que_o_staff_de_fora_ve from admin_listar_financeiro_cotas('cob14');
-select r ->> 'contratado' as contratado_visto_de_fora from admin_financeiro_cotas_resumo('cob14') r;
-rollback to s_achado_fin;
+savepoint s_fin_fora;
+\echo '-- staff de OUTRO evento le o contrato das cotas do cob14 (20261005110000) — deve FALHAR'
+select count(*) from admin_listar_financeiro_cotas('cob14');
+rollback to s_fin_fora;
+savepoint s_resumo_fora;
+\echo '-- nem o resumo financeiro — deve FALHAR'
+select admin_financeiro_cotas_resumo('cob14');
+rollback to s_resumo_fora;
 
 \echo ''
 \echo '#############################################'
