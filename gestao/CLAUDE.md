@@ -102,8 +102,13 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
   padrão**; produção é flag explícita. Manter esse comportamento.
 - **Google Drive:** conta de serviço `robo-fichas` só tem leitura e **não tem cota para
   upload em My Drive** (403 `storageQuotaExceeded`) — upload usa OAuth de usuário.
-- **E-mail corporativo @ciocerrado.com.br** fica na **Skymail**, não no Google Workspace;
-  a rede do escritório às vezes bloqueia portas SMTP de saída. Preferir Resend/API.
+- **E-mail corporativo @ciocerrado.com.br** migrou da Skymail pro **Google
+  Workspace** (informado pelo organizador em 06/10/2026). O Workspace só
+  recebe/hospeda as caixas; o sistema continua mandando e-mail pelo
+  **Resend** (API), não por SMTP — a rede do escritório às vezes bloqueia
+  portas SMTP de saída. Os registros do Resend (DKIM `resend._domainkey` e o
+  subdomínio de envio `send`) não conflitam com o SPF do Google na raiz do
+  domínio; o que não pode é ter dois registros SPF no mesmo nome.
 - Rooming list: patrocinadores costumam preencher a coluna "Associação" com o nome da
   empresa em vez do número, agrupando tudo num bloco só. O sistema deve validar isso na
   entrada, em vez de deixar para a revisão manual.
@@ -176,7 +181,8 @@ rode de novo a consulta do README §8.
   organizador** (ver "O que depende do organizador" abaixo): a conta só
   deixa mandar e-mail pro próprio endereço da conta
   (`gerardocarvalhogp@gmail.com`) até `ciocerrado.com.br` ser verificado
-  em resend.com/domains (registros SPF/DKIM, DNS fica na Skymail). Até
+  em resend.com/domains (registros SPF/DKIM no DNS do domínio — onde foram
+  apontados os MX pro Google Workspace em 06/10/2026). Até
   lá, todo aviso real (contrato enviado/assinado, rooming confirmado)
   falha com 403 pra qualquer destinatário que não seja essa conta —
   bloqueia o uso de verdade do botão "Enviar toda a fila" (aba Equipe).
@@ -314,8 +320,8 @@ código.
   participantes de ~130, e `sympla_event_id` está vazio
 - credenciais do `integracao.py` (Sympla, Autentique, Resend)
 - domínio `ciocerrado.com.br` verificado no Resend (registros SPF/DKIM
-  na Skymail) — sem isso, nenhum e-mail real sai da fila (ver "achados"
-  acima)
+  no DNS do domínio, o mesmo onde os MX foram pro Google Workspace) — sem
+  isso, nenhum e-mail real sai da fila (ver "achados" acima)
 - criar o Experience 2027 no Sympla e cadastrar o id dele no painel
   (aba Estrutura) — hoje só existe o "Teste Ferramenta 2027"; até lá,
   `integracao.py --sympla` no `cerrado2027` só avisa "Evento sem

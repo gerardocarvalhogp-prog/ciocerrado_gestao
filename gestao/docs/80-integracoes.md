@@ -113,9 +113,9 @@ chamada — confirmado em teste isolado nesta mesma apuração: a função recus
 enviar por 403 porque o domínio `ciocerrado.com.br` ainda não está verificado
 no Resend (sem SPF/DKIM no DNS), não por estar em modo de teste.
 
-**Nota de infraestrutura:** as caixas corporativas `@ciocerrado.com.br` ficam na
-Skymail, não no Google Workspace, e a rede do escritório bloqueia portas SMTP de
-saída em alguns momentos. Isso afeta scripts que enviam por SMTP direto — o
+**Nota de infraestrutura:** as caixas corporativas `@ciocerrado.com.br` migraram
+da Skymail pro Google Workspace em 06/10/2026; a rede do escritório bloqueia
+portas SMTP de saída em alguns momentos. Isso afeta scripts que enviam por SMTP direto — o
 sistema, por usar API, não sofre com isso. Mas a falha de domínio não
 verificado é silenciosa em outro sentido: o comentário no próprio código da
 função alerta que, se o domínio não estivesse configurado de jeito nenhum (em

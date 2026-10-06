@@ -47,8 +47,9 @@ const PRODUCAO = (Deno.env.get("AMBIENTE") ?? "").trim().toLowerCase() === "prod
 // ATENCAO: ciocerrado.com.br precisa estar VERIFICADO no Resend (os
 // registros SPF/DKIM no DNS). Sem isso o Resend aceita a chamada,
 // devolve 200, e o e-mail nao chega em ninguem — falha silenciosa, a
-// pior de todas. O dominio fica na Skymail, entao os registros entram
-// no painel de DNS de la, nao no Google.
+// pior de todas. Os registros entram no DNS do dominio (o mesmo onde os
+// MX foram apontados pro Google Workspace em 06/10/2026); o Workspace so
+// hospeda as caixas, quem envia continua sendo o Resend.
 const REMETENTE  = Deno.env.get("REMETENTE") ?? "CIO Cerrado <contato@ciocerrado.com.br>";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
