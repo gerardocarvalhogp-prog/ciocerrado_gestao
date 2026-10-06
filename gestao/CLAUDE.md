@@ -119,7 +119,7 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
 **29 tabelas, 6 views, 368 colunas, 143 funções, 37 políticas de RLS,
-8 migrations.** Desatualizado — são **142 migrations** em 05/10/2026, mas os
+8 migrations.** Desatualizado — são **143 migrations** em 06/10/2026, mas os
 outros números (tabelas/views/colunas/funções/políticas) não foram reconferidos
 desde então porque exigem consulta ao catálogo do banco hospedado, que este
 arquivo não tem como fazer sozinho. Antes de confiar nesses quatro números,
@@ -188,9 +188,10 @@ rode de novo a consulta do README §8.
   string) via silenciosamente os dados do evento de produção em vez de um
   erro claro. Corrigido: as duas telas agora bloqueiam com mensagem
   explícita ("Link incompleto") em vez de adivinhar o evento.
-  `admin.html`/`checkin.html` têm o mesmo padrão mas não foram mexidas —
-  são operadas por equipe logada com seletor de evento visível, risco bem
-  menor que um link de e-mail de uso único.
+  `admin.html`/`checkin.html` tinham o mesmo padrão — corrigidas em
+  06/10/2026: sem `?evento=`, usam o único evento visível pra pessoa ou
+  pedem a escolha no seletor; slug inválido avisa em vez de trocar de
+  evento calado.
 
 ### O que está verificado e o que não está
 
@@ -233,6 +234,16 @@ organizador, e os testes afirmam o comportamento novo — lista com a
 migration de cada um em `supabase/tests/LEIA-ME.md`. Mais uma sobra da
 mesma varredura — `admin_preparar_cobranca` sem escopo por evento — saiu
 em `20261005150000`. Todas no hospedado desde 05/10/2026.
+
+Auditoria de guarda em 06/10/2026, varrendo o catálogo: toda `admin_*` e
+`jantar_*` checa papel na primeira linha; `part_*`/`patro_*` checam logo
+depois de descobrir de quem é o recurso. 28 auxiliares internos (`_*`)
+estavam executáveis por qualquer usuário logado — fechados em
+`20261006090000`. Sem checagem, por desenho (só leitura de dado do evento
+pra quem está logado): `listar_cotas`, `patro_manual`,
+`part_disponibilidade`, `patro_disponibilidade`; e `part_autocadastro`
+(público). `admin.html`/`checkin.html` deixaram de cair calados no
+`cerrado2027` sem `?evento=` (mesmo erro de rooming/portal de 01/10).
 
 Daqui pra frente a regra é a de sempre: migration de comportamento nova
 entra com teste no mesmo commit. O `23` olha o catálogo inteiro (função

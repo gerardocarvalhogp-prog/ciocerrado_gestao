@@ -221,7 +221,11 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
 // =====================================================================
 const SUPABASE_URL  = "https://jlvcjqfrsxxexflvwbvn.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsdmNqcWZyc3h4ZXhmbHZ3YnZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzY0NTAsImV4cCI6MjEwMTM1MjQ1MH0.SkY0N_k2oaYAqZUpZCmm0GBY3j8vsZzB5oX4Am75MnE";
-let EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+// Sem evento padrao: link sem ?evento= caia calado no cerrado2027 — no
+// balcao, isso e check-in registrado no evento errado sem ninguem ver.
+// Mesmo erro corrigido em rooming.html/portal.html em 01/10/2026; aqui
+// o seletor pede a escolha (ou usa o unico evento visivel).
+let EVENTO = new URLSearchParams(location.search).get("evento") || "";
 const LOCAL  = new URLSearchParams(location.search).get("local")  || null;
 // modo jantar: ?jantar=<uuid> troca o escopo inteiro. Jantar nao tem
 // evento_id (design deliberado — jantares sao standalone), entao
@@ -426,14 +430,26 @@ async function carregarSeletorEventos(){
       return;
     }
 
-    if(!evs.some(e => e.slug === EVENTO)) EVENTO = evs[0].slug;
+    // Nunca adivinhar o evento (mesma regra de admin.html): um so
+    // visivel, usa ele; varios, espera a escolha; slug invalido, avisa.
+    const pedido = EVENTO;
+    if(!evs.some(e => e.slug === EVENTO)){
+      EVENTO = evs.length === 1 ? evs[0].slug : "";
+      if(EVENTO) fixarEventoNaUrl(EVENTO);
+    }
 
     const rotulo = { rascunho:"rascunho", aberto:"aberto", encerrado:"encerrado" };
-    sel.innerHTML = evs.map(e => `
+    sel.innerHTML = (EVENTO ? "" : `<option value="" selected disabled>— escolha o evento —</option>`) +
+      evs.map(e => `
       <option value="${esc(e.slug)}" ${e.slug === EVENTO ? "selected" : ""}>
         ${esc(e.nome)} · ${rotulo[e.status] || e.status}
       </option>`).join("");
     sel.disabled = false;
+
+    if(pedido && pedido !== EVENTO){
+      aviso(`O evento "${pedido}" do link não existe ou você não tem acesso a ele.` +
+        (EVENTO ? " Abrimos o único evento disponível pra você." : " Escolha o evento no seletor acima."));
+    }
 
     sel.addEventListener("change", () => trocarEvento(sel.value));
   }catch(e){
@@ -442,14 +458,18 @@ async function carregarSeletorEventos(){
   }
 }
 
-async function trocarEvento(slug){
-  EVENTO = slug;
-
-  // mantem o link compartilhavel: quem copiar a URL abre no mesmo evento
+// mantem o link compartilhavel: quem copiar a URL abre no mesmo evento
+function fixarEventoNaUrl(slug){
   const u = new URL(location.href);
   u.searchParams.set("evento", slug);
   history.replaceState(null, "", u);
   atualizarLinksNav();
+}
+
+async function trocarEvento(slug){
+  EVENTO = slug;
+  fixarEventoNaUrl(slug);
+  aviso("");
 
   await carregar(); await placar();
 }
@@ -484,6 +504,7 @@ async function placar(){
       <div class="pend"><div class="n">${ATIVIDADE_CACHE.length-feitos}</div><div class="r">Pendentes</div></div>`;
     return;
   }
+  if(!EVENTO){ $("#placar").innerHTML = ""; return; }
   try{
     const r = await rpc("checkin_resumo", { p_evento_slug: EVENTO });
     $("#placar").innerHTML = `
@@ -495,6 +516,11 @@ async function placar(){
 
 async function carregar(){
   const termo = $("#termo").value.trim();
+
+  if(!JANTAR && !ATIVIDADE && !EVENTO){
+    $("#lista").innerHTML = `<div class="vazio">Escolha o evento no seletor acima pra começar o check-in.</div>`;
+    return;
+  }
 
   if(JANTAR){
     try{

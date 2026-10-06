@@ -325,7 +325,12 @@ const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // Evento ativo. Vem da URL na primeira carga e depois muda pelo
 // seletor do cabecalho — as duas abas globais (Cadastro e Equipe)
 // ignoram este valor.
-let EVENTO = new URLSearchParams(location.search).get("evento") || "cerrado2027";
+// Sem evento padrao: link sem ?evento= (ou com um que nao existe) caia
+// calado no cerrado2027 / no primeiro da lista — o mesmo erro corrigido
+// em rooming.html e portal.html em 01/10/2026. Aqui a equipe tem o
+// seletor, entao em vez de bloquear a tela pede a escolha (ou usa o
+// unico evento que a pessoa enxerga). Ver carregarSeletorEventos.
+let EVENTO = new URLSearchParams(location.search).get("evento") || "";
 
 // Abas que NAO dependem do evento: a base de gestores e a equipe do
 // painel valem para todas as edicoes.
@@ -668,6 +673,11 @@ function fecharMenu(){
 // ABAS[ABA_ATUAL]() direto, um segundo caminho que nao passava por
 // nenhum guard.
 function desenharAba(nome){
+  if(!EVENTO && !ABAS_GLOBAIS.includes(nome)){
+    $("#conteudo").innerHTML =
+      `<div class="vazio">Escolha o evento no seletor acima pra começar.</div>`;
+    return;
+  }
   if(ABAS_SO_ADMIN.has(nome) && !SOU_ADMIN){
     $("#conteudo").innerHTML =
       `<div class="vazio">Esta ação exige perfil de administrador. Seu acesso é de staff.</div>`;
@@ -721,16 +731,30 @@ async function carregarSeletorEventos(){
       return;
     }
 
-    // se a URL trouxe um slug que nao existe, cai no primeiro da lista
-    // em vez de deixar todas as abas vazias sem explicar por que
-    if(!evs.some(e => e.slug === EVENTO)) EVENTO = evs[0].slug;
+    // Nunca adivinhar o evento: com um so visivel pra esta pessoa, usa
+    // ele; com varios, a tela fica parada ate escolherem no seletor.
+    // Slug do link que nao existe (ou que o staff nao enxerga) avisa em
+    // vez de trocar de evento calado.
+    const pedido = EVENTO;
+    if(!evs.some(e => e.slug === EVENTO)){
+      EVENTO = evs.length === 1 ? evs[0].slug : "";
+      if(EVENTO) fixarEventoNaUrl(EVENTO);
+    }
 
     const rotulo = { rascunho:"rascunho", aberto:"aberto", encerrado:"encerrado" };
-    sel.innerHTML = evs.map(e => `
+    sel.innerHTML = (EVENTO ? "" : `<option value="" selected disabled>— escolha o evento —</option>`) +
+      evs.map(e => `
       <option value="${esc(e.slug)}" ${e.slug === EVENTO ? "selected" : ""}>
         ${esc(e.nome)} · ${rotulo[e.status] || e.status}
       </option>`).join("");
     sel.disabled = false;
+
+    if(pedido && pedido !== EVENTO){
+      aviso("#aviso-global", `O evento "${pedido}" do link não existe ou você não tem acesso a ele.` +
+        (EVENTO ? " Abrimos o único evento disponível pra você." : " Escolha o evento no seletor acima."));
+    }else if(!EVENTO){
+      aviso("#aviso-global", "Escolha o evento no seletor acima pra começar.");
+    }
 
     sel.addEventListener("change", () => trocarEvento(sel.value));
   }catch(e){
@@ -739,13 +763,16 @@ async function carregarSeletorEventos(){
   }
 }
 
-function trocarEvento(slug){
-  EVENTO = slug;
-
-  // mantem o link compartilhavel: quem copiar a URL abre no mesmo evento
+// mantem o link compartilhavel: quem copiar a URL abre no mesmo evento
+function fixarEventoNaUrl(slug){
   const u = new URL(location.href);
   u.searchParams.set("evento", slug);
   history.replaceState(null, "", u);
+}
+
+function trocarEvento(slug){
+  EVENTO = slug;
+  fixarEventoNaUrl(slug);
 
   aviso("#aviso-global", "");
 
@@ -756,6 +783,7 @@ function trocarEvento(slug){
 }
 
 async function atualizarContadores(){
+  if(!EVENTO) return;  // sem evento escolhido nao ha o que contar
   try{
     const [pend, sug] = await Promise.all([
       rpc("admin_listar_pendentes", { p_evento_slug: EVENTO }),

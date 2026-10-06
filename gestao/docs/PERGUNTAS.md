@@ -37,17 +37,24 @@ arquivo de área correspondente, como fato conferido.
 8. Há campo de sobrescrita manual em `contratos` para assinatura fora do
    fluxo do Autentique? Não encontrado no schema — se existe, é fora da
    tabela. `[70]`
-9. Alcance de staff sobre dado financeiro de patrocinador fora do evento
-   associado a ele em `admin_eventos` — hoje o bypass de staff em
-   `pode_ver_patrocinador` não distingue evento. `[70]`
+9. ~~Alcance de staff sobre dado financeiro de patrocinador fora do evento
+   associado a ele em `admin_eventos`.~~ **Respondida pelo código em
+   05/10/2026:** as funções de financeiro, cotas, patrocinadores, quartos,
+   Lounge e prévia de cobrança passaram a exigir o escopo por evento
+   (`20261005110000`, `20261005150000`); o teste 23 varre o catálogo atrás
+   de função com `p_evento_slug` sem escopo. `[70]`
 10. O patrocinador deveria ter acesso a eventos passados? Hoje
     `meus_patrocinadores()` não filtra por evento nem por status. `[70]`
 
 ## Admin (`admin.html`)
 
-11. As 26 funções `admin_*` cujo mecanismo de guarda não bateu com o padrão
-    de busca desta apuração — conferir uma a uma se têm proteção adequada.
-    `[10]`
+11. ~~As 26 funções `admin_*` cujo mecanismo de guarda não bateu com o padrão
+    de busca desta apuração.~~ **Conferida em 06/10/2026, varrendo o
+    catálogo:** toda `admin_*` e `jantar_*` checa papel na primeira linha —
+    as 26 eram falha do padrão de busca, não falta de guarda. O que a
+    varredura achou foi outra coisa: 28 auxiliares internos (`_*`)
+    executáveis por qualquer usuário logado, fechados em `20261006090000`
+    (teste 23 passa a conferir). `[10]`
 12. Escopo exato de `admin_match_jantar` — é a ponte entre a aba Sessões e o
     módulo `jantares.html`? `[10]`
 13. Natureza e origem do módulo Pesquisa de perfil — de onde vêm as

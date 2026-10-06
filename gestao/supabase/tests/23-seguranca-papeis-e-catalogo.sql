@@ -20,7 +20,9 @@
 --      20261001170000 e 20261001240000) e toda tabela com RLS ligada;
 --      segmentos com policy (20260918100000)
 --   4. indices de 20260918090000, inclusive o unico de reserva ativa
---   5. o que anon executa: so o que precisa funcionar sem login
+--   5. o que anon executa: so o que precisa funcionar sem login; e
+--      nenhum auxiliar interno (_*) exposto a anon/authenticated
+--      (20261006090000)
 --   6. sem funcao duplicada por assinatura (overload orfao)
 --   7. funcao que recebe p_evento_slug respeita o escopo de staff por
 --      evento de 10/11
@@ -122,6 +124,17 @@ where p.pronamespace='gestao'::regnamespace and p.prosecdef
   and has_function_privilege('anon', p.oid, 'execute')
   and p.prorettype <> 'trigger'::regtype
   and p.proname not in ('part_autocadastro','pre_cadastro_obter','pre_cadastro_enviar','is_staff','meus_patrocinadores');
+
+\echo '-- nenhum auxiliar interno (_*) e executavel por anon ou por usuario logado:'
+\echo '-- so roda de dentro das funcoes SECURITY DEFINER que o chamam. Eram 28'
+\echo '-- expostos ate 20261006090000 — deve PASSAR'
+select coalesce(string_agg(p.proname, ', '), '') = '' as auxiliares_fechados_ok
+from pg_proc p
+where p.pronamespace='gestao'::regnamespace
+  and p.proname like '\_%'
+  and p.prorettype <> 'trigger'::regtype
+  and (has_function_privilege('anon', p.oid, 'execute')
+       or has_function_privilege('authenticated', p.oid, 'execute'));
 
 \echo ''
 \echo '#############################################'
