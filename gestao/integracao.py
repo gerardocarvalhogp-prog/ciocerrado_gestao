@@ -233,7 +233,10 @@ def _linha_pesquisa(nome, email, custom_form):
         return None
     linha = {"nome": nome, "email": email, "investimentos": {}, "perfil": {}}
     for c in (custom_form or []):
-        titulo = (c.get("name") or "").strip()
+        # o formulario do Sympla as vezes traz o titulo entre aspas e com
+        # tab no meio ('"INVESTIMENTO SEGURANCA - \tANTI-PHISHING"') — sem
+        # limpar, nao comeca com INVESTIMENTO e cai no balde de perfil
+        titulo = re.sub(r"\s+", " ", (c.get("name") or "").strip().strip('"').strip())
         valor = str(c.get("value") or "").strip()
         if not titulo:
             continue
