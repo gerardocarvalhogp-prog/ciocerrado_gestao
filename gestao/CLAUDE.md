@@ -163,9 +163,12 @@ rode de novo a consulta do README §8.
       mailing, com os campos da pesquisa (faturamento, orçamento de TI,
       áreas de investimento) achatados em colunas. Desde 05/10,
       `integracao.py --sympla` importa a pesquisa sozinho, lendo o
-      `custom_form` que a API do Sympla já devolve — **mas isso nunca rodou
-      de verdade em produção ainda**, só testado isoladamente com dado
-      fictício.
+      `custom_form` que a API do Sympla já devolve. **Rodado de verdade em
+      06/10/2026** contra o evento de teste do Sympla (Teste Ferramenta
+      2027, id 3599365 → `teste2027`): casou o inscrito pelo CPF com o
+      gestor que já existia (sem duplicar) e importou a pesquisa — as 8
+      colunas e as 46 áreas de investimento (uma caía fora por vir com
+      aspas/tab no título; corrigido no mesmo dia).
 
 ### Achados de 01/10/2026
 
@@ -302,10 +305,11 @@ código.
 - domínio `ciocerrado.com.br` verificado no Resend (registros SPF/DKIM
   na Skymail) — sem isso, nenhum e-mail real sai da fila (ver "achados"
   acima)
-- rodar `integracao.py --sympla --producao` de verdade pelo menos uma
-  vez, pra confirmar que a importação automática da pesquisa de perfil
-  (05/10) casa com os títulos reais das perguntas do formulário do
-  Sympla — testado só com dado fictício até aqui
+- criar o Experience 2027 no Sympla e cadastrar o id dele no painel
+  (aba Estrutura) — hoje só existe o "Teste Ferramenta 2027"; até lá,
+  `integracao.py --sympla` no `cerrado2027` só avisa "Evento sem
+  sympla_event_id" e para. Se o formulário mudar em relação ao de teste,
+  rodar primeiro sem `--producao` e conferir a pesquisa
 - confirmar que `supabase db push` está em dia no hospedado com as
   migrations mais recentes (a partir de `20261001230000`, quádruplo em
   diante) antes de testar as telas que dependem delas
