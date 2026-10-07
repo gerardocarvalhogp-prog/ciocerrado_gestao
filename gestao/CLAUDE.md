@@ -177,15 +177,13 @@ rode de novo a consulta do README §8.
 
 ### Achados de 01/10/2026
 
-- **Domínio não verificado no Resend — ainda sem solução, depende do
-  organizador** (ver "O que depende do organizador" abaixo): a conta só
-  deixa mandar e-mail pro próprio endereço da conta
-  (`gerardocarvalhogp@gmail.com`) até `ciocerrado.com.br` ser verificado
-  em resend.com/domains (registros SPF/DKIM no DNS do domínio — onde foram
-  apontados os MX pro Google Workspace em 06/10/2026). Até
-  lá, todo aviso real (contrato enviado/assinado, rooming confirmado)
-  falha com 403 pra qualquer destinatário que não seja essa conta —
-  bloqueia o uso de verdade do botão "Enviar toda a fila" (aba Equipe).
+- **Domínio não verificado no Resend — RESOLVIDO em 07/10/2026.** Até
+  então a conta só deixava mandar e-mail pro próprio endereço da conta, e
+  todo aviso real falhava com 403. `ciocerrado.com.br` foi verificado
+  (região São Paulo): DKIM `resend._domainkey` (TXT), CNAME `rsend` e
+  `send` pro Resend, e DMARC `_dmarc` = `v=DMARC1; p=none;` — tudo na zona
+  do Registro.br (DNS `sec.dns.br`), ao lado do MX/SPF do Google
+  Workspace, que ficaram intactos. Conferido no DNS público em 07/10.
 - **`?evento=` ausente na URL caía num evento errado, silenciosamente —
   CORRIGIDO no mesmo dia**:
   `rooming.html` e `portal.html` tinham `|| "cerrado2027"` como fallback
@@ -319,9 +317,9 @@ código.
 - dados reais de 2027 — hoje são 4 patrocinadores de ~61 e 8
   participantes de ~130, e `sympla_event_id` está vazio
 - credenciais do `integracao.py` (Sympla, Autentique, Resend)
-- domínio `ciocerrado.com.br` verificado no Resend (registros SPF/DKIM
-  no DNS do domínio, o mesmo onde os MX foram pro Google Workspace) — sem
-  isso, nenhum e-mail real sai da fila (ver "achados" acima)
+- primeiro envio real de e-mail depois da verificação do Resend (07/10):
+  confirmar que chega na caixa de entrada, não no spam — o DMARC está em
+  `p=none` (só monitora); endurecer depois de ver que está tudo entregando
 - criar o Experience 2027 no Sympla e cadastrar o id dele no painel
   (aba Estrutura) — hoje só existe o "Teste Ferramenta 2027"; até lá,
   `integracao.py --sympla` no `cerrado2027` só avisa "Evento sem
