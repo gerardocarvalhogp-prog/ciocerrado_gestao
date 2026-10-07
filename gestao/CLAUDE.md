@@ -124,7 +124,7 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
 **29 tabelas, 6 views, 368 colunas, 143 funções, 37 políticas de RLS,
-8 migrations.** Desatualizado — são **143 migrations** em 06/10/2026, mas os
+8 migrations.** Desatualizado — são **144 migrations** em 07/10/2026, mas os
 outros números (tabelas/views/colunas/funções/políticas) não foram reconferidos
 desde então porque exigem consulta ao catálogo do banco hospedado, que este
 arquivo não tem como fazer sozinho. Antes de confiar nesses quatro números,
@@ -248,6 +248,16 @@ pra quem está logado): `listar_cotas`, `patro_manual`,
 `part_disponibilidade`, `patro_disponibilidade`; e `part_autocadastro`
 (público). `admin.html`/`checkin.html` deixaram de cair calados no
 `cerrado2027` sem `?evento=` (mesmo erro de rooming/portal de 01/10).
+
+Achado ao vivo em 07/10/2026 (cobrança de patrocinador sem destinatário):
+desde 20260909100000 o login do patrocinador é da **empresa**
+(`usuarios_patrocinador.empresa_id`); `patrocinador_id` ali é só histórico
+e fica vazio pra quem é cadastrado pela tela de hoje. Seis lugares ainda
+procuravam por ele (cobrança, fatura, planilha do app, `v_etiquetas`,
+`v_esperados`) — corrigidos em `20261007090000`, teste `25`. **Ao
+escrever teste, cadastrar usuário de patrocinador por
+`admin_salvar_usuario_patro`, não por insert com `patrocinador_id`** — foi
+o que escondeu isso dos testes 14 e 18.
 
 Daqui pra frente a regra é a de sempre: migration de comportamento nova
 entra com teste no mesmo commit. O `23` olha o catálogo inteiro (função

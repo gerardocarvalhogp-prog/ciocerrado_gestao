@@ -97,6 +97,7 @@ Quando der, vale converter `01`–`03` e `05` para o mesmo formato.
 | `21` | padrão de cadastro (trigger, 31/08), editar gestor, filtros, enriquecimento, empresa global entre eventos, CPF e CNPJ como chave |
 | `22` | webhook do Autentique (só service_role, idempotente, link do PDF, aviso com corpo), mailing do evento inteiro, pesquisa no mailing |
 | `23` | catálogo: service_role e admin inativo, nenhum papel de cliente lê tabela/view, views com security_invoker, RLS em toda tabela, índices, o que anon executa, overload órfão, escopo de staff por evento |
+| `25` | usuário do patrocinador cadastrado como a tela faz hoje (só pela empresa): aparece na cobrança, na fatura, na planilha do app, no crachá e no check-in |
 | `24` | **corrida de verdade** no duplo clique de "salvar hospedagem": duas sessões `psql` ao mesmo tempo, a segunda espera a trava da primeira e reaproveita a mesma reserva (`.py`, ver abaixo) |
 
 `03` e `05` **não rodam juntos**: os dois criam mesa redonda para as
@@ -179,6 +180,7 @@ virou "deve PASSAR"/"deve FALHAR" de verdade, citando a migration:
 | `20` | convidado novo vindo do Sympla não recebia o aviso de WhatsApp | `20261005140000` |
 | `20`, `23` | `_jantar_enfileirar_whatsapp_confirmacao` executável por `anon` | `20261005140000` |
 | `14` | `admin_preparar_cobranca` (prévia com o e-mail do pendente) sem escopo de staff por evento — sobra da varredura | `20261005150000` |
+| `25` | achado ao vivo (07/10): usuário de patrocinador cadastrado pela tela de hoje não era achado na cobrança, fatura, app, crachá e check-in — 6 lugares ainda procuravam por `patrocinador_id`, não pela empresa. Os testes 14 e 18 não pegaram porque montavam o usuário do jeito antigo | `20261007090000` |
 | `20` | importação (jantar e evento) criava gestor a partir de linha recusada/cancelada | `20261005140000` |
 | `20` | telefone fixo ganhava o 9 e virava celular inexistente | `20261005140000` |
 
