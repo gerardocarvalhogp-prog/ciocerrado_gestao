@@ -11,7 +11,7 @@
 <link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -39,7 +39,7 @@ button{font-family:inherit;cursor:pointer;}
   display:flex;align-items:center;justify-content:space-between;gap:16px;
   flex-wrap:wrap;
 }
-.marca{font-family:'Archivo',sans-serif;font-weight:700;letter-spacing:-.01em;font-size:16px;}
+.marca{font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:-.01em;font-size:16px;}
 .marca span{
   display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
   font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;
@@ -78,7 +78,7 @@ button{font-family:inherit;cursor:pointer;}
 .menu-nav-cab{display:flex;align-items:center;justify-content:space-between;
   padding:14px 16px;border-bottom:1px solid var(--linha);
   position:sticky;top:0;background:var(--superficie);}
-.menu-nav-titulo{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
+.menu-nav-titulo{font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
 .menu-fechar{background:none;border:none;font-size:22px;line-height:1;color:var(--suave);padding:2px 6px;}
 
 .aba{
@@ -99,7 +99,7 @@ button{font-family:inherit;cursor:pointer;}
   padding:12px 14px;margin-bottom:18px;
 }
 .resumo-pend .titulo{
-  font-family:'Archivo',sans-serif;font-weight:700;font-size:13.5px;
+  font-family:'Montserrat',sans-serif;font-weight:700;font-size:13.5px;
   color:var(--ouro);margin:0 0 6px;
 }
 .resumo-pend ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;}
@@ -111,12 +111,12 @@ button{font-family:inherit;cursor:pointer;}
 .resumo-pend.tudo-ok{background:var(--ok-bg, #E4F0EA);border-color:#C9E0D4;}
 .resumo-pend.tudo-ok .titulo{color:var(--verde-med);}
 
-h1{font-family:'Archivo',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
-h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
+h1{font-family:'Montserrat',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
+h2{font-family:'Montserrat',sans-serif;font-size:17px;margin:0 0 10px;}
 .sub{color:var(--suave);font-size:13.5px;margin:0 0 22px;}
 
 .cartao-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
-.cartao h3{font-family:'Archivo',sans-serif;font-size:15px;margin:0 0 2px;}
+.cartao h3{font-family:'Montserrat',sans-serif;font-size:15px;margin:0 0 2px;}
 .meta{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--suave);}
 
 .selo{
@@ -157,7 +157,7 @@ textarea{min-height:64px;resize:vertical;}
   padding:13px;margin-bottom:10px;background:var(--papel);
 }
 .pessoa-cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
-.pessoa-cab strong{font-family:'Archivo',sans-serif;font-size:13.5px;}
+.pessoa-cab strong{font-family:'Montserrat',sans-serif;font-size:13.5px;}
 
 /* ---------- fila de escolha (signature) ---------- */
 .fila{
@@ -176,7 +176,7 @@ textarea{min-height:64px;resize:vertical;}
   font-family:'IBM Plex Mono',monospace;font-size:10px;
   text-transform:uppercase;letter-spacing:.1em;color:var(--suave);
 }
-.fila-passo .q{font-family:'Archivo',sans-serif;font-size:13.5px;margin-top:2px;}
+.fila-passo .q{font-family:'Montserrat',sans-serif;font-size:13.5px;margin-top:2px;}
 .fila-passo.passou{border-top-color:var(--verde-med);}
 .fila-passo.passou .q{color:var(--suave);}
 .fila-passo.aqui{border-top-color:var(--ouro);}
@@ -223,7 +223,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
 <div id="tela-login" class="login">
   <div class="cartao">
     <h1>Portal do Patrocinador</h1>
-    <p class="sub">Entre com o e-mail cadastrado pela sua empresa. Entre com seu e-mail e senha.</p>
+    <p class="sub">Entre com o e-mail que sua empresa cadastrou e a sua senha.</p>
     <div id="login-aviso"></div>
     <label for="email">E-mail</label>
     <input type="email" id="email" placeholder="voce@empresa.com.br" autocomplete="email">
@@ -250,7 +250,7 @@ td{padding:8px 6px;border-bottom:1px solid #F0F1EC;}
     <button class="btn-hamb" id="btn-menu" aria-expanded="false" aria-controls="menu-nav" title="Menu">
       <span></span>
     </button>
-    <div class="marca">CIO Cerrado<span>Portal do patrocinador</span></div>
+    <div class="marca"><img class="marca-logo" src="assets/logo-oficial-wordmark.png" alt="CIO Cerrado"><span>Portal do patrocinador</span></div>
     <div class="topo-dir">
       <span class="quem" id="quem"></span>
       <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>
@@ -794,7 +794,7 @@ async function carregarQuartos(){
 
     alvo.innerHTML = `
       <h2>Seus quartos</h2>
-      <p class="sub">Preencha quem ocupa cada quarto, o transfer e o brinde.</p>
+      <p class="sub">Preencha quem ocupa cada quarto e o transfer. O brinde fica na seção Brindes.</p>
       <div id="lista-quartos"></div>
       ${blocoDisponibilidade(disp)}`;
 

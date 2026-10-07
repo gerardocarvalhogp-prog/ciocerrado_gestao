@@ -11,7 +11,7 @@
 <link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/design-system.js"></script>
@@ -32,7 +32,7 @@ button{font-family:inherit;cursor:pointer;}
   background:var(--verde);color:#fff;padding:14px 20px;
   display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
 }
-.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:16px;letter-spacing:-.01em;}
+.marca{font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px;letter-spacing:-.01em;}
 .marca span{
   display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:10.5px;
   letter-spacing:.14em;text-transform:uppercase;opacity:.7;
@@ -47,8 +47,8 @@ button{font-family:inherit;cursor:pointer;}
 .sair:hover{background:rgba(255,255,255,.1);}
 
 .wrap{max-width:780px;margin:0 auto;padding:26px 20px 80px;}
-h1{font-family:'Archivo',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
-h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
+h1{font-family:'Montserrat',sans-serif;font-size:24px;margin:0 0 4px;letter-spacing:-.015em;}
+h2{font-family:'Montserrat',sans-serif;font-size:17px;margin:0 0 10px;}
 .sub{color:var(--suave);font-size:13.5px;margin:0 0 22px;}
 
 /* ---------- trilha de etapas (signature) ---------- */
@@ -65,7 +65,7 @@ h2{font-family:'Archivo',sans-serif;font-size:17px;margin:0 0 10px;}
 }
 .etapa.feita .marcador{background:var(--verde-med);border-color:var(--verde-med);color:#fff;}
 .etapa.agora .marcador{border-color:var(--ouro);color:var(--ouro);font-weight:600;}
-.etapa .txt h3{font-family:'Archivo',sans-serif;font-size:14.5px;margin:0 0 1px;}
+.etapa .txt h3{font-family:'Montserrat',sans-serif;font-size:14.5px;margin:0 0 1px;}
 .etapa .txt p{margin:0;font-size:13px;color:var(--suave);}
 .etapa.bloqueada .txt h3{color:var(--suave);}
 .etapa.agora .txt h3{color:var(--verde);}
@@ -75,6 +75,11 @@ input[type=text],input[type=email],input[type=date],select,textarea{
   width:100%;padding:8px 10px;border:1px solid var(--linha);border-radius:var(--raio);
   font-family:inherit;font-size:14px;background:var(--superficie);color:var(--texto);
 }
+.atalhos{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px;}
+.atalhos a{font-size:13px;padding:6px 12px;border:1px solid var(--linha);border-radius:999px;
+  background:var(--superficie);text-decoration:none;}
+.atalhos a:hover{background:var(--ok-bg);}
+#area,#quartoextra,#materiais,#meusdados,#indicar{scroll-margin-top:16px;}
 .linha{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
 .linha > div{flex:1;min-width:130px;}
 .check{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--texto);}
@@ -96,7 +101,7 @@ input[type=text],input[type=email],input[type=date],select,textarea{
   padding:13px;margin-bottom:10px;background:var(--papel);
 }
 .pessoa-cab{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
-.pessoa-cab strong{font-family:'Archivo',sans-serif;font-size:13.5px;}
+.pessoa-cab strong{font-family:'Montserrat',sans-serif;font-size:13.5px;}
 
 /* ---------- fatura ---------- */
 .fatura{
@@ -107,8 +112,8 @@ input[type=text],input[type=email],input[type=date],select,textarea{
   display:flex;justify-content:space-between;align-items:baseline;
   border-bottom:1px solid var(--linha);padding-bottom:9px;margin-bottom:10px;
 }
-.fatura-topo h3{font-family:'Archivo',sans-serif;font-size:15px;margin:0;}
-.fatura-total{font-family:'Archivo',sans-serif;font-size:22px;color:var(--verde);}
+.fatura-topo h3{font-family:'Montserrat',sans-serif;font-size:15px;margin:0;}
+.fatura-total{font-family:'Montserrat',sans-serif;font-size:22px;color:var(--verde);}
 .fatura-item{display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;}
 .fatura-item span:last-child{font-family:'IBM Plex Mono',monospace;}
 .fatura-nota{font-size:12.5px;color:var(--suave);margin:9px 0 0;}
@@ -147,7 +152,7 @@ input[type=text],input[type=email],input[type=date],select,textarea{
   <div class="cartao">
     <div id="modo-entrar">
       <h1>Sua hospedagem</h1>
-      <p class="sub">Entre com o e-mail da sua inscrição. Entre com seu e-mail e senha.</p>
+      <p class="sub">Entre com o e-mail da sua inscrição e a sua senha.</p>
       <div id="login-aviso"></div>
       <label for="email">E-mail</label>
       <input type="email" id="email" placeholder="voce@empresa.com.br" autocomplete="email">
@@ -195,7 +200,7 @@ input[type=text],input[type=email],input[type=date],select,textarea{
 <!-- ================= APP ================= -->
 <div id="app" class="oculto">
   <header class="topo">
-    <div class="marca">CIO Cerrado<span>Sua hospedagem</span></div>
+    <div class="marca"><img class="marca-logo" src="assets/logo-oficial-wordmark.png" alt="CIO Cerrado"><span>Sua hospedagem</span></div>
     <div class="topo-dir">
       <span class="quem" id="quem"></span>
       <button class="sair" id="btn-senha" title="Trocar minha senha">Senha</button>
@@ -512,9 +517,18 @@ function desenhar(){
   }
 
   c.innerHTML = `
-    <h1>Olá, ${esc(String(STATUS.nome||"").split(" ")[0])}</h1>
+    <h1>Olá, ${esc(nomeExibicao(STATUS.nome).split(" ")[0])}</h1>
     <p class="sub">${esc(STATUS.empresa || "")}</p>
     <div class="trilha">${trilha()}</div>
+    <!-- atalhos: a pagina empilha seis secoes e no celular vira uma rolagem
+         longa — a pessoa nao sabia que "Meus dados" ou "Indicar" existiam -->
+    <nav class="atalhos" aria-label="Seções desta página">
+      <a href="#area">Hospedagem</a>
+      ${STATUS.rooming_liberado ? `<a href="#quartoextra">Quarto extra</a>` : ""}
+      <a href="#materiais">Materiais</a>
+      <a href="#meusdados">Meus dados</a>
+      <a href="#indicar">Indicar alguém</a>
+    </nav>
     <div id="aviso-global"></div>
     <div id="area"></div>
     <div id="quartoextra"></div>
@@ -766,19 +780,32 @@ async function areaRooming(){
     <div class="cartao">
       <h2>Quem vai com você</h2>
       <p class="sub" style="margin-bottom:16px;">
-        Você já está incluído. Adicione os familiares que vão com você — cada um gera custo
-        adicional, que aparece no resumo abaixo enquanto você preenche.
+        Você já está incluído. Adicione os familiares que vão com você — o primeiro
+        familiar adulto é cortesia; os demais e o transfer têm custo, que aparece no
+        resumo abaixo enquanto você preenche.
       </p>
 
       <div class="pessoa" style="background:#EDF2EF;">
         <div class="pessoa-cab">
-          <strong>${esc(STATUS.nome)}</strong>
+          <strong>${esc(nomeExibicao(STATUS.nome))}</strong>
           <span class="selo ok">Você</span>
         </div>
-        <label class="check">
-          <input type="checkbox" id="titular-transfer" ${titular?.usa_transfer ? "checked" : ""}>
-          Vou usar o transfer
-        </label>
+        <!-- transfer e local de saida juntos, no mesmo cartao (era um
+             seletor separado no rodape que nunca lia o valor salvo e
+             voltava sempre pra "Nao vou usar transfer" — contradizia a
+             caixa marcada aqui em cima) -->
+        <div class="linha" style="align-items:flex-end;">
+          <div><label class="check" style="padding-bottom:9px;">
+            <input type="checkbox" id="titular-transfer" ${titular?.usa_transfer ? "checked" : ""}>
+            Vou usar o transfer
+          </label></div>
+          <div><label for="transfer-origem">Saio de</label>
+            <select id="transfer-origem" ${titular?.usa_transfer ? "" : "disabled"}>
+              <option value="">—</option>
+              <option value="GYN" ${titular?.transfer_origem === "GYN" ? "selected" : ""}>Goiânia</option>
+              <option value="BSB" ${titular?.transfer_origem === "BSB" ? "selected" : ""}>Brasília</option>
+            </select></div>
+        </div>
         <div class="linha" style="margin-top:8px;">
           <label class="check">
             <input type="checkbox" id="titular-mobilidade" ${titular?.dificuldade_mobilidade ? "checked" : ""}>
@@ -803,17 +830,6 @@ async function areaRooming(){
 
       <button class="btn sec mini" id="add-pessoa">+ Adicionar familiar</button>
 
-      <div class="linha" style="margin-top:16px;">
-        <div style="max-width:280px;">
-          <label>De onde <strong>você</strong> sai</label>
-          <select id="transfer-origem">
-            <option value="">Não vou usar transfer</option>
-            <option value="GYN">Goiânia</option>
-            <option value="BSB">Brasília</option>
-          </select>
-        </div>
-      </div>
-
       <div class="fatura" id="fatura"></div>
       <div id="aviso-rooming"></div>
       <button class="btn" id="salvar-rooming">Confirmar dados</button>
@@ -827,7 +843,12 @@ async function areaRooming(){
     desenharPessoas();
   });
   $("#salvar-rooming").addEventListener("click", salvarRooming);
-  $("#titular-transfer").addEventListener("change", atualizarFatura);
+  $("#titular-transfer").addEventListener("change", e => {
+    const sel = $("#transfer-origem");
+    sel.disabled = !e.target.checked;
+    if(!e.target.checked) sel.value = "";
+    atualizarFatura();
+  });
   $("#transfer-origem").addEventListener("change", atualizarFatura);
   $("#titular-alergia").addEventListener("change", e => {
     $("#titular-alergia-detalhe").disabled = !e.target.checked;
@@ -965,6 +986,10 @@ function atualizarFatura(){
       // duas crianças de idades diferentes podem ter valores diferentes,
       // e sem mostrar a idade o total parece errado.
       const itens = r.itens || [];
+      // a linha do transfer vem sem valor (part_previa_fatura so soma no
+      // total) — e o que sobra do total depois das outras linhas
+      const conhecido = itens.reduce((t, i) => t + (i.valor == null ? 0 : Number(i.valor)), 0);
+      const resto = Number(r.total || 0) - conhecido;
 
       box.innerHTML = `
         <div class="fatura-topo">
@@ -974,7 +999,7 @@ function atualizarFatura(){
         ${itens.length
           ? itens.map(i => `<div class="fatura-item">
               <span>${esc(i.descricao)}</span>
-              <span>${i.valor === null || i.valor === undefined ? "" : moeda(i.valor)}</span>
+              <span>${i.valor == null ? (resto > 0 ? moeda(resto) : "") : moeda(i.valor)}</span>
             </div>`).join("")
           : `<p class="fatura-nota" style="margin-top:0;">Sem custo adicional — só você na hospedagem.</p>`}
         <p class="fatura-nota">

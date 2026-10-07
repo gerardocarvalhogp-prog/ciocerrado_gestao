@@ -11,7 +11,7 @@
 <link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -27,7 +27,7 @@ button{font-family:inherit;cursor:pointer;}
 .topo{background:var(--verde);color:#fff;padding:12px 16px;
   display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
   position:sticky;top:0;z-index:10;}
-.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;}
+.marca{font-family:'Montserrat',sans-serif;font-weight:700;font-size:15px;}
 .marca span{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
   font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
 .sair{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;
@@ -43,9 +43,9 @@ button{font-family:inherit;cursor:pointer;}
 
 /* placar: a informação que a equipe olha o tempo todo */
 .placar{display:flex;gap:8px;margin-bottom:14px;}
-.placar div{flex:1;background:var(--superficie);border:1px solid var(--linha);
+.placar > div{flex:1;background:var(--superficie);border:1px solid var(--linha);
   border-radius:var(--raio);padding:11px 10px;text-align:center;}
-.placar .n{font-family:'Archivo',sans-serif;font-size:22px;line-height:1.1;}
+.placar .n{font-family:'Montserrat',sans-serif;font-size:22px;line-height:1.1;}
 .placar .r{font-family:'IBM Plex Mono',monospace;font-size:9.5px;
   text-transform:uppercase;letter-spacing:.1em;color:var(--suave);margin-top:3px;}
 .placar .feitos .n{color:var(--verde-med);}
@@ -74,7 +74,7 @@ button{font-family:inherit;cursor:pointer;}
   border-radius:var(--raio);padding:12px 13px;margin-bottom:8px;
   display:flex;justify-content:space-between;align-items:center;gap:12px;}
 .pessoa.feito{background:#F2F7F4;border-color:#C9E0D4;}
-.pessoa .info strong{display:block;font-family:'Archivo',sans-serif;font-size:15px;}
+.pessoa .info strong{display:block;font-family:'Montserrat',sans-serif;font-size:15px;}
 .pessoa .info .meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--suave);}
 .btn{background:var(--verde);color:#fff;border:none;border-radius:var(--raio);
   padding:10px 16px;font-size:14px;font-weight:500;white-space:nowrap;}
@@ -96,7 +96,7 @@ button{font-family:inherit;cursor:pointer;}
 .login{max-width:380px;margin:12vh auto;padding:0 20px;}
 .login .cartao{background:var(--superficie);border:1px solid var(--linha);
   border-radius:var(--raio);padding:24px;}
-.login h1{font-family:'Archivo',sans-serif;font-size:20px;margin:0 0 4px;}
+.login h1{font-family:'Montserrat',sans-serif;font-size:20px;margin:0 0 4px;}
 .login p{color:var(--suave);font-size:13.5px;margin:0 0 16px;}
 label{display:block;font-size:12px;color:var(--suave);margin-bottom:3px;}
 input[type=email],input[type=text]{width:100%;padding:9px 10px;
@@ -144,7 +144,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
 
 <div id="app" class="oculto">
   <header class="topo">
-    <div class="marca">CIO Cerrado<span>Check-in</span></div>
+    <div class="marca"><img class="marca-logo" src="assets/logo-oficial-wordmark.png" alt="CIO Cerrado"><span>Check-in</span></div>
     <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html">Painel</a><a href="jantares.html">Jantares</a><a href="checkin.html" aria-current="page">Check-in</a></nav>
     <script>
       // Link de pagina cheia, nao SPA: sem isto, clicar em Painel/Jantares/
@@ -173,7 +173,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
       <div class="filtros">
         <button class="chip" id="f-todos" aria-pressed="true">Todos</button>
         <button class="chip" id="f-pend"  aria-pressed="false">Só pendentes</button>
-        <button class="btn sec mini" id="ler-qr" style="margin-left:auto;">Ler QR</button>
+        <button class="btn mini" id="ler-qr" style="margin-left:auto;">Ler crachá (QR)</button>
       </div>
     </div>
 
@@ -181,7 +181,7 @@ select{width:100%;padding:9px 10px;border:1px solid var(--linha);
 
     <div id="form-novo" class="oculto">
       <div class="pessoa" style="display:block;">
-        <strong style="font-family:'Archivo';font-size:15px;display:block;margin-bottom:10px;">
+        <strong style="font-family:'Montserrat',sans-serif;font-size:15px;display:block;margin-bottom:10px;">
           Cadastrar quem chegou</strong>
         <div style="margin-bottom:8px;">
           <label>Nome completo</label><input type="text" id="n-nome"></div>
@@ -545,7 +545,7 @@ async function carregar(){
       : l.map(p => `
         <div class="pessoa ${p.status==='compareceu' ? "feito" : ""}" data-c="${esc(p.id)}">
           <div class="info">
-            <strong>${esc(p.nome)}</strong>
+            <strong>${esc(nomeExibicao(p.nome))}</strong>
             <span class="meta">${esc(p.empresa||"—")}</span>
           </div>
           ${p.status === "compareceu"
@@ -589,7 +589,7 @@ async function carregar(){
       : ATIVIDADE_CACHE.map(p => `
         <div class="pessoa ${p.checkin_id ? "feito" : ""}" data-k="${esc(p.pessoa_key)}" data-c="${esc(p.checkin_id||"")}">
           <div class="info">
-            <strong>${esc(p.nome)}</strong>
+            <strong>${esc(nomeExibicao(p.nome))}</strong>
             <span class="meta">${esc(p.empresa||"—")}</span>
             <span class="selo">${esc(p.categoria)}</span>
           </div>
@@ -631,7 +631,7 @@ async function carregar(){
     $("#lista").innerHTML = l.map(p => `
       <div class="pessoa ${p.checkin_id ? "feito" : ""}" data-k="${esc(p.pessoa_key)}" data-c="${esc(p.checkin_id||"")}">
         <div class="info">
-          <strong>${esc(p.nome)}</strong>
+          <strong>${esc(nomeExibicao(p.nome))}</strong>
           <span class="meta">${esc(p.empresa||"—")}${p.quarto ? " · apto "+esc(p.quarto) : ""}</span>
           <span class="selo">${esc(p.categoria)}</span>
         </div>

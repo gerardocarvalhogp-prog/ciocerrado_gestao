@@ -11,7 +11,7 @@
 <link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
@@ -31,7 +31,7 @@ button{font-family:inherit;cursor:pointer;}
 
 .topo{background:var(--verde);color:#fff;padding:13px 20px;
   display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
-.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;}
+.marca{font-family:'Montserrat',sans-serif;font-weight:700;font-size:15.5px;}
 .marca span{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
   font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
 .topo-dir{display:flex;align-items:center;gap:11px;flex-wrap:wrap;}
@@ -59,7 +59,7 @@ button{font-family:inherit;cursor:pointer;}
   padding:22px 24px;box-shadow:0 20px 50px rgba(20,49,43,.25);
   max-height:85vh;overflow-y:auto;
 }
-.ac-modal h2{font-family:'Archivo',sans-serif;font-size:var(--tx-lg);margin:0 0 8px;color:var(--texto);}
+.ac-modal h2{font-family:'Montserrat',sans-serif;font-size:var(--tx-lg);margin:0 0 8px;color:var(--texto);}
 .ac-modal textarea{font-family:inherit;font-size:var(--tx-base);resize:vertical;}
 
 .wrap{max-width:1120px;margin:0 auto;padding:22px 20px 80px;}
@@ -89,7 +89,7 @@ button{font-family:inherit;cursor:pointer;}
 .menu-nav-cab{display:flex;align-items:center;justify-content:space-between;
   padding:14px 16px;border-bottom:1px solid var(--linha);
   position:sticky;top:0;background:var(--superficie);}
-.menu-nav-titulo{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
+.menu-nav-titulo{font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
 .menu-fechar{background:none;border:none;font-size:22px;line-height:1;color:var(--suave);padding:2px 6px;}
 
 .aba-grupo{border-bottom:1px solid var(--linha);}
@@ -111,8 +111,8 @@ button{font-family:inherit;cursor:pointer;}
 .aba .contador{font-family:'IBM Plex Mono',monospace;font-size:10.5px;
   background:var(--ouro);color:#fff;border-radius:10px;padding:1px 6px;margin-left:5px;}
 
-h1{font-family:'Archivo',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing:-.015em;}
-h2{font-family:'Archivo',sans-serif;font-size:16px;margin:0 0 8px;}
+h1{font-family:'Montserrat',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing:-.015em;}
+h2{font-family:'Montserrat',sans-serif;font-size:16px;margin:0 0 8px;}
 .sub{color:var(--suave);font-size:13px;margin:0 0 18px;}
 
 .barra{display:flex;gap:9px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px;}
@@ -209,7 +209,7 @@ td{padding:7px 6px;border-bottom:1px solid #F0F1EC;vertical-align:top;}
     <button class="btn-hamb" id="btn-menu" aria-expanded="false" aria-controls="menu-nav" title="Menu">
       <span></span>
     </button>
-    <div class="marca">CIO Cerrado<span>Painel da organização</span></div>
+    <div class="marca"><img class="marca-logo" src="assets/logo-oficial-wordmark.png" alt="CIO Cerrado"><span>Painel da organização</span></div>
     <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html" aria-current="page">Painel</a><a href="jantares.html">Jantares</a><a href="checkin.html">Check-in</a></nav>
     <script>
       // Link de pagina cheia, nao SPA: sem isto, clicar em Painel/Jantares/
@@ -1665,7 +1665,7 @@ ABAS.cadastro = async function(){
           <td class="meta">${e.qtd_gestores}</td>
           <td style="white-space:nowrap;">
             <button class="btn sec mini emp-editar" data-id="${esc(e.id)}">Editar</button>
-            <button class="btn sec mini emp-remover" data-id="${esc(e.id)}">Remover</button>
+            <button class="btn sec perigo mini emp-remover" data-id="${esc(e.id)}">Remover</button>
           </td></tr>`).join("") ||
         `<tr><td colspan="5" style="color:var(--suave)">Nenhuma empresa cadastrada ainda.</td></tr>`}`;
 
@@ -4517,8 +4517,8 @@ async function blocoQuartos(){
           ${total} quarto(s) cadastrado(s). Crie por faixa de numeração — repetidos são ignorados.
         </p>
         <div class="barra">
-          <div style="max-width:100px;"><label>De</label><input type="text" id="qt-de" placeholder="200"></div>
-          <div style="max-width:100px;"><label>Até</label><input type="text" id="qt-ate" placeholder="279"></div>
+          <div style="max-width:100px;"><label>De</label><input type="text" id="qt-de" placeholder="ex.: 200" inputmode="numeric"></div>
+          <div style="max-width:100px;"><label>Até</label><input type="text" id="qt-ate" placeholder="ex.: 279" inputmode="numeric"></div>
           <div style="max-width:120px;"><label>Tipo</label>
             <select id="qt-tipo">
               <option value="single">Single</option>
@@ -4536,8 +4536,8 @@ async function blocoQuartos(){
             Errou o tipo na criação? Corrija sem apagar e recriar — a alocação já feita fica de pé.
           </p>
           <div class="barra">
-            <div style="max-width:100px;"><label>De</label><input type="text" id="qta-de" placeholder="200"></div>
-            <div style="max-width:100px;"><label>Até</label><input type="text" id="qta-ate" placeholder="279"></div>
+            <div style="max-width:100px;"><label>De</label><input type="text" id="qta-de" placeholder="ex.: 200" inputmode="numeric"></div>
+            <div style="max-width:100px;"><label>Até</label><input type="text" id="qta-ate" placeholder="ex.: 279" inputmode="numeric"></div>
             <div style="max-width:120px;"><label>Novo tipo</label>
               <select id="qta-tipo">
                 <option value="single">Single</option>

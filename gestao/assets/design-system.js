@@ -282,3 +282,84 @@ window.explicar = explicar;
     explicarBase: explicar,
   };
 })();
+
+// ---------------------------------------------------------------------
+// Rótulo ligado ao campo — análise de design de 07/10/2026.
+//
+// Quase todo formulário do sistema escreve <label>Nome</label><input>
+// lado a lado, sem `for`: na tela parece ligado, mas o leitor de tela
+// não anuncia o que o campo pede e clicar no rótulo não foca o campo.
+// Em vez de editar centenas de campos (muitos montados por innerHTML),
+// liga aqui cada <label> sem `for` ao campo que vem logo depois dele —
+// inclusive nos formulários desenhados depois da carga, via
+// MutationObserver. Rótulo que já envolve o campo já é ligado; fica.
+// ---------------------------------------------------------------------
+(function () {
+  let seq = 0;
+  function ligarRotulos(raiz) {
+    if (!raiz || !raiz.querySelectorAll) return;
+    raiz.querySelectorAll("label:not([for])").forEach((l) => {
+      if (l.querySelector("input,select,textarea")) return;
+      const alvo = l.nextElementSibling;
+      if (!alvo || !alvo.matches("input,select,textarea")) return;
+      if (!alvo.id) alvo.id = "campo-ds-" + (++seq);
+      l.htmlFor = alvo.id;
+    });
+  }
+  function iniciar() {
+    ligarRotulos(document);
+    new MutationObserver((mudancas) => {
+      for (const m of mudancas) {
+        m.addedNodes.forEach((n) => {
+          if (n.nodeType !== 1) return;
+          ligarRotulos(n.parentNode || n);
+        });
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", iniciar);
+  } else {
+    iniciar();
+  }
+})();
+
+// ---------------------------------------------------------------------
+// Nome pra exibir — análise de design de 07/10/2026.
+//
+// O cadastro padroniza nome em CAIXA ALTA (trigger de 20260831170000,
+// bom pra comparar e deduplicar), e isso vazava pra tela: "Olá, CARLOS",
+// "CARLOS DIRETOR" ao lado de "Ana Souza" no check-in. Só pra mostrar:
+// nome que vier inteiro em maiúsculas vira "Carlos Diretor", com
+// da/de/do/das/dos/e em minúsculas. Nome com caixa mista (digitado por
+// alguém) passa intacto — não sabemos melhor que quem digitou.
+// ---------------------------------------------------------------------
+function nomeExibicao(v) {
+  const s = String(v ?? "").trim();
+  if (!s || s !== s.toUpperCase() || s === s.toLowerCase()) return s;
+  const miudas = new Set(["da", "de", "do", "das", "dos", "e"]);
+  return s.toLowerCase().split(/\s+/).map((p, i) =>
+    i > 0 && miudas.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)
+  ).join(" ");
+}
+window.nomeExibicao = nomeExibicao;
+
+// Altura do cabeçalho pro menu lateral fixo de tela larga começar logo
+// abaixo dele (ver design-system.css, @media min-width:1200px). O
+// cabeçalho fica dentro de #app, escondido até o login — por isso
+// ResizeObserver, e não uma medida só na carga.
+(function () {
+  function medir(topo) {
+    if (topo.offsetHeight) {
+      document.documentElement.style.setProperty("--ds-topo-altura", topo.offsetHeight + "px");
+    }
+  }
+  function iniciar() {
+    const topo = document.querySelector(".topo");
+    if (!topo || !document.querySelector(".menu-nav")) return;
+    medir(topo);
+    if (window.ResizeObserver) new ResizeObserver(() => medir(topo)).observe(topo);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);
+  else iniciar();
+})();

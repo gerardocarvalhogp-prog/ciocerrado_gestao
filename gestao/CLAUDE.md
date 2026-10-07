@@ -124,7 +124,7 @@ Sem repetir o mesmo convidado na mesma mesa em dias diferentes.
 
 Números do schema `gestao`, conferidos no banco hospedado em 25/08/2026:
 **29 tabelas, 6 views, 368 colunas, 143 funções, 37 políticas de RLS,
-8 migrations.** Desatualizado — são **144 migrations** em 07/10/2026, mas os
+8 migrations.** Desatualizado — são **145 migrations** em 07/10/2026, mas os
 outros números (tabelas/views/colunas/funções/políticas) não foram reconferidos
 desde então porque exigem consulta ao catálogo do banco hospedado, que este
 arquivo não tem como fazer sozinho. Antes de confiar nesses quatro números,
@@ -260,6 +260,23 @@ procuravam por ele (cobrança, fatura, planilha do app, `v_etiquetas`,
 escrever teste, cadastrar usuário de patrocinador por
 `admin_salvar_usuario_patro`, não por insert com `patrocinador_id`** — foi
 o que escondeu isso dos testes 14 e 18.
+
+Análise de design de 07/10/2026 (todas as telas, logado, notebook e
+celular, contra o banco local) e consertos no mesmo dia:
+login por senha que só abria o sistema depois de recarregar (as 5 telas);
+transfer do CIO contraditório (o "sai de" do titular nunca lia o valor
+salvo); textos que contradiziam o sistema (cortesia do 1º familiar,
+brinde por quarto); quartos do patrocinador fora de ordem
+(`20261007100000`); campos de senha/data/número sem estilo; formulário em
+2 colunas espremidas no celular; seções do portal e abas do admin
+escondidas no menu mesmo em tela larga (agora menu lateral fixo ≥1200px);
+nomes em CAIXA ALTA na tela (`nomeExibicao()`, só exibição); rótulos não
+ligados aos campos (ligados automaticamente em `design-system.js`). Marca:
+títulos em **Montserrat** (era Archivo) e o wordmark oficial no cabeçalho,
+seguindo `assets/identidade-visual.md`. A base comum de formulário mora
+agora em `assets/design-system.css` — **campo novo não precisa de estilo
+próprio na tela**; o `<style>` de cada tela ainda duplica parte disso e
+pode ir sendo enxugado.
 
 Daqui pra frente a regra é a de sempre: migration de comportamento nova
 entra com teste no mesmo commit. O `23` olha o catálogo inteiro (função

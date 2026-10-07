@@ -99,7 +99,7 @@ table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:1
   transform:translateY(8px) scale(.98);transition:transform .15s ease;
 }
 .ds-backdrop.aberto .ds-modal{transform:translateY(0) scale(1);}
-.ds-modal h2{font-family:'Archivo',sans-serif;font-size:var(--tx-lg);margin:0 0 8px;color:var(--texto);}
+.ds-modal h2{font-family:'Montserrat',sans-serif;font-size:var(--tx-lg);margin:0 0 8px;color:var(--texto);}
 .ds-modal p{font-size:var(--tx-base);color:var(--suave);margin:0 0 20px;line-height:1.5;}
 .ds-modal.tom-perigo h2{color:var(--erro);}
 .ds-modal-acoes{display:flex;justify-content:flex-end;gap:8px;}
@@ -136,3 +136,80 @@ table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:1
 @media (max-width:480px){
   .ds-toasts{left:16px;right:16px;bottom:16px;max-width:none;}
 }
+
+/* =====================================================================
+   Base de formulário e acabamento comuns — análise de design de 07/10/2026.
+   Este arquivo é carregado ANTES do <style> de cada tela: as regras
+   abaixo preenchem o que cada tela esqueceu, sem brigar com o que ela
+   já define. Onde precisam vencer (menu, coluna única no celular), usam
+   seletor mais específico.
+   ===================================================================== */
+
+/* cada tela listava à mão os tipos de campo que estilizava, e todas
+   esqueceram alguns: senha (as 5 telas), data/número/horário (admin) —
+   apareciam como caixa crua do navegador */
+input[type=password],input[type=tel],input[type=number],input[type=time],
+input[type=date],input[type=search]{
+  width:100%;padding:8px 10px;border:1px solid var(--linha);border-radius:var(--raio);
+  font-family:inherit;font-size:14px;background:var(--superficie);color:var(--texto);
+}
+
+/* caixas de seleção na cor da marca e com alvo de toque maior (eram o
+   azul padrão do navegador, 13–16px) */
+input[type=checkbox],input[type=radio]{
+  accent-color:var(--verde);min-width:18px;min-height:18px;cursor:pointer;
+}
+
+/* campo desabilitado com cara de desabilitado — antes era igual a um
+   campo normal, e a pessoa não entendia por que não conseguia digitar */
+input:disabled,select:disabled,textarea:disabled{
+  background:#F1F3EE;color:var(--suave);cursor:not-allowed;
+}
+/* detalhe da alergia só aparece com "tem alergia" marcado */
+div:has(> .f-alergia-detalhe:disabled),
+div:has(> #titular-alergia-detalhe:disabled){display:none;}
+
+/* exemplo de campo bem distinto de valor preenchido */
+::placeholder{color:#9AA7A2;opacity:1;}
+
+/* link sem estilo próprio caía no azul padrão do navegador */
+a{color:var(--verde);}
+
+/* o menu lateral fica escondido fora da tela, mas a sombra dele vazava
+   numa faixa na borda esquerda de todas as telas */
+.menu-nav:not(.aberto){box-shadow:none;}
+
+/* botão destrutivo de contorno — mesmo tamanho dos vizinhos, cor de
+   perigo, pra "Remover"/"Cancelar" não ter o mesmo peso de "Editar" */
+.btn.sec.perigo,.btn.perigo.sec{
+  background:var(--superficie);color:var(--erro);border:1px solid #E4CFCB;
+}
+.btn.sec.perigo:hover,.btn.perigo.sec:hover{background:var(--erro-bg);}
+
+/* celular: formulário em uma coluna. Os blocos tinham largura mínima de
+   130px e cabiam dois lado a lado numa tela de 375px — campos estreitos
+   e texto cortado. !important porque vários blocos têm max-width inline */
+@media (max-width:560px){
+  .linha > div{min-width:100% !important;max-width:none !important;}
+}
+
+/* tela larga: o menu lateral fica sempre visível. Antes, num notebook,
+   as seções do portal (Brindes, Arquivos...) e as 19 abas do admin só
+   apareciam abrindo o menu — o patrocinador nem sabia que existiam.
+   No celular continua gaveta. `body` na frente pra vencer o .menu-nav
+   de cada tela, que é carregado depois deste arquivo. A altura do
+   cabeçalho vem de design-system.js (--ds-topo-altura). */
+@media (min-width:1200px){
+  body .topo{position:sticky;top:0;z-index:57;}
+  body .menu-nav{
+    transform:none;transition:none;box-shadow:none;z-index:50;
+    top:var(--ds-topo-altura,64px);border-right:1px solid var(--linha);
+  }
+  body .menu-nav-cab,body .menu-fundo,body #btn-menu{display:none;}
+  body #app > :not(header):not(nav):not(.menu-fundo){margin-left:290px;}
+}
+
+/* logo oficial no cabeçalho — análise de design de 07/10/2026. O
+   wordmark é branco sobre transparente (assets/identidade-visual.md):
+   funciona no verde do cabeçalho, sumiria em fundo claro. */
+.marca-logo{height:26px;width:auto;display:block;margin-bottom:3px;}

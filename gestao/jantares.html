@@ -11,7 +11,7 @@
 <link rel="manifest" href="assets/icons/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/design-system.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/design-system.js"></script>
@@ -29,7 +29,7 @@ button{font-family:inherit;cursor:pointer;}
 
 .topo{background:var(--verde);color:#fff;padding:13px 20px;
   display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
-.marca{font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;}
+.marca{font-family:'Montserrat',sans-serif;font-weight:700;font-size:15.5px;}
 .marca span{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
   font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
 .topo-dir{display:flex;align-items:center;gap:11px;flex-wrap:wrap;}
@@ -63,7 +63,7 @@ button{font-family:inherit;cursor:pointer;}
 .menu-nav-cab{display:flex;align-items:center;justify-content:space-between;
   padding:14px 16px;border-bottom:1px solid var(--linha);
   position:sticky;top:0;background:var(--superficie);}
-.menu-nav-titulo{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
+.menu-nav-titulo{font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;color:var(--texto);}
 .menu-fechar{background:none;border:none;font-size:22px;line-height:1;color:var(--suave);padding:2px 6px;}
 
 .aba{display:block;width:100%;text-align:left;background:none;border:none;
@@ -73,8 +73,8 @@ button{font-family:inherit;cursor:pointer;}
 .aba[aria-selected="true"]{color:var(--verde);border-left-color:var(--verde);
   font-weight:600;background:#F1F3EE;}
 
-h1{font-family:'Archivo',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing:-.015em;}
-h2{font-family:'Archivo',sans-serif;font-size:16px;margin:0 0 8px;}
+h1{font-family:'Montserrat',sans-serif;font-size:21px;margin:0 0 3px;letter-spacing:-.015em;}
+h2{font-family:'Montserrat',sans-serif;font-size:16px;margin:0 0 8px;}
 .sub{color:var(--suave);font-size:13px;margin:0 0 18px;}
 
 .cartao-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
@@ -82,6 +82,10 @@ h2{font-family:'Archivo',sans-serif;font-size:16px;margin:0 0 8px;}
 .barra > div{min-width:150px;}
 
 label{display:block;font-size:11.5px;color:var(--suave);margin-bottom:3px;}
+.novo-jantar > summary{cursor:pointer;list-style:none;}
+.novo-jantar > summary::-webkit-details-marker{display:none;}
+.novo-jantar > summary h2{display:inline;margin:0;color:var(--verde);}
+.novo-jantar[open] > summary{margin-bottom:12px;}
 input[type=text],input[type=email],input[type=date],input[type=file],select{
   width:100%;padding:7px 9px;border:1px solid var(--linha);border-radius:var(--raio);
   font-family:inherit;font-size:13.5px;background:var(--superficie);color:var(--texto);}
@@ -183,7 +187,7 @@ tr.linha-clique.marcada:hover{background:rgba(56,120,40,.14);}
     <button class="btn-hamb" id="btn-menu" aria-expanded="false" aria-controls="menu-nav" title="Menu">
       <span></span>
     </button>
-    <div class="marca">CIO Cerrado<span>Jantares</span></div>
+    <div class="marca"><img class="marca-logo" src="assets/logo-oficial-wordmark.png" alt="CIO Cerrado"><span>Jantares</span></div>
     <nav class="ir-para" aria-label="Trocar de tela"><a href="admin.html">Painel</a><a href="jantares.html" aria-current="page">Jantares</a><a href="checkin.html">Check-in</a></nav>
     <script>
       // Link de pagina cheia, nao SPA: sem isto, clicar em Painel/Jantares/
@@ -458,19 +462,22 @@ ABAS.agenda = async function(){
       <h1>Agenda de jantares</h1>
       <p class="sub">${l.length} jantar(es) cadastrado(s).</p>
 
-      <div class="cartao">
-        <h2>Novo jantar</h2>
+      <!-- recolhido atras de uma linha clicavel: a agenda e o que se consulta
+           todo dia, e o formulario de 10 campos ficava sempre aberto em cima
+           dela. Abre sozinho quando ainda nao existe jantar nenhum. -->
+      <details class="cartao novo-jantar" ${l.length ? "" : "open"}>
+        <summary><h2>+ Novo jantar</h2></summary>
         <div class="barra">
           <div><label>Patrocinador</label><input type="text" id="j-patro"></div>
           <div><label>Site</label><input type="text" id="j-site"></div>
           <div style="max-width:150px;"><label>Data</label><input type="date" id="j-data"></div>
-          <div style="max-width:100px;"><label>Horário</label><input type="text" id="j-hora" placeholder="20:00"></div>
+          <div style="max-width:100px;"><label>Horário</label><input type="time" id="j-hora"></div>
         </div>
         <div class="barra">
           <div><label>Local</label><input type="text" id="j-local"></div>
           <div style="max-width:130px;"><label>CEP do local</label>
             <input type="text" id="j-cep" placeholder="00000-000"></div>
-          <div style="max-width:110px;"><label>Capacidade</label><input type="text" id="j-cap" placeholder="8"></div>
+          <div style="max-width:110px;"><label>Capacidade</label><input type="text" id="j-cap" placeholder="8" inputmode="numeric"></div>
           <div><label>Perfil de convidado desejado</label>
             <input type="text" id="j-perfil" placeholder="Ex.: indústrias com faturamento acima de 1 Bi"></div>
         </div>
@@ -489,7 +496,7 @@ ABAS.agenda = async function(){
         </div>
         <div id="j-aviso"></div>
         <button class="btn" id="j-salvar">Criar jantar</button>
-      </div>
+      </details>
 
       <div class="cartao">
         <div class="rolagem"><table>
@@ -504,7 +511,7 @@ ABAS.agenda = async function(){
             <td style="white-space:nowrap;">
               <button class="btn sec mini abrir" data-id="${esc(j.id)}">Abrir</button>
               ${(j.status !== "realizado" && j.status !== "cancelado")
-                ? `<button class="btn sec mini cancelar" data-id="${esc(j.id)}"
+                ? `<button class="btn sec perigo mini cancelar" data-id="${esc(j.id)}"
                      data-nome="${esc(j.patrocinador)}">Cancelar</button>` : ""}
             </td>
           </tr>`).join("") || `<tr><td colspan="6" style="color:var(--suave)">Nenhum jantar ainda.</td></tr>`}

@@ -269,6 +269,20 @@ set role authenticated;
 set request.jwt.claims = '{"email":"patro13@teste.invalido","role":"authenticated"}';
 \echo '-- a tela do patrocinador mostra duplo = 2 (nao o teto 4 do CIO) — deve PASSAR'
 select capacidade = 2 as mostra_dois_ok from patro_listar_quartos(:'pat'::uuid) where reserva_id=:'res_pat'::uuid;
+
+reset role;
+reset request.jwt.claims;
+-- mais dois da cota, criados fora de ordem e na mesma transacao (mesmo
+-- created_at — como admin_gerar_quartos_cota cria de verdade), e um extra
+insert into reservas (evento_id,patrocinador_id,rotulo,tipo,origem,status) values
+  (:'ev'::uuid,:'pat'::uuid,'Quarto 10','duplo','cota','rascunho'),
+  (:'ev'::uuid,:'pat'::uuid,'Quarto 2','duplo','cota','rascunho'),
+  (:'ev'::uuid,:'pat'::uuid,'Quarto 3','duplo','extra','rascunho');
+set role authenticated;
+set request.jwt.claims = '{"email":"patro13@teste.invalido","role":"authenticated"}';
+\echo '-- portal lista os da cota pelo numero (1, 2, 10) e o extra no fim (antes saia 2, 1, 3 — 20261007100000) — deve PASSAR'
+select array_agg(rotulo order by ord) = array['Quarto 1','Quarto 2','Quarto 10','Quarto 3'] as quartos_em_ordem_ok
+from (select rotulo, row_number() over () as ord from patro_listar_quartos(:'pat'::uuid)) x;
 savepoint s_cap;
 \echo '-- 3 pessoas num duplo do patrocinador — deve FALHAR'
 select patro_salvar_quarto(:'res_pat'::uuid,
