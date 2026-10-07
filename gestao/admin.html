@@ -585,7 +585,10 @@ async function iniciar(){
   if(iniciado) return;
   iniciado = true;
   const { data:{ user } } = await sb.auth.getUser();
-  if(!user) return;
+  // sem usuario (o evento inicial do Supabase, antes de qualquer login)
+  // devolve a marca: senao o SIGNED_IN do login por senha encontra
+  // iniciado=true, sai sem fazer nada e a tela fica parada no formulario
+  if(!user){ iniciado = false; return; }
 
   $("#tela-login").classList.add("oculto");
   $("#app").classList.remove("oculto");
